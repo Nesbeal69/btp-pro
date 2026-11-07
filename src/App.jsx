@@ -96,6 +96,10 @@ export default function App() {
     });
   };
 
+  const handleDeleteTool = (toolId) => {
+    setEquipment(equipment.filter(t => t.id !== toolId));
+  };
+
   const handleSaveToolEdit = (e) => {
     e.preventDefault();
     if (!editingTool) return;
@@ -232,11 +236,6 @@ export default function App() {
     setShowAddToolModal(false);
     setNewToolData({ id: '', name: '', brand: 'REMS', category: 'Sertissage', status: 'Disponible' });
   };
-
-  const handleDeleteTool = (toolId) => {
-    setEquipment(equipment.filter(t => t.id !== toolId));
-  };
-
   const handleAddNote = (toolId) => {
     if (!newNoteText.trim() || !currentUser) return;
     const noteObj = {
@@ -682,7 +681,7 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === 'tools' && (
+{activeTab === 'tools' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>🔧</span> Parc Outillage & Matériel</h2>
@@ -724,12 +723,21 @@ export default function App() {
                     </button>
 
                     {isAdmin && (
-                      <button
-                        onClick={() => handleOpenEditModal(tool)}
-                        className="px-2.5 py-1.5 bg-amber-600/25 hover:bg-amber-600/40 text-amber-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
-                      >
-                        Modifier
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleOpenEditModal(tool)}
+                          className="px-2.5 py-1.5 bg-amber-600/25 hover:bg-amber-600/40 text-amber-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTool(tool.id)}
+                          className="px-2.5 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs font-semibold rounded-lg transition-colors"
+                          title="Supprimer cette machine"
+                        >
+                          🗑️
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
