@@ -144,7 +144,6 @@ export default function App() {
   const [showAddToolModal, setShowAddToolModal] = useState(false);
   const [newToolData, setNewToolData] = useState({ id: '', name: '', brand: 'REMS', category: 'Sertissage', status: 'Disponible' });
 
-  // États pour le partage de planning
   const [showAddPlanModal, setShowAddPlanModal] = useState(false);
   const [newPlanTitle, setNewPlanTitle] = useState('');
   const [newPlanTarget, setNewPlanTarget] = useState('all');
@@ -253,7 +252,7 @@ export default function App() {
     setNewNoteText('');
   };
 
-const handleValidateRequest = (reqId) => {
+  const handleValidateRequest = (reqId) => {
     setRequests(requests.filter(r => r.id !== reqId));
   };
 
@@ -291,7 +290,6 @@ const handleValidateRequest = (reqId) => {
   const pendingUsers = useMemo(() => users.filter(u => u.status === 'pending'), [users]);
   const approvedUsers = useMemo(() => users.filter(u => u.status === 'approved'), [users]);
   
-  // Filtrer les plannings visibles pour l'utilisateur connecté
   const visiblePlans = useMemo(() => {
     if (!currentUser) return [];
     if (currentUser.role === 'admin') return plans;
@@ -395,7 +393,6 @@ const handleValidateRequest = (reqId) => {
         </div>
       </header>
 
-      {/* Barre de navigation secondaire */}
       <div className="bg-slate-900/60 border-b border-slate-800 px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {activeTab !== 'dashboard' && (
@@ -414,7 +411,6 @@ const handleValidateRequest = (reqId) => {
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
         
-        {/* ================= TABLEAU DE BORD AVEC CARTES EN RELIEF ================= */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-blue-900/40 via-slate-900 to-slate-900 border border-blue-500/20 rounded-2xl p-6 shadow-xl">
@@ -428,7 +424,6 @@ const handleValidateRequest = (reqId) => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               
-              {/* CARTE : PLANNINGS (NOUVEAU) */}
               <div 
                 onClick={() => setActiveTab('planning')}
                 className="group bg-slate-900 border border-slate-800 hover:border-cyan-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-cyan-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
@@ -447,7 +442,6 @@ const handleValidateRequest = (reqId) => {
                 </div>
               </div>
 
-              {/* CARTE : DEMANDES */}
               <div 
                 onClick={() => setActiveTab('requests')}
                 className="group bg-slate-900 border border-slate-800 hover:border-amber-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-amber-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
@@ -466,7 +460,6 @@ const handleValidateRequest = (reqId) => {
                 </div>
               </div>
 
-              {/* CARTE : EFFECTIFS */}
               <div 
                 onClick={() => setActiveTab('workers')}
                 className="group bg-slate-900 border border-slate-800 hover:border-emerald-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-emerald-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
@@ -485,7 +478,6 @@ const handleValidateRequest = (reqId) => {
                 </div>
               </div>
 
-              {/* CARTE : CHANTIERS */}
               <div 
                 onClick={() => setActiveTab('sites')}
                 className="group bg-slate-900 border border-slate-800 hover:border-blue-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-blue-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
@@ -504,7 +496,6 @@ const handleValidateRequest = (reqId) => {
                 </div>
               </div>
 
-              {/* CARTE : OUTILLAGE */}
               <div 
                 onClick={() => setActiveTab('tools')}
                 className="group bg-slate-900 border border-slate-800 hover:border-indigo-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-indigo-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
@@ -523,7 +514,6 @@ const handleValidateRequest = (reqId) => {
                 </div>
               </div>
 
-              {/* CARTE : COMPTES (ADMIN) */}
               {isAdmin && (
                 <div 
                   onClick={() => setActiveTab('accounts')}
@@ -548,7 +538,6 @@ const handleValidateRequest = (reqId) => {
           </div>
         )}
 
-        {/* ================= ONGLET : PLANNINGS & PDF ================= */}
         {activeTab === 'planning' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -578,13 +567,13 @@ const handleValidateRequest = (reqId) => {
                   <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
                     <button 
                       onClick={() => {
-  const link = document.createElement('a');
-  link.href = plan.fileUrl; // Remplace par la variable qui contient l'URL ou le lien du fichier PDF
-  link.download = plan.fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}}
+                        const link = document.createElement('a');
+                        link.href = plan.fileUrl;
+                        link.download = plan.fileName;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }}
                       className="flex-1 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold rounded-lg transition-colors text-center"
                     >
                       📄 Télécharger PDF
@@ -608,7 +597,6 @@ const handleValidateRequest = (reqId) => {
           </div>
         )}
 
-        {/* ================= ONGLET : DEMANDES ================= */}
         {activeTab === 'requests' && (
           <div className="space-y-4">
             <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>📋</span> Demandes de Matériel</h2>
@@ -620,10 +608,15 @@ const handleValidateRequest = (reqId) => {
                     <span className="text-amber-400 font-bold px-2 py-0.5 bg-amber-500/10 rounded">{req.status}</span>
                   </div>
                   <div className="text-sm font-bold text-white">{req.requester}</div>
-                  <div className="p-2.5 bg-slate-950 rounded-lg text-xs font-mono text-slate-200 border border-slate-800">{req.items}</div>
+                  <div className="p-2.5 bg-slate-950 rounded-lg text-xs font-mono text-slate-200 border border-slate-800">
+                    {req.items}
+                  </div>
                   {isAdmin && (
-                    <button onClick={() => handleValidateRequest(req.id)} className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 transition-colors text-white font-semibold text-xs rounded-xl shadow">
-                      Valider la demande
+                    <button 
+                      onClick={() => handleValidateRequest(req.id)}
+                      className="w-full py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold rounded-lg transition-colors"
+                    >
+                      ✓ Valider et archiver
                     </button>
                   )}
                 </div>
@@ -635,76 +628,71 @@ const handleValidateRequest = (reqId) => {
           </div>
         )}
 
-        {/* ================= ONGLET : EFFECTIFS ================= */}
         {activeTab === 'workers' && (
           <div className="space-y-4">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>👷‍♂️</span> Équipe & Collaborateurs</h2>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>👷‍♂️</span> Effectifs Actifs</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {approvedUsers.map(u => (
-                <div key={u.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-1 shadow-md">
+                <div key={u.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 shadow-md">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-emerald-400 font-bold px-2 py-0.5 bg-emerald-500/10 rounded">{u.role.toUpperCase()}</span>
+                    <span className="text-slate-400">Depuis {u.joinedAt}</span>
+                  </div>
                   <div className="text-sm font-bold text-white">{u.name}</div>
-                  <div className="text-xs text-blue-400 font-medium">{u.team}</div>
-                  <div className="text-[11px] text-slate-400 uppercase tracking-wider">Rôle : {u.role}</div>
+                  <div className="text-xs text-slate-400">{u.team} • <span className="font-mono text-slate-300">{u.email}</span></div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* ================= ONGLET : CHANTIERS ================= */}
         {activeTab === 'sites' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>🏗️</span> Chantiers en cours</h2>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>🏗️</span> Chantiers en Cours</h2>
               {isAdmin && (
-                <button onClick={() => setShowAddSiteModal(true)} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 transition-colors text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow">
+                <button onClick={() => setShowAddSiteModal(true)} className="px-3 py-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow">
                   <Plus className="w-4 h-4" /> Nouveau Chantier
                 </button>
               )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sites.map(st => (
-                <div key={st.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 shadow-md flex flex-col justify-between">
-                  <div className="space-y-1">
-                    <div className="text-sm font-bold text-white">{st.name}</div>
-                    <div className="text-xs text-slate-400 flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-blue-400" /> {st.address}</div>
-                    <div className="text-xs text-slate-500 pt-2 border-t border-slate-800">Client : <span className="text-slate-300 font-semibold">{st.client}</span></div>
-                  </div>
-                  {isAdmin && (
-                    <div className="pt-2 border-t border-slate-800/80 flex justify-end">
-                      <button 
-                        onClick={() => handleDeleteSite(st.id)} 
-                        className="px-2.5 py-1 bg-red-600/25 hover:bg-red-600/40 text-red-200 text-[11px] font-semibold rounded-lg transition-colors flex items-center gap-1"
-                      >
-                        🗑️ Supprimer le chantier
-                      </button>
+              {sites.map(s => (
+                <div key={s.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3 shadow-md flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-blue-400 font-bold px-2 py-0.5 bg-blue-500/10 rounded">{s.client}</span>
+                      <span className="text-emerald-400 text-[11px] font-semibold">{s.status}</span>
                     </div>
-                  )}
+                    <div className="text-sm font-bold text-white">{s.name}</div>
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                      <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span>{s.address}</span>
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
+                    <span className="text-slate-400">Chef : <strong className="text-slate-200">{s.manager}</strong></span>
+                    {isAdmin && (
+                      <button onClick={() => handleDeleteSite(s.id)} className="text-red-400 hover:text-red-300 text-xs">Supprimer</button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* ================= ONGLET : OUTILLAGE ================= */}
         {activeTab === 'tools' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>🔧</span> Parc Outillage & Machines</h2>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>🔧</span> Parc Outillage & Matériel</h2>
               {isAdmin && (
-                <button onClick={() => setShowAddToolModal(true)} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 transition-colors text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow">
-                  <Plus className="w-4 h-4" /> Ajouter un outil
+                <button onClick={() => setShowAddToolModal(true)} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 transition-colors text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow">
+                  <Plus className="w-4 h-4" /> Ajouter une machine
                 </button>
               )}
-              <div className="text-xs text-slate-400">
-  Statut : <span className={`font-medium ${tool.status === 'Disponible' ? 'text-emerald-400' : 'text-amber-400'}`}>
-    {tool.status || 'Disponible'}
-  </span>
-  {tool.assignedTo && (
-    <span className="text-slate-500"> • Assigné à : <strong className="text-slate-300">{tool.assignedTo}</strong></span>
-  )}
-</div>
             </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {equipment.map(tool => (
                 <div key={tool.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 shadow-md flex flex-col justify-between">
@@ -714,25 +702,33 @@ const handleValidateRequest = (reqId) => {
                       <span className="text-slate-400">{tool.brand}</span>
                     </div>
                     <div className="text-sm font-bold text-white">{tool.name}</div>
-                    <div className="text-xs text-slate-400">Statut : <span className="text-emerald-400 font-medium">{tool.status}</span></div>
+                    <div className="text-xs text-slate-400">
+                      Statut : <span className="text-emerald-400 font-medium">{tool.status}</span>
+                    </div>
                   </div>
+
+                  <div className="text-xs text-slate-400 space-y-1 my-1">
+                    {tool.assignedTo && (
+                      <div className="text-slate-500">
+                        Assigné à : <strong className="text-slate-300">{tool.assignedTo}</strong>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="pt-2 border-t border-slate-800 flex items-center gap-2">
-                    <button onClick={() => setSelectedTool(tool)} className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 transition-colors text-xs text-slate-200 font-medium rounded-lg">
+                    <button 
+                      onClick={() => setSelectedTool(tool)} 
+                      className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 transition-colors text-xs text-slate-200 rounded-lg"
+                    >
                       Carnet ({tool.notes?.length || 0})
                     </button>
-                    {isAdmin && (
-  <button
-    onClick={() => setEditingTool(tool)}
-    className="px-2.5 py-1.5 bg-amber-600/25 hover:bg-amber-600/40 text-amber-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
-  >
-    ✏️ Modifier
-  </button>
-)}
-
 
                     {isAdmin && (
-                      <button onClick={() => handleDeleteTool(tool.id)} className="px-2.5 py-1.5 bg-red-600/25 hover:bg-red-600/40 text-red-200 text-xs rounded-lg transition-colors" title="Supprimer l'outil">
-                        🗑️
+                      <button
+                        onClick={() => handleOpenEditModal(tool)}
+                        className="px-2.5 py-1.5 bg-amber-600/25 hover:bg-amber-600/40 text-amber-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                      >
+                        Modifier
                       </button>
                     )}
                   </div>
@@ -742,20 +738,23 @@ const handleValidateRequest = (reqId) => {
           </div>
         )}
 
-        {/* ================= ONGLET : COMPTES (ADMIN) ================= */}
-        {activeTab === 'accounts' && isAdmin && (
+        {isAdmin && activeTab === 'accounts' && (
           <div className="space-y-4">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>🛡️</span> Inscriptions en attente ({pendingUsers.length})</h2>
-            <div className="space-y-3">
-              {pendingUsers.map(pUser => (
-                <div key={pUser.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center shadow-md">
-                  <div>
-                    <div className="text-sm font-bold text-white">{pUser.name} <span className="text-xs text-purple-400 font-normal">({pUser.role})</span></div>
-                    <div className="text-xs text-slate-400">{pUser.email}</div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>🛡️</span> Validation des Comptes en Attente</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {pendingUsers.map(u => (
+                <div key={u.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3 shadow-md">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-amber-400 font-bold px-2 py-0.5 bg-amber-500/10 rounded">EN ATTENTE</span>
+                    <span className="text-slate-400">{u.joinedAt}</span>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => handleApproveAccount(pUser.id)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 transition-colors text-white text-xs font-semibold rounded-lg shadow">Valider</button>
-                    <button onClick={() => handleRejectAccount(pUser.id)} className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 transition-colors text-red-200 text-xs font-semibold rounded-lg">Refuser</button>
+                  <div>
+                    <div className="text-sm font-bold text-white">{u.name}</div>
+                    <div className="text-xs text-slate-400">{u.email} • <span className="font-mono text-slate-300">{u.role}</span></div>
+                  </div>
+                  <div className="flex gap-2 pt-2 border-t border-slate-800">
+                    <button onClick={() => handleApproveAccount(u.id)} className="flex-1 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold rounded-lg">Approuver</button>
+                    <button onClick={() => handleRejectAccount(u.id)} className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs font-semibold rounded-lg">Refuser</button>
                   </div>
                 </div>
               ))}
@@ -765,269 +764,200 @@ const handleValidateRequest = (reqId) => {
             </div>
           </div>
         )}
+
       </main>
 
-      {/* MODAL PARTAGE DE PLANNING PDF (ADMIN) */}
-      {showAddPlanModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2"><span>📅</span> Partager un planning PDF</h3>
-            <form onSubmit={handleUploadPlan} className="space-y-3 text-xs">
+      {/* MODALE : CARNET D'ENTRETIEN OUTIL */}
+      {selectedTool && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-5 space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Titre / Description du planning</label>
-                <input type="text" required placeholder="Ex: Planning Chauffage - Semaine 48" value={newPlanTitle} onChange={e => setNewPlanTitle(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white" />
+                <span className="text-xs text-indigo-400 font-mono font-bold">{selectedTool.id}</span>
+                <h3 className="text-base font-bold text-white">{selectedTool.name}</h3>
+              </div>
+              <button onClick={() => setSelectedTool(null)} className="p-1 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Historique & Notes</h4>
+              {selectedTool.notes && selectedTool.notes.length > 0 ? (
+                selectedTool.notes.map(note => (
+                  <div key={note.id} className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
+                    <div className="flex justify-between text-[11px] text-slate-400">
+                      <span className="font-semibold text-indigo-300">{note.author}</span>
+                      <span>{note.date}</span>
+                    </div>
+                    <p className="text-xs text-slate-200">{note.text}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-slate-500 italic">Aucune note enregistrée sur ce carnet.</p>
+              )}
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-slate-800">
+              <label className="block text-xs text-slate-400">Ajouter une note de suivi</label>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={newNoteText} 
+                  onChange={e => setNewNoteText(e.target.value)} 
+                  placeholder="Ex: Révision flexible, changement de mors..." 
+                  className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                />
+                <button onClick={() => handleAddNote(selectedTool.id)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl">Ajouter</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODALE : MODIFICATION RAPIDE OUTIL */}
+      {editingTool && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleSaveToolEdit} className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white">Modifier l'outillage : {editingTool.id}</h3>
+              <button type="button" onClick={() => setEditingTool(null)} className="p-1 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Assigné à (Chantier ou Personne)</label>
+                <input 
+                  type="text" 
+                  value={editToolForm.assignedTo} 
+                  onChange={e => setEditToolForm({ ...editToolForm, assignedTo: e.target.value })} 
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                />
               </div>
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Destinataire (Utilisateur ou Équipe)</label>
-                <select value={newPlanTarget} onChange={e => setNewPlanTarget(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white">
-                  <option value="all">📢 Toute l'équipe (Général)</option>
+                <label className="block text-xs text-slate-400 mb-1">Statut</label>
+                <select 
+                  value={editToolForm.status} 
+                  onChange={e => setEditToolForm({ ...editToolForm, status: e.target.value })} 
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                >
+                  <option value="Disponible">Disponible</option>
+                  <option value="Sur chantier">Sur chantier</option>
+                  <option value="En révision">En révision</option>
+                  <option value="Hors service">Hors service</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <button type="button" onClick={() => setEditingTool(null)} className="px-3 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs rounded-xl">Enregistrer</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODALE : AJOUTER UN CHANTIER */}
+      {showAddSiteModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleCreateSite} className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white">Nouveau Chantier</h3>
+              <button type="button" onClick={() => setShowAddSiteModal(false)} className="p-1 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Nom du chantier</label>
+                <input type="text" required value={newSiteData.name} onChange={e => setNewSiteData({ ...newSiteData, name: e.target.value })} placeholder="Ex: Résidence Les Jardins" className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Client / Maître d'ouvrage</label>
+                <input type="text" value={newSiteData.client} onChange={e => setNewSiteData({ ...newSiteData, client: e.target.value })} placeholder="Ex: Nexity, GCC..." className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Adresse</label>
+                <input type="text" value={newSiteData.address} onChange={e => setNewSiteData({ ...newSiteData, address: e.target.value })} placeholder="Adresse complète" className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Chef de chantier / Responsable</label>
+                <input type="text" value={newSiteData.manager} onChange={e => setNewSiteData({ ...newSiteData, manager: e.target.value })} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <button type="button" onClick={() => setShowAddSiteModal(false)} className="px-3 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl">Créer</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODALE : AJOUTER UN OUTIL */}
+      {showAddToolModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleCreateTool} className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white">Ajouter une machine</h3>
+              <button type="button" onClick={() => setShowAddToolModal(false)} className="p-1 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">ID / Référence (ex: OUT-103)</label>
+                <input type="text" required value={newToolData.id} onChange={e => setNewToolData({ ...newToolData, id: e.target.value })} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Nom de la machine</label>
+                <input type="text" required value={newToolData.name} onChange={e => setNewToolData({ ...newToolData, name: e.target.value })} placeholder="Ex: Coupe-tube sans fil" className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Marque</label>
+                <input type="text" value={newToolData.brand} onChange={e => setNewToolData({ ...newToolData, brand: e.target.value })} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Catégorie</label>
+                <input type="text" value={newToolData.category} onChange={e => setNewToolData({ ...newToolData, category: e.target.value })} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <button type="button" onClick={() => setShowAddToolModal(false)} className="px-3 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl">Ajouter</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODALE : PARTAGER UN PLANNING */}
+      {showAddPlanModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleUploadPlan} className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white">Partager un planning PDF</h3>
+              <button type="button" onClick={() => setShowAddPlanModal(false)} className="p-1 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Titre du planning</label>
+                <input type="text" required value={newPlanTitle} onChange={e => setNewPlanTitle(e.target.value)} placeholder="Ex: Planning S47 - Réseau Chauffage" className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Destinataire</label>
+                <select value={newPlanTarget} onChange={e => setNewPlanTarget(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
+                  <option value="all">Toute l'équipe</option>
                   {approvedUsers.map(u => (
-                    <option key={u.id} value={u.id}>👤 {u.name} ({u.role})</option>
+                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Fichier PDF</label>
-                <input type="file" accept=".pdf" onChange={e => setNewPlanFile(e.target.files[0])} className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer" />
+                <input type="file" accept=".pdf" onChange={e => setNewPlanFile(e.target.files[0])} className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500" />
               </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setShowAddPlanModal(false)} className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium">Annuler</button>
-                <button type="submit" className="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-semibold shadow">Partager le planning</button>
-              </div>
-            </form>
-          </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <button type="button" onClick={() => setShowAddPlanModal(false)} className="px-3 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs rounded-xl">Partager</button>
+            </div>
+          </form>
         </div>
       )}
 
-      {/* MODAL MODIFIER OUTIL */}
-{editingTool && (
-  <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
-      <h3 className="text-sm font-bold text-white flex items-center justify-between">
-        <span>✏️ Modifier l'outil : {editingTool.name}</span>
-        <button onClick={() => setEditingTool(null)} className="text-slate-400 hover:text-white">✕</button>
-      </h3>
-      <form onSubmit={handleSaveToolEdit} className="space-y-3 text-xs">
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Nom de l'outil / Machine</label>
-          <input
-            type="text"
-            required
-            value={editingTool.name}
-            onChange={(e) => setEditingTool({ ...editingTool, name: e.target.value })}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Marque</label>
-          <input
-            type="text"
-            value={editingTool.brand || ''}
-            onChange={(e) => setEditingTool({ ...editingTool, brand: e.target.value })}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Statut</label>
-          <select
-            value={editingTool.status || 'Disponible'}
-            onChange={(e) => setEditingTool({ ...editingTool, status: e.target.value })}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-          >
-            <option value="Disponible">Disponible</option>
-            <option value="En service"> Affecté (Affecté)</option>
-            <option value="En maintenance">En maintenance</option>
-            <option value="Hors service">Hors service</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Assigné à (Chantier / Personne)</label>
-          <input
-            type="text"
-            placeholder="Ex: Dépôt Central ou Nom du gars"
-            value={editingTool.assignedTo || ''}
-            onChange={(e) => setEditingTool({ ...editingTool, assignedTo: e.target.value })}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-          />
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={() => setEditingTool(null)}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium"
-          >
-            Annuler
-          </button>
-          <button
-            type="submit"
-            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium"
-          >
-            Enregistrer les modifications
-          </button>
-        </div>
-      </form>
     </div>
-  </div>
-)}
-
-      {/* MODAL CARNET D'ENTRETIEN OUTIL */}
-      {selectedTool && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center">
-              <div>
-                <span className="text-[10px] text-indigo-400 font-mono font-bold">{selectedTool.id}</span>
-                <h3 className="text-sm font-bold text-white">{selectedTool.name}</h3>
-              </div>
-              <button onClick={() => setSelectedTool(null)} className="text-slate-400 hover:text-white p-1"><X className="w-4 h-4" /></button>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="block text-xs text-slate-400 font-medium">Ajouter une note de révision ou d'intervention</label>
-              <input type="text" placeholder="Ex: Changement de joint effectué..." value={newNoteText} onChange={e => setNewNoteText(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
-              <button onClick={() => handleAddNote(selectedTool.id)} className="w-full py-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white text-xs font-semibold rounded-xl shadow">Enregistrer la note</button>
-            </div>
-
-            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-              <div className="text-xs font-bold text-slate-300 pt-2 border-t border-slate-800">Historique des notes :</div>
-              {selectedTool.notes?.map(n => (
-                <div key={n.id} className="p-2.5 bg-slate-950 border border-slate-800/60 rounded-xl text-[11px] text-slate-300 space-y-1">
-                  <div className="flex justify-between text-[10px] text-slate-400 font-medium">
-                    <span className="text-blue-400 font-bold">{n.author}</span>
-                    <span>{n.date}</span>
-                  </div>
-                  <div>{n.text}</div>
-                </div>
-              ))}
-              {(!selectedTool.notes || selectedTool.notes.length === 0) && (
-                <p className="text-[11px] text-slate-500 italic">Aucune note enregistrée pour cet outil.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL NOUVEAU CHANTIER */}
-      {showAddSiteModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2"><span>🏗️</span> Créer un nouveau chantier</h3>
-            <form onSubmit={handleCreateSite} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Nom du chantier</label>
-                <input type="text" required placeholder="Ex: Résidence Les Jardins" value={newSiteData.name} onChange={e => setNewSiteData({...newSiteData, name: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Client</label>
-                <input type="text" placeholder="Ex: Nexity / Mairie" value={newSiteData.client} onChange={e => setNewSiteData({...newSiteData, client: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Adresse</label>
-                <input type="text" placeholder="Ex: 12 rue de la République" value={newSiteData.address} onChange={e => setNewSiteData({...newSiteData, address: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white" />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setShowAddSiteModal(false)} className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium">Annuler</button>
-                <button type="submit" className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-semibold shadow">Créer le chantier</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {editingTool && (
-  <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
-      <h3 className="text-sm font-bold text-white flex items-center justify-between">
-        <span>✏️ Modifier l'outil : {editingTool.name}</span>
-        <button onClick={() => setEditingTool(null)} className="text-slate-400 hover:text-white">✕</button>
-      </h3>
-      <form onSubmit={handleSaveToolEdit} className="space-y-3 text-xs">
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Nom de l'outil / Machine</label>
-          <input
-            type="text"
-            required
-            value={editingTool.name}
-            onChange={(e) => setEditingTool({ ...editingTool, name: e.target.value })}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Marque</label>
-          <input
-            type="text"
-            value={editingTool.brand || ''}
-            onChange={(e) => setEditingTool({ ...editingTool, brand: e.target.value })}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Statut</label>
-          <select
-            value={editingTool.status || 'Disponible'}
-            onChange={(e) => setEditingTool({ ...editingTool, status: e.target.value })}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-          >
-            <option value="Disponible">Disponible</option>
-            <option value="En service">En service</option>
-            <option value="En maintenance">En maintenance</option>
-            <option value="Hors service">Hors service</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Assigné à</label>
-          <input
-            type="text"
-            value={editingTool.assignedTo || ''}
-            onChange={(e) => setEditingTool({ ...editingTool, assignedTo: e.target.value })}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-          />
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={() => setEditingTool(null)}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium"
-          >
-            Annuler
-          </button>
-          <button
-            type="submit"
-            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium"
-          >
-            Enregistrer les modifications
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-)}
-
-      {/* MODAL NOUVEL OUTIL */}
-      {showAddToolModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2"><span>🔧</span> Ajouter un nouvel outil</h3>
-            <form onSubmit={handleCreateTool} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Réf / ID (ex: OUT-103)</label>
-                <input type="text" required placeholder="OUT-103" value={newToolData.id} onChange={e => setNewToolData({...newToolData, id: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Nom de l'outil / Machine</label>
-                <input type="text" required placeholder="Ex: Coupe-tube électromécanique" value={newToolData.name} onChange={e => setNewToolData({...newToolData, name: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Marque</label>
-                <input type="text" placeholder="Ex: REMS / Rothenberger" value={newToolData.brand} onChange={e => setNewToolData({...newToolData, brand: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white" />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setShowAddToolModal(false)} className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium">Annuler</button>
-                <button type="submit" className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-semibold shadow">Ajouter au parc</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>  );
+  );
 }
