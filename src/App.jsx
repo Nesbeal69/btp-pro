@@ -835,7 +835,7 @@ const handleValidateRequest = (reqId) => {
             className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
           >
             <option value="Disponible">Disponible</option>
-            <option value="En service">En service (Affecté)</option>
+            <option value="En service"> Affecté (Affecté)</option>
             <option value="En maintenance">En maintenance</option>
             <option value="Hors service">Hors service</option>
           </select>
