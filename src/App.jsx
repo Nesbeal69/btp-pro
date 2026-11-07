@@ -34,6 +34,7 @@ export default function App() {
   const [authMode, setAuthMode] = useState('login');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [toolSearch, setToolSearch] = useState('');
+  const [toolStatusFilter, setToolStatusFilter] = useState('all');
 
   const [editingTool, setEditingTool] = useState(null);
   const [editToolForm, setEditToolForm] = useState({ assignedTo: '', status: '' });
@@ -63,7 +64,14 @@ export default function App() {
   const [newSiteData, setNewSiteData] = useState({ name: '', client: '', address: '', manager: 'Marc Vasseur' });
   
   const [showAddToolModal, setShowAddToolModal] = useState(false);
-  const [newToolData, setNewToolData] = useState({ id: '', name: '', brand: 'REMS', category: 'Sertissage', status: 'Disponible' });
+  const [newToolData, setNewToolData] = useState({ 
+    id: '', 
+    name: '', 
+    brand: 'REMS', 
+    category: 'Sertissage', 
+    status: 'Disponible',
+    assignedTo: 'Dépôt Central' 
+  });
 
   const [showAddPlanModal, setShowAddPlanModal] = useState(false);
   const [planningViewMode, setPlanningViewMode] = useState('week');
@@ -132,7 +140,17 @@ export default function App() {
     });
 
     const unsubEquipment = onSnapshot(collection(db, "equipment"), (snapshot) => {
-      setEquipment(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
+      const eqList = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
+      if (eqList.length === 0) {
+        const defaultTools = [
+          { id: 'REM-01', name: 'Sertisseuse radiale REMS Power-Press', brand: 'REMS', category: 'Sertissage', status: 'Disponible', assignedTo: 'Dépôt Central', notes: [] },
+          { id: 'REM-02', name: 'Carotteuse diamant REMS Picus S1', brand: 'REMS', category: 'Carottage', status: 'En service', assignedTo: 'Chantier Air Bel', notes: [] },
+          { id: 'VIR-03', name: 'Cintreuse hydraulique Virax', brand: 'Virax', category: 'Cintrage', status: 'Disponible', assignedTo: 'Dépôt Central', notes: [] }
+        ];
+        defaultTools.forEach(t => addDoc(collection(db, "equipment"), t));
+      } else {
+        setEquipment(eqList);
+      }
     });
 
     const unsubSites = onSnapshot(collection(db, "sites"), (snapshot) => {
@@ -168,14 +186,16 @@ export default function App() {
   const filteredEquipment = useMemo(() => {
     return equipment.filter(tool => {
       const query = toolSearch.toLowerCase().trim();
-      return (
+      const matchesSearch = (
         tool.name?.toLowerCase().includes(query) ||
         tool.id?.toLowerCase().includes(query) ||
         tool.brand?.toLowerCase().includes(query) ||
         (tool.assignedTo && tool.assignedTo.toLowerCase().includes(query))
       );
+      const matchesStatus = toolStatusFilter === 'all' || tool.status === toolStatusFilter;
+      return matchesSearch && matchesStatus;
     });
-  }, [equipment, toolSearch]);
+  }, [equipment, toolSearch, toolStatusFilter]);
 
   const handleCreateSite = async (e) => {
     e.preventDefault();
@@ -210,11 +230,10 @@ export default function App() {
     try {
       await addDoc(collection(db, "equipment"), {
         ...newToolData,
-        assignedTo: 'Dépôt Central',
         notes: []
       });
       setShowAddToolModal(false);
-      setNewToolData({ id: '', name: '', brand: 'REMS', category: 'Sertissage', status: 'Disponible' });
+      setNewToolData({ id: '', name: '', brand: 'REMS', category: 'Sertissage', status: 'Disponible', assignedTo: 'Dépôt Central' });
     } catch (error) {
       console.error(error);
     }
@@ -230,7 +249,7 @@ export default function App() {
 
   const handleOpenEditModal = (tool) => {
     setEditingTool(tool);
-    setEditToolForm({ assignedTo: tool.assignedTo || '', status: tool.status || 'Disponible' });
+    setEditToolForm({ assignedTo: tool.assignedTo || 'Dépôt Central', status: tool.status || 'Disponible' });
   };
 
   const handleSaveToolEdit = async (e) => {
@@ -1103,38 +1122,90 @@ export default function App() {
           </div>
         )}
 
+        {/* --- MODULE PARC OUTILLAGE --- */}
         {activeTab === 'tools' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900">Parc Outillage</h2>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <input type="text" value={toolSearch} onChange={e => setToolSearch(e.target.value)} placeholder="Rechercher..." className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" />
-                {isAdmin && (<button onClick={() => setShowAddToolModal(true)} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow-sm"><Plus className="w-4 h-4" /> Machine</button>)}
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Wrench className="w-5 h-5 text-indigo-600" /> Parc Outillage & Matériel
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">Suivi des sertisseuses, carotteuses et de leur affectation sur chantier</p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <select 
+                  value={toolStatusFilter} 
+                  onChange={e => setToolStatusFilter(e.target.value)}
+                  className="px-3 py-2 bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-xl focus:outline-none"
+                >
+                  <option value="all">🔍 Tous les statuts</option>
+                  <option value="Disponible">🟢 Disponible</option>
+                  <option value="En service">⚡ En service</option>
+                  <option value="En révision">🛠️ En révision</option>
+                </select>
+
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input 
+                    type="text" 
+                    value={toolSearch} 
+                    onChange={e => setToolSearch(e.target.value)} 
+                    placeholder="Rechercher machine..." 
+                    className="pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 w-full sm:w-44 focus:outline-none" 
+                  />
+                </div>
+
+                {isAdmin && (
+                  <button onClick={() => setShowAddToolModal(true)} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow-sm">
+                    <Plus className="w-4 h-4" /> Machine
+                  </button>
+                )}
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredEquipment.map(tool => (
-                <div key={tool.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl space-y-2 flex flex-col justify-between shadow-sm">
+                <div key={tool.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl space-y-3 shadow-sm flex flex-col justify-between">
                   <div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-indigo-600 font-mono font-bold">{tool.id}</span>
-                      <span className="text-slate-500">{tool.brand}</span>
+                    <div className="flex justify-between items-center text-xs mb-1">
+                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 font-mono font-bold rounded border border-indigo-200">{tool.id}</span>
+                      <span className="text-slate-500 font-medium">{tool.brand || 'REMS'}</span>
                     </div>
-                    <div className="text-sm font-bold text-slate-900 mt-1">{tool.name}</div>
-                    <div className="text-xs text-slate-500 mt-1">Statut : <span className="text-emerald-600 font-medium">{tool.status}</span></div>
-                    {tool.assignedTo && <div className="text-xs text-slate-400 mt-1">Assigné : <strong>{tool.assignedTo}</strong></div>}
+
+                    <h3 className="text-sm font-bold text-slate-900 mt-2">{tool.name}</h3>
+
+                    <div className="mt-3 space-y-1.5 text-xs">
+                      <div className="flex justify-between bg-slate-50 p-2 rounded-lg border border-slate-100">
+                        <span className="text-slate-500">Statut :</span>
+                        <span className="font-semibold text-emerald-600">{tool.status || 'Disponible'}</span>
+                      </div>
+                      <div className="flex justify-between bg-slate-50 p-2 rounded-lg border border-slate-100">
+                        <span className="text-slate-500">Affecté à :</span>
+                        <span className="font-semibold text-slate-800">{tool.assignedTo || 'Dépôt Central'}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
-                    <button onClick={() => setSelectedTool(tool)} className="flex-1 py-1 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-lg font-medium border border-slate-200">Notes</button>
+
+                  <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
+                    <button onClick={() => setSelectedTool(tool)} className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-lg font-medium border border-slate-200">
+                      💬 Notes ({tool.notes ? tool.notes.length : 0})
+                    </button>
                     {isAdmin && (
                       <>
-                        <button onClick={() => handleOpenEditModal(tool)} className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs rounded-lg border border-amber-200 font-medium">Modifier</button>
-                        <button onClick={() => handleDeleteTool(tool.firestoreId)} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded-lg border border-red-200 font-medium">🗑️</button>
+                        <button onClick={() => handleOpenEditModal(tool)} className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs rounded-lg border border-amber-200 font-medium">Modifier</button>
+                        <button onClick={() => handleDeleteTool(tool.firestoreId)} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded-lg border border-red-200 font-medium">🗑️</button>
                       </>
                     )}
                   </div>
                 </div>
               ))}
+
+              {filteredEquipment.length === 0 && (
+                <div className="col-span-full py-12 text-center bg-white border border-slate-200 rounded-2xl text-slate-500 text-xs italic shadow-sm">
+                  Aucune machine trouvée. Ajoute un nouvel outil ou modifie tes filtres de recherche.
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1162,6 +1233,89 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* --- MODALE NOTES / HISTORIQUE OUTIL --- */}
+      {selectedTool && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white border border-slate-200 p-6 rounded-2xl w-full max-w-lg space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{selectedTool.id}</span>
+                <h3 className="text-base font-bold text-slate-900 mt-1">{selectedTool.name}</h3>
+              </div>
+              <button onClick={() => setSelectedTool(null)} className="p-1 text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-medium text-slate-600">Ajouter une note de suivi (panne, révision, entretien...)</label>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={newNoteText} 
+                  onChange={e => setNewNoteText(e.target.value)} 
+                  placeholder="Ex: Changement de mâchoire Ø26..." 
+                  className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" 
+                />
+                <button onClick={() => handleAddNote(selectedTool)} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm">Ajouter</button>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <span className="text-xs font-bold text-slate-700">Historique des notes :</span>
+              {selectedTool.notes && selectedTool.notes.map((note) => (
+                <div key={note.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
+                  <div className="flex justify-between text-[11px] text-slate-400 font-medium">
+                    <span>Par {note.author}</span>
+                    <span>{note.date}</span>
+                  </div>
+                  <p className="text-slate-700">{note.text}</p>
+                </div>
+              ))}
+              {(!selectedTool.notes || selectedTool.notes.length === 0) && (
+                <p className="text-xs text-slate-400 italic">Aucune note enregistrée pour cet outil.</p>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button onClick={() => setSelectedTool(null)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-xl font-medium border border-slate-200">Fermer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODALE EDITION OUTIL (ADMIN) --- */}
+      {editingTool && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleSaveToolEdit} className="bg-white border border-slate-200 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900">Modifier l'affectation / Statut</h3>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Affecté à (Ouvrier ou Dépôt)</label>
+              <select 
+                value={editToolForm.assignedTo} 
+                onChange={e => setEditToolForm({...editToolForm, assignedTo: e.target.value})} 
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none"
+              >
+                <option value="Dépôt Central">📦 Dépôt Central</option>
+                {approvedUsers.map(u => (
+                  <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name} ({u.role})</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Statut</label>
+              <select value={editToolForm.status} onChange={e => setEditToolForm({...editToolForm, status: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none">
+                <option value="Disponible">🟢 Disponible</option>
+                <option value="En service">⚡ En service</option>
+                <option value="En révision">🛠️ En révision</option>
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setEditingTool(null)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-xl font-medium border border-slate-200">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-xs text-white font-semibold rounded-xl shadow-sm">Enregistrer</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* --- MODALE MODIFICATION FICHE UTILISATEUR / PROFIL --- */}
       {showUserModal && (
@@ -1210,7 +1364,7 @@ export default function App() {
                 <select 
                   value={userModalData.role} 
                   onChange={e => setUserModalData({...userModalData, role: e.target.value})}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-xs text-slate-800 rounded-xl focus:outline-none"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none"
                 >
                   <option value="Employé">Employé</option>
                   <option value="Intérimaire">Intérimaire</option>
@@ -1361,11 +1515,42 @@ export default function App() {
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreateTool} className="bg-white border border-slate-200 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
             <h3 className="text-lg font-bold text-slate-900">Ajouter une machine</h3>
-            <input type="text" placeholder="ID Machine" value={newToolData.id} onChange={e => setNewToolData({...newToolData, id: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" />
-            <input type="text" placeholder="Nom de l'outil" value={newToolData.name} onChange={e => setNewToolData({...newToolData, name: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" />
-            <div className="flex justify-end gap-2">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">ID Machine (ex: REM-04)</label>
+              <input type="text" placeholder="REM-04" value={newToolData.id} onChange={e => setNewToolData({...newToolData, id: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Nom de la machine</label>
+              <input type="text" placeholder="ex: Sertisseuse électro-hydraulique" value={newToolData.name} onChange={e => setNewToolData({...newToolData, name: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Marque</label>
+              <input type="text" value={newToolData.brand} onChange={e => setNewToolData({...newToolData, brand: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Affecter à (Ouvrier ou Dépôt)</label>
+              <select 
+                value={newToolData.assignedTo} 
+                onChange={e => setNewToolData({...newToolData, assignedTo: e.target.value})} 
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none"
+              >
+                <option value="Dépôt Central">📦 Dépôt Central</option>
+                {approvedUsers.map(u => (
+                  <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name} ({u.role})</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Statut initial</label>
+              <select value={newToolData.status} onChange={e => setNewToolData({...newToolData, status: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none">
+                <option value="Disponible">🟢 Disponible</option>
+                <option value="En service">⚡ En service</option>
+                <option value="En révision">🛠️ En révision</option>
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setShowAddToolModal(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-xl font-medium border border-slate-200">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-xs text-white rounded-xl shadow-sm">Ajouter</button>
+              <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-xs text-white font-semibold rounded-xl shadow-sm">Ajouter</button>
             </div>
           </form>
         </div>
