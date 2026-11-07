@@ -14,9 +14,13 @@ import {
   LogOut,
   ChevronRight,
   ArrowLeft,
-  Calendar,
+  Calendar as CalendarIcon,
   FileText,
-  Upload
+  Upload,
+  Download,
+  Eye,
+  Filter,
+  CheckCircle2
 } from 'lucide-react';
 
 const INITIAL_USERS = [
@@ -60,30 +64,35 @@ export default function App() {
   const [showAddToolModal, setShowAddToolModal] = useState(false);
   const [newToolData, setNewToolData] = useState({ id: '', name: '', brand: 'REMS', category: 'Sertissage', status: 'Disponible' });
 
+  // États Spécifiques au Planning Avancé
   const [showAddPlanModal, setShowAddPlanModal] = useState(false);
-  const [newPlanTitle, setNewPlanTitle] = useState('');
-  const [newPlanTarget, setNewPlanTarget] = useState('all');
+  const [planningViewMode, setPlanningViewMode] = useState('week'); // 'week' ou 'month'
+  const [selectedWorkerFilter, setSelectedWorkerFilter] = useState('all');
+  
+  const [newPlanData, setNewPlanData] = useState({
+    title: '',
+    targetUserId: 'all',
+    date: new Date().toISOString().split('T')[0],
+    pdfName: '',
+    description: ''
+  });
 
-  // Écoute en temps réel Firebase
+  // Synchronisation Firestore
   useEffect(() => {
     const unsubEquipment = onSnapshot(collection(db, "equipment"), (snapshot) => {
-      const items = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
-      setEquipment(items);
+      setEquipment(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
 
     const unsubSites = onSnapshot(collection(db, "sites"), (snapshot) => {
-      const items = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
-      setSites(items);
+      setSites(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
 
     const unsubRequests = onSnapshot(collection(db, "requests"), (snapshot) => {
-      const items = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
-      setRequests(items);
+      setRequests(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
 
     const unsubPlans = onSnapshot(collection(db, "plans"), (snapshot) => {
-      const items = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
-      setPlans(items);
+      setPlans(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
 
     return () => {
@@ -121,7 +130,7 @@ export default function App() {
       setShowAddSiteModal(false);
       setNewSiteData({ name: '', client: '', address: '', manager: 'Marc Vasseur' });
     } catch (error) {
-      console.error("Erreur ajout chantier :", error);
+      console.error(error);
     }
   };
 
@@ -129,7 +138,7 @@ export default function App() {
     try {
       if (firestoreId) await deleteDoc(doc(db, "sites", firestoreId));
     } catch (error) {
-      console.error("Erreur suppression chantier :", error);
+      console.error(error);
     }
   };
 
@@ -145,7 +154,7 @@ export default function App() {
       setShowAddToolModal(false);
       setNewToolData({ id: '', name: '', brand: 'REMS', category: 'Sertissage', status: 'Disponible' });
     } catch (error) {
-      console.error("Erreur ajout outil :", error);
+      console.error(error);
     }
   };
 
@@ -153,30 +162,26 @@ export default function App() {
     try {
       if (firestoreId) await deleteDoc(doc(db, "equipment", firestoreId));
     } catch (error) {
-      console.error("Erreur suppression outil :", error);
+      console.error(error);
     }
   };
 
   const handleOpenEditModal = (tool) => {
     setEditingTool(tool);
-    setEditToolForm({
-      assignedTo: tool.assignedTo || '',
-      status: tool.status || 'Disponible'
-    });
+    setEditToolForm({ assignedTo: tool.assignedTo || '', status: tool.status || 'Disponible' });
   };
 
   const handleSaveToolEdit = async (e) => {
     e.preventDefault();
     if (!editingTool || !editingTool.firestoreId) return;
     try {
-      const toolRef = doc(db, "equipment", editingTool.firestoreId);
-      await updateDoc(toolRef, {
+      await updateDoc(doc(db, "equipment", editingTool.firestoreId), {
         assignedTo: editToolForm.assignedTo,
         status: editToolForm.status
       });
       setEditingTool(null);
     } catch (error) {
-      console.error("Erreur modification outil :", error);
+      console.error(error);
     }
   };
 
@@ -195,7 +200,7 @@ export default function App() {
       setNewNoteText('');
       setSelectedTool(prev => ({ ...prev, notes: updatedNotes }));
     } catch (error) {
-      console.error("Erreur ajout note :", error);
+      console.error(error);
     }
   };
 
@@ -203,29 +208,32 @@ export default function App() {
     try {
       if (firestoreId) await deleteDoc(doc(db, "requests", firestoreId));
     } catch (error) {
-      console.error("Erreur validation demande :", error);
+      console.error(error);
     }
   };
 
+  // --- LOGIQUE PLANNING & ATTACHEMENT PDF ---
   const handleUploadPlan = async (e) => {
     e.preventDefault();
-    if (!newPlanTitle) return;
+    if (!newPlanData.title) return;
+
     let targetName = 'Toute l’équipe';
-    if (newPlanTarget !== 'all') {
-      const foundUser = users.find(u => u.id === Number(newPlanTarget));
+    if (newPlanData.targetUserId !== 'all') {
+      const foundUser = users.find(u => u.id === Number(newPlanData.targetUserId));
       if (foundUser) targetName = foundUser.name;
     }
+
     try {
       await addDoc(collection(db, "plans"), {
-        title: newPlanTitle,
-        fileName: 'Planning_Equipe.pdf',
-        targetUserId: newPlanTarget === 'all' ? 'all' : Number(newPlanTarget),
+        title: newPlanData.title,
+        description: newPlanData.description || '',
+        fileName: newPlanData.pdfName ? `${newPlanData.pdfName}.pdf` : 'Plan_Execution.pdf',
+        targetUserId: newPlanData.targetUserId === 'all' ? 'all' : Number(newPlanData.targetUserId),
         targetName: targetName,
-        date: new Date().toISOString().split('T')[0]
+        date: newPlanData.date
       });
       setShowAddPlanModal(false);
-      setNewPlanTitle('');
-      setNewPlanTarget('all');
+      setNewPlanData({ title: '', targetUserId: 'all', date: new Date().toISOString().split('T')[0], pdfName: '', description: '' });
     } catch (error) {
       console.error("Erreur ajout planning :", error);
     }
@@ -235,7 +243,7 @@ export default function App() {
     try {
       if (firestoreId) await deleteDoc(doc(db, "plans", firestoreId));
     } catch (error) {
-      console.error("Erreur suppression planning :", error);
+      console.error(error);
     }
   };
 
@@ -291,11 +299,20 @@ export default function App() {
 
   const pendingUsers = useMemo(() => users.filter(u => u.status === 'pending'), [users]);
   const approvedUsers = useMemo(() => users.filter(u => u.status === 'approved'), [users]);
+  
+  // FILTRAGE STRICT DU PLANNING
   const visiblePlans = useMemo(() => {
     if (!currentUser) return [];
-    if (currentUser.role === 'admin') return plans;
-    return plans.filter(p => p.targetUserId === 'all' || p.targetUserId === currentUser.id);
-  }, [plans, currentUser]);
+    
+    // Si l'utilisateur est ouvrier, il ne voit QUE ce qui lui est attribué ou collectif
+    if (currentUser.role !== 'admin') {
+      return plans.filter(p => p.targetUserId === 'all' || p.targetUserId === currentUser.id);
+    }
+
+    // Si Admin, il peut filtrer par ouvrier ou voir tout
+    if (selectedWorkerFilter === 'all') return plans;
+    return plans.filter(p => p.targetUserId === Number(selectedWorkerFilter));
+  }, [plans, currentUser, selectedWorkerFilter]);
 
   const isAdmin = currentUser?.role === 'admin';
 
@@ -388,7 +405,7 @@ export default function App() {
             <span className="font-bold text-white">{currentUser.name}</span>
             <span className="text-[10px] ml-2 px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-semibold">{isAdmin ? 'ADMIN' : currentUser.role.toUpperCase()}</span>
           </div>
-          <button onClick={handleLogout} className="p-1.5 text-slate-400 hover:text-red-400 transition-colors" title="Se déconnecter">
+          <button onClick={handleLogout} className="p-1.5 text-slate-400 hover:text-red-400 transition-colors">
             <LogOut className="w-4 h-4" />
           </button>
         </div>
@@ -397,10 +414,7 @@ export default function App() {
       <div className="bg-slate-900/60 border-b border-slate-800 px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {activeTab !== 'dashboard' && (
-            <button 
-              onClick={() => setActiveTab('dashboard')} 
-              className="flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg transition-all shadow-sm font-medium"
-            >
+            <button onClick={() => setActiveTab('dashboard')} className="flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg transition-all shadow-sm font-medium">
               <ArrowLeft className="w-3.5 h-3.5" /> Retour au Tableau de bord
             </button>
           )}
@@ -411,7 +425,6 @@ export default function App() {
       </div>
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
-        
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-blue-900/40 via-slate-900 to-slate-900 border border-blue-500/20 rounded-2xl p-6 shadow-xl">
@@ -424,140 +437,214 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              
-              <div 
-                onClick={() => setActiveTab('planning')}
-                className="group bg-slate-900 border border-slate-800 hover:border-cyan-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-cyan-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
-              >
+              <div onClick={() => setActiveTab('planning')} className="group bg-slate-900 border border-slate-800 hover:border-cyan-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-cyan-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-3">
-                    <span className="text-3xl p-2.5 bg-cyan-500/10 rounded-xl group-hover:scale-110 transition-transform">📅</span>
+                    <span className="text-3xl p-2.5 bg-cyan-500/10 rounded-xl">📅</span>
                     <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-300 text-[11px] font-bold rounded-full">{visiblePlans.length} dispo</span>
                   </div>
-                  <h3 className="text-base font-bold text-white group-hover:text-cyan-400 transition-colors">Planning</h3>
-                  <p className="text-xs text-slate-400 mt-1">Consulter les plannings partagés.</p>
+                  <h3 className="text-base font-bold text-white group-hover:text-cyan-400">Planning & PDF</h3>
+                  <p className="text-xs text-slate-400 mt-1">Feuilles de route et plans d'exécution nominatifs.</p>
                 </div>
-                <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-cyan-400">
+                <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-cyan-400">
                   <span>Accéder au module</span>
-                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <ChevronRight className="w-4 h-4" />
                 </div>
               </div>
 
-              <div 
-                onClick={() => setActiveTab('requests')}
-                className="group bg-slate-900 border border-slate-800 hover:border-amber-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-amber-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
-              >
+              <div onClick={() => setActiveTab('requests')} className="group bg-slate-900 border border-slate-800 hover:border-amber-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-amber-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-3">
-                    <span className="text-3xl p-2.5 bg-amber-500/10 rounded-xl group-hover:scale-110 transition-transform">📋</span>
+                    <span className="text-3xl p-2.5 bg-amber-500/10 rounded-xl">📋</span>
                     <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[11px] font-bold rounded-full">{requests.length} en attente</span>
                   </div>
-                  <h3 className="text-base font-bold text-white group-hover:text-amber-400 transition-colors">Demandes de Matériel</h3>
-                  <p className="text-xs text-slate-400 mt-1">Validez les besoins en raccords, tubes et quincaillerie des équipes.</p>
+                  <h3 className="text-base font-bold text-white group-hover:text-amber-400">Demandes de Matériel</h3>
+                  <p className="text-xs text-slate-400 mt-1">Besoins en raccords, tubes et fournitures.</p>
                 </div>
-                <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-amber-400">
+                <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-amber-400">
                   <span>Accéder au module</span>
-                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <ChevronRight className="w-4 h-4" />
                 </div>
               </div>
 
-              <div 
-                onClick={() => setActiveTab('workers')}
-                className="group bg-slate-900 border border-slate-800 hover:border-emerald-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-emerald-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
-              >
+              <div onClick={() => setActiveTab('workers')} className="group bg-slate-900 border border-slate-800 hover:border-emerald-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-emerald-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-3">
-                    <span className="text-3xl p-2.5 bg-emerald-500/10 rounded-xl group-hover:scale-110 transition-transform">👷‍♂️</span>
+                    <span className="text-3xl p-2.5 bg-emerald-500/10 rounded-xl">👷‍♂️</span>
                     <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-[11px] font-bold rounded-full">{approvedUsers.length} actifs</span>
                   </div>
-                  <h3 className="text-base font-bold text-white group-hover:text-emerald-400 transition-colors">Gestion des Effectifs</h3>
-                  <p className="text-xs text-slate-400 mt-1">Suivi des équipes de plombiers, chauffagistes et chefs d'équipe.</p>
+                  <h3 className="text-base font-bold text-white group-hover:text-emerald-400">Gestion des Effectifs</h3>
+                  <p className="text-xs text-slate-400 mt-1">Suivi des plombiers et chefs d'équipe.</p>
                 </div>
-                <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-emerald-400">
+                <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-emerald-400">
                   <span>Accéder au module</span>
-                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <ChevronRight className="w-4 h-4" />
                 </div>
               </div>
 
-              <div 
-                onClick={() => setActiveTab('sites')}
-                className="group bg-slate-900 border border-slate-800 hover:border-blue-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-blue-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
-              >
+              <div onClick={() => setActiveTab('sites')} className="group bg-slate-900 border border-slate-800 hover:border-blue-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-blue-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-3">
-                    <span className="text-3xl p-2.5 bg-blue-500/10 rounded-xl group-hover:scale-110 transition-transform">🏗️</span>
+                    <span className="text-3xl p-2.5 bg-blue-500/10 rounded-xl">🏗️</span>
                     <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-[11px] font-bold rounded-full">{sites.length} chantiers</span>
                   </div>
-                  <h3 className="text-base font-bold text-white group-hover:text-blue-400 transition-colors">Chantiers & Résidences</h3>
-                  <p className="text-xs text-slate-400 mt-1">Suivi des travaux de réhabilitation, adresses et chefs de chantier.</p>
+                  <h3 className="text-base font-bold text-white group-hover:text-blue-400">Chantiers</h3>
+                  <p className="text-xs text-slate-400 mt-1">Suivi des résidences et travaux.</p>
                 </div>
-                <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-blue-400">
+                <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-blue-400">
                   <span>Accéder au module</span>
-                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <ChevronRight className="w-4 h-4" />
                 </div>
               </div>
 
-              <div 
-                onClick={() => setActiveTab('tools')}
-                className="group bg-slate-900 border border-slate-800 hover:border-indigo-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-indigo-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
-              >
+              <div onClick={() => setActiveTab('tools')} className="group bg-slate-900 border border-slate-800 hover:border-indigo-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-indigo-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-3">
-                    <span className="text-3xl p-2.5 bg-indigo-500/10 rounded-xl group-hover:scale-110 transition-transform">🔧</span>
+                    <span className="text-3xl p-2.5 bg-indigo-500/10 rounded-xl">🔧</span>
                     <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 text-[11px] font-bold rounded-full">{equipment.length} machines</span>
                   </div>
-                  <h3 className="text-base font-bold text-white group-hover:text-indigo-400 transition-colors">Parc Outillage</h3>
-                  <p className="text-xs text-slate-400 mt-1">Suivi des sertisseuses, carotteuses et carnets d'entretien matériel.</p>
+                  <h3 className="text-base font-bold text-white group-hover:text-indigo-400">Parc Outillage</h3>
+                  <p className="text-xs text-slate-400 mt-1">Sertisseuses, carotteuses et entretien.</p>
                 </div>
-                <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-indigo-400">
+                <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-indigo-400">
                   <span>Accéder au module</span>
-                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <ChevronRight className="w-4 h-4" />
                 </div>
               </div>
 
               {isAdmin && (
-                <div 
-                  onClick={() => setActiveTab('accounts')}
-                  className="group bg-slate-900 border border-slate-800 hover:border-purple-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-purple-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
-                >
+                <div onClick={() => setActiveTab('accounts')} className="group bg-slate-900 border border-slate-800 hover:border-purple-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-purple-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-start mb-3">
-                      <span className="text-3xl p-2.5 bg-purple-500/10 rounded-xl group-hover:scale-110 transition-transform">🛡️</span>
+                      <span className="text-3xl p-2.5 bg-purple-500/10 rounded-xl">🛡️</span>
                       <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-[11px] font-bold rounded-full">{pendingUsers.length} à valider</span>
                     </div>
-                    <h3 className="text-base font-bold text-white group-hover:text-purple-400 transition-colors">Validation des Comptes</h3>
-                    <p className="text-xs text-slate-400 mt-1">Approuvez ou refusez les accès des nouveaux collaborateurs.</p>
+                    <h3 className="text-base font-bold text-white group-hover:text-purple-400">Validation des Comptes</h3>
+                    <p className="text-xs text-slate-400 mt-1">Validation des accès collaborateurs.</p>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-purple-400">
+                  <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-purple-400">
                     <span>Accéder au module</span>
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    <ChevronRight className="w-4 h-4" />
                   </div>
                 </div>
               )}
-
             </div>
           </div>
         )}
 
-        {/* --- MODULE CHANTIERS --- */}
+        {/* --- MODULE PLANNING ULTRA COMPLET (SEMAINE / MOIS + PDF) --- */}
+        {activeTab === 'planning' && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-md">
+              <div>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <CalendarIcon className="w-5 h-5 text-cyan-400" /> Planning des interventions
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {isAdmin ? "Gestion globale des affectations et plans d'exécution" : "Tes tâches et feuilles de route attribuées"}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                {/* Sélecteur Vue Semaine / Mois */}
+                <div className="flex rounded-xl bg-slate-950 p-1 border border-slate-800">
+                  <button 
+                    onClick={() => setPlanningViewMode('week')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${planningViewMode === 'week' ? 'bg-cyan-600 text-white' : 'text-slate-400'}`}
+                  >
+                    Vue Semaine
+                  </button>
+                  <button 
+                    onClick={() => setPlanningViewMode('month')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${planningViewMode === 'month' ? 'bg-cyan-600 text-white' : 'text-slate-400'}`}
+                  >
+                    Vue Mois
+                  </button>
+                </div>
+
+                {/* Filtre Ouvrier pour l'Admin */}
+                {isAdmin && (
+                  <select 
+                    value={selectedWorkerFilter}
+                    onChange={e => setSelectedWorkerFilter(e.target.value)}
+                    className="px-3 py-1.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl focus:outline-none"
+                  >
+                    <option value="all">Tous les ouvriers</option>
+                    {approvedUsers.map(u => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
+                )}
+
+                {isAdmin && (
+                  <button onClick={() => setShowAddPlanModal(true)} className="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow">
+                    <Plus className="w-4 h-4" /> Assigner Tâche & PDF
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* VUE GRILLE DE PLANNING */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {visiblePlans.map(plan => (
+                <div key={plan.firestoreId || plan.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3 shadow-md flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="px-2 py-0.5 rounded font-mono font-bold bg-cyan-500/20 text-cyan-300">📅 {plan.date}</span>
+                      <span className="text-slate-400 font-medium">Pour : <strong className="text-slate-200">{plan.targetName}</strong></span>
+                    </div>
+
+                    <h3 className="text-sm font-bold text-white mt-2">{plan.title}</h3>
+                    {plan.description && <p className="text-xs text-slate-300 mt-1">{plan.description}</p>}
+
+                    {/* Bloc PDF téléchargeable */}
+                    <div className="mt-3 p-2.5 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-red-400" />
+                        <span className="text-xs text-slate-200 font-medium truncate max-w-[150px]">{plan.fileName}</span>
+                      </div>
+                      <button onClick={() => alert(`Téléchargement simulé de : ${plan.fileName}`)} className="p-1 text-cyan-400 hover:text-cyan-300" title="Télécharger PDF">
+                        <Download className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {isAdmin && (
+                    <div className="pt-2 border-t border-slate-800 flex justify-end">
+                      <button onClick={() => handleDeletePlan(plan.firestoreId)} className="px-2 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs rounded-lg transition-colors">
+                        Supprimer
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {visiblePlans.length === 0 && (
+                <div className="col-span-full py-8 text-center bg-slate-900 border border-slate-800 rounded-2xl text-slate-400 text-xs italic">
+                  Aucune tâche ou planning attribué pour cette période.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* --- MODULES SECONDAIRES --- */}
         {activeTab === 'sites' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>🏗️</span> Chantiers en cours</h2>
+              <h2 className="text-lg font-bold text-white">Chantiers en cours</h2>
               {isAdmin && (
-                <button onClick={() => setShowAddSiteModal(true)} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 transition-colors text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow">
+                <button onClick={() => setShowAddSiteModal(true)} className="px-3 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl flex items-center gap-1">
                   <Plus className="w-4 h-4" /> Nouveau Chantier
                 </button>
               )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {sites.map(site => (
-                <div key={site.firestoreId || site.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 shadow-md">
+                <div key={site.firestoreId} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2">
                   <div className="flex justify-between items-start">
                     <h3 className="text-sm font-bold text-white">{site.name}</h3>
-                    {isAdmin && (
-                      <button onClick={() => handleDeleteSite(site.firestoreId)} className="text-red-400 hover:text-red-300 text-xs p-1">🗑️</button>
-                    )}
+                    {isAdmin && <button onClick={() => handleDeleteSite(site.firestoreId)} className="text-red-400 text-xs">🗑️</button>}
                   </div>
                   <p className="text-xs text-slate-400">Client : {site.client}</p>
                   <p className="text-xs text-slate-400">Adresse : {site.address}</p>
@@ -567,58 +654,37 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE OUTILLAGE --- */}
         {activeTab === 'tools' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>🔧</span> Parc Outillage & Matériel</h2>
+              <h2 className="text-lg font-bold text-white">Parc Outillage</h2>
               <div className="flex items-center gap-2 w-full sm:w-auto">
-                <input 
-                  type="text"
-                  value={toolSearch}
-                  onChange={e => setToolSearch(e.target.value)}
-                  placeholder="Rechercher (nom, ID, assigné...)"
-                  className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white w-full sm:w-64 focus:outline-none focus:border-indigo-500"
-                />
+                <input type="text" value={toolSearch} onChange={e => setToolSearch(e.target.value)} placeholder="Rechercher..." className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white" />
                 {isAdmin && (
-                  <button onClick={() => setShowAddToolModal(true)} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 transition-colors text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow shrink-0">
-                    <Plus className="w-4 h-4" /> Ajouter une machine
+                  <button onClick={() => setShowAddToolModal(true)} className="px-3 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl flex items-center gap-1">
+                    <Plus className="w-4 h-4" /> Machine
                   </button>
                 )}
               </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {filteredEquipment.map(tool => (
-                <div key={tool.firestoreId || tool.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 shadow-md flex flex-col justify-between">
+                <div key={tool.firestoreId} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between text-xs">
                       <span className="text-indigo-400 font-mono font-bold">{tool.id}</span>
                       <span className="text-slate-400">{tool.brand}</span>
                     </div>
                     <div className="text-sm font-bold text-white mt-1">{tool.name}</div>
-                    <div className="text-xs text-slate-400 mt-1">
-                      Statut : <span className="text-emerald-400 font-medium">{tool.status}</span>
-                    </div>
-                    {tool.assignedTo && (
-                      <div className="text-xs text-slate-500 mt-1">
-                        Assigné à : <strong className="text-slate-300">{tool.assignedTo}</strong>
-                      </div>
-                    )}
+                    <div className="text-xs text-slate-400 mt-1">Statut : <span className="text-emerald-400">{tool.status}</span></div>
+                    {tool.assignedTo && <div className="text-xs text-slate-500 mt-1">Assigné : <strong>{tool.assignedTo}</strong></div>}
                   </div>
-
                   <div className="pt-2 border-t border-slate-800 flex items-center gap-2">
-                    <button onClick={() => setSelectedTool(tool)} className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 rounded-lg transition-colors">
-                      Carnet ({tool.notes?.length || 0})
-                    </button>
+                    <button onClick={() => setSelectedTool(tool)} className="flex-1 py-1 bg-slate-800 text-xs text-slate-200 rounded-lg">Notes</button>
                     {isAdmin && (
                       <>
-                        <button onClick={() => handleOpenEditModal(tool)} className="px-2.5 py-1.5 bg-amber-600/25 hover:bg-amber-600/40 text-amber-300 text-xs font-semibold rounded-lg transition-colors">
-                          Modifier
-                        </button>
-                        <button onClick={() => handleDeleteTool(tool.firestoreId)} className="px-2.5 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs font-semibold rounded-lg transition-colors">
-                          🗑️
-                        </button>
+                        <button onClick={() => handleOpenEditModal(tool)} className="px-2 py-1 bg-amber-600/30 text-amber-300 text-xs rounded-lg">Modifier</button>
+                        <button onClick={() => handleDeleteTool(tool.firestoreId)} className="px-2 py-1 bg-red-600/20 text-red-300 text-xs rounded-lg">🗑️</button>
                       </>
                     )}
                   </div>
@@ -628,39 +694,30 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE BESOINS --- */}
         {activeTab === 'requests' && (
           <div className="space-y-4">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>📋</span> Demandes de matériel</h2>
+            <h2 className="text-lg font-bold text-white">Demandes de matériel</h2>
             <div className="space-y-2">
               {requests.map(req => (
-                <div key={req.firestoreId || req.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center shadow-md">
+                <div key={req.firestoreId} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center">
                   <div>
                     <p className="text-sm font-bold text-white">{req.items}</p>
                     <p className="text-xs text-slate-400">Demandeur : {req.requester}</p>
                   </div>
-                  {isAdmin && (
-                    <button onClick={() => handleValidateRequest(req.firestoreId)} className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold rounded-lg transition-colors">
-                      Valider
-                    </button>
-                  )}
+                  {isAdmin && <button onClick={() => handleValidateRequest(req.firestoreId)} className="px-3 py-1.5 bg-emerald-600/20 text-emerald-300 text-xs font-semibold rounded-lg">Valider</button>}
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* --- MODULE EFFECTIFS --- */}
         {activeTab === 'workers' && (
           <div className="space-y-4">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>👷‍♂️</span> Équipes & Effectifs actifs</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <h2 className="text-lg font-bold text-white">Équipes & Effectifs actifs</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {approvedUsers.map(user => (
-                <div key={user.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 shadow-md">
-                  <div className="flex justify-between items-start">
-                    <h3 className="text-sm font-bold text-white">{user.name}</h3>
-                    <span className="text-[10px] px-2 py-0.5 bg-blue-500/20 text-blue-300 font-semibold rounded">{user.role}</span>
-                  </div>
+                <div key={user.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2">
+                  <h3 className="text-sm font-bold text-white">{user.name}</h3>
                   <p className="text-xs text-slate-400">{user.email}</p>
                   <p className="text-xs text-slate-500">Équipe : {user.team}</p>
                 </div>
@@ -669,54 +726,20 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE COMPTES (ADMIN) --- */}
         {activeTab === 'accounts' && isAdmin && (
           <div className="space-y-4">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>🛡️</span> Validation des comptes</h2>
+            <h2 className="text-lg font-bold text-white">Validation des comptes</h2>
             <div className="space-y-3">
               {pendingUsers.map(user => (
-                <div key={user.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center shadow-md">
+                <div key={user.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center">
                   <div>
                     <p className="text-sm font-bold text-white">{user.name} ({user.email})</p>
                     <p className="text-xs text-slate-400">Rôle : {user.role}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => handleApproveAccount(user.id)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition-colors">Approuver</button>
-                    <button onClick={() => handleRejectAccount(user.id)} className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs font-semibold rounded-lg transition-colors">Refuser</button>
+                    <button onClick={() => handleApproveAccount(user.id)} className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg">Approuver</button>
+                    <button onClick={() => handleRejectAccount(user.id)} className="px-3 py-1.5 bg-red-600/20 text-red-300 text-xs rounded-lg">Refuser</button>
                   </div>
-                </div>
-              ))}
-              {pendingUsers.length === 0 && (
-                <p className="text-xs text-slate-400 italic">Aucun compte en attente de validation.</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* --- MODULE PLANNING --- */}
-        {activeTab === 'planning' && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>📅</span> Plannings partagés</h2>
-              {isAdmin && (
-                <button onClick={() => setShowAddPlanModal(true)} className="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow">
-                  <Upload className="w-4 h-4" /> Publier Planning
-                </button>
-              )}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {visiblePlans.map(plan => (
-                <div key={plan.firestoreId || plan.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 shadow-md">
-                  <div className="flex justify-between items-center text-xs text-cyan-400 font-bold">
-                    <span>{plan.date}</span>
-                    <span className="text-slate-400">Pour : {plan.targetName}</span>
-                  </div>
-                  <div className="text-sm font-bold text-white">{plan.title}</div>
-                  {isAdmin && (
-                    <button onClick={() => handleDeletePlan(plan.firestoreId)} className="w-full py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs rounded-lg mt-2 transition-colors">
-                      Supprimer
-                    </button>
-                  )}
                 </div>
               ))}
             </div>
@@ -724,17 +747,59 @@ export default function App() {
         )}
       </main>
 
-      {/* --- MODALES --- */}
+      {/* --- MODALE CREATION TÂCHE & PDF (ADMIN) --- */}
+      {showAddPlanModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleUploadPlan} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-white">Assigner Tâche & Plan PDF</h3>
+            
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Titre de l'intervention / Chantier</label>
+              <input type="text" placeholder="ex: Pose colonnes Bâtiment A" value={newPlanData.title} onChange={e => setNewPlanData({...newPlanData, title: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Attribuer à</label>
+              <select value={newPlanData.targetUserId} onChange={e => setNewPlanData({...newPlanData, targetUserId: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
+                <option value="all">Toute l'équipe (Général)</option>
+                {approvedUsers.map(u => (
+                  <option key={u.id} value={u.id}>{u.name} ({u.team})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Date d'intervention</label>
+              <input type="date" value={newPlanData.date} onChange={e => setNewPlanData({...newPlanData, date: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Nom du Plan / Fichier PDF</label>
+              <input type="text" placeholder="ex: Plan_Plomberie_BatA" value={newPlanData.pdfName} onChange={e => setNewPlanData({...newPlanData, pdfName: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Consignes complémentaires</label>
+              <textarea placeholder="Instruction pour l'ouvrier..." value={newPlanData.description} onChange={e => setNewPlanData({...newPlanData, description: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white h-20" />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setShowAddPlanModal(false)} className="px-4 py-2 bg-slate-800 text-xs text-slate-300 rounded-xl">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-cyan-600 text-xs text-white font-semibold rounded-xl">Enregistrer & Publier</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODALES ANCIENNES */}
       {showAddSiteModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleCreateSite} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
+          <form onSubmit={handleCreateSite} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4">
             <h3 className="text-lg font-bold text-white">Nouveau Chantier</h3>
-            <input type="text" placeholder="Nom du chantier" value={newSiteData.name} onChange={e => setNewSiteData({...newSiteData, name: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500" />
-            <input type="text" placeholder="Client" value={newSiteData.client} onChange={e => setNewSiteData({...newSiteData, client: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500" />
-            <input type="text" placeholder="Adresse" value={newSiteData.address} onChange={e => setNewSiteData({...newSiteData, address: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500" />
+            <input type="text" placeholder="Nom du chantier" value={newSiteData.name} onChange={e => setNewSiteData({...newSiteData, name: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setShowAddSiteModal(false)} className="px-4 py-2 bg-slate-800 text-xs text-slate-300 rounded-xl">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-indigo-600 text-xs text-white font-semibold rounded-xl">Créer</button>
+              <button type="submit" className="px-4 py-2 bg-indigo-600 text-xs text-white rounded-xl">Créer</button>
             </div>
           </form>
         </div>
@@ -742,71 +807,13 @@ export default function App() {
 
       {showAddToolModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleCreateTool} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
+          <form onSubmit={handleCreateTool} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4">
             <h3 className="text-lg font-bold text-white">Ajouter une machine</h3>
-            <input type="text" placeholder="ID Machine (ex: REMS-03)" value={newToolData.id} onChange={e => setNewToolData({...newToolData, id: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500" />
-            <input type="text" placeholder="Nom de l'outil" value={newToolData.name} onChange={e => setNewToolData({...newToolData, name: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500" />
+            <input type="text" placeholder="ID Machine" value={newToolData.id} onChange={e => setNewToolData({...newToolData, id: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+            <input type="text" placeholder="Nom de l'outil" value={newToolData.name} onChange={e => setNewToolData({...newToolData, name: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setShowAddToolModal(false)} className="px-4 py-2 bg-slate-800 text-xs text-slate-300 rounded-xl">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-indigo-600 text-xs text-white font-semibold rounded-xl">Ajouter</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {editingTool && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleSaveToolEdit} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-white">Modifier : {editingTool.name}</h3>
-            <input type="text" placeholder="Assigné à" value={editToolForm.assignedTo} onChange={e => setEditToolForm({...editToolForm, assignedTo: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500" />
-            <select value={editToolForm.status} onChange={e => setEditToolForm({...editToolForm, status: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500">
-              <option value="Disponible">Disponible</option>
-              <option value="Sur chantier">Sur chantier</option>
-              <option value="En révision">En révision</option>
-            </select>
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setEditingTool(null)} className="px-4 py-2 bg-slate-800 text-xs text-slate-300 rounded-xl">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-amber-600 text-xs text-white font-semibold rounded-xl">Enregistrer</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {selectedTool && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-lg space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold text-white">Carnet : {selectedTool.name}</h3>
-              <button onClick={() => setSelectedTool(null)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-              {selectedTool.notes?.length === 0 && <p className="text-xs text-slate-400 italic">Aucune note dans le carnet.</p>}
-              {selectedTool.notes?.map(note => (
-                <div key={note.id} className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs space-y-1">
-                  <div className="flex justify-between text-slate-400 text-[10px]">
-                    <span className="font-bold text-indigo-300">{note.author}</span>
-                    <span>{note.date}</span>
-                  </div>
-                  <p className="text-slate-200">{note.text}</p>
-                </div>
-              ))}
-            </div>
-            <div className="space-y-2 pt-2 border-t border-slate-800">
-              <input type="text" value={newNoteText} onChange={e => setNewNoteText(e.target.value)} placeholder="Ajouter une note..." className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500" />
-              <button onClick={() => handleAddNote(selectedTool)} className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-xs text-white font-semibold rounded-xl shadow">Ajouter au carnet</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showAddPlanModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleUploadPlan} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-white">Publier un Planning</h3>
-            <input type="text" placeholder="Titre" value={newPlanTitle} onChange={e => setNewPlanTitle(e.target.value)} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500" />
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setShowAddPlanModal(false)} className="px-4 py-2 bg-slate-800 text-xs text-slate-300 rounded-xl">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-cyan-600 text-xs text-white font-semibold rounded-xl">Publier</button>
+              <button type="submit" className="px-4 py-2 bg-indigo-600 text-xs text-white rounded-xl">Ajouter</button>
             </div>
           </form>
         </div>
