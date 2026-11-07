@@ -851,6 +851,75 @@ const handleValidateRequest = (reqId) => {
         </div>
       )}
 
+      {editingTool && (
+  <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
+      <h3 className="text-sm font-bold text-white flex items-center justify-between">
+        <span>✏️ Modifier l'outil : {editingTool.name}</span>
+        <button onClick={() => setEditingTool(null)} className="text-slate-400 hover:text-white">✕</button>
+      </h3>
+      <form onSubmit={handleSaveToolEdit} className="space-y-3 text-xs">
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Nom de l'outil / Machine</label>
+          <input
+            type="text"
+            required
+            value={editingTool.name}
+            onChange={(e) => setEditingTool({ ...editingTool, name: e.target.value })}
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Marque</label>
+          <input
+            type="text"
+            value={editingTool.brand || ''}
+            onChange={(e) => setEditingTool({ ...editingTool, brand: e.target.value })}
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Statut</label>
+          <select
+            value={editingTool.status || 'Disponible'}
+            onChange={(e) => setEditingTool({ ...editingTool, status: e.target.value })}
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+          >
+            <option value="Disponible">Disponible</option>
+            <option value="En service">En service</option>
+            <option value="En maintenance">En maintenance</option>
+            <option value="Hors service">Hors service</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Assigné à</label>
+          <input
+            type="text"
+            value={editingTool.assignedTo || ''}
+            onChange={(e) => setEditingTool({ ...editingTool, assignedTo: e.target.value })}
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+          />
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <button
+            type="button"
+            onClick={() => setEditingTool(null)}
+            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium"
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium"
+          >
+            Enregistrer les modifications
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
+
       {/* MODAL NOUVEL OUTIL */}
       {showAddToolModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
