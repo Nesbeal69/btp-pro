@@ -35,7 +35,8 @@ import {
   Key,
   Layers,
   SlidersHorizontal,
-  FolderOpen
+  FolderOpen,
+  Archive
 } from 'lucide-react';
 
 export default function App() {
@@ -57,7 +58,13 @@ export default function App() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [userModalData, setUserModalData] = useState({ firestoreId: '', name: '', phone: '', role: 'Employé', password: '' });
 
+  // Modale pour choisir le rôle lors de l'approbation d'un compte
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [userToApprove, setUserToApprove] = useState(null);
+  const [selectedRoleToAssign, setSelectedRoleToAssign] = useState('Employé');
+
   const [users, setUsers] = useState([]);
+  const [archivedUsers, setArchivedUsers] = useState([]); // Pour garder la trace des supprimés
   const [equipment, setEquipment] = useState([]);
   const [requests, setRequests] = useState([]);
   const [plans, setPlans] = useState([]);
@@ -94,6 +101,14 @@ export default function App() {
   const [workerSearch, setWorkerSearch] = useState('');
   const [workerRoleFilter, setWorkerRoleFilter] = useState('all');
 
+  // Formater un numéro de téléphone 2 par 2 (ex: 0612345678 -> 06 12 34 56 78)
+  const formatPhoneFr = (phoneStr) => {
+    if (!phoneStr) return 'Non renseigné';
+    const cleaned = phoneStr.replace(/\s+/g, '');
+    const match = cleaned.match(/.{1,2}/g);
+    return match ? match.join(' ') : phoneStr;
+  };
+
   const formatDateFr = (dateString) => {
     if (!dateString) return '';
     try {
@@ -114,6 +129,10 @@ export default function App() {
   useEffect(() => {
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
+    });
+
+    const unsubArchived = onSnapshot(collection(db, "archivedUsers"), (snapshot) => {
+      setArchivedUsers(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
 
     const unsubEquipment = onSnapshot(collection(db, "equipment"), (snapshot) => {
@@ -143,6 +162,7 @@ export default function App() {
 
     return () => {
       unsubUsers();
+      unsubArchived();
       unsubEquipment();
       unsubRequests();
       unsubPlans();
@@ -178,6 +198,11 @@ export default function App() {
     if (!myProjectCode) return [];
     return users.filter(u => u.projectCode === myProjectCode || u.adminProjectCode === myProjectCode);
   }, [users, myProjectCode]);
+
+  const projectArchivedUsers = useMemo(() => {
+    if (!myProjectCode) return [];
+    return archivedUsers.filter(u => u.projectCode === myProjectCode);
+  }, [archivedUsers, myProjectCode]);
 
   const approvedUsers = useMemo(() => projectUsers.filter(u => u.status === 'approved'), [projectUsers]);
   const pendingUsers = useMemo(() => projectUsers.filter(u => u.status === 'pending' && u.role !== 'admin'), [projectUsers]);
@@ -350,14 +375,48 @@ export default function App() {
     } catch (e) { console.error(e); }
   };
 
-  const handleDeleteUser = async (firestoreId) => {
-    if (window.confirm("Supprimer cet utilisateur de votre chantier ?")) {
-      try { await deleteDoc(doc(db, "users", firestoreId)); } catch (e) { console.error(e); }
+  // Suppression d'un utilisateur : sauvegarde dans les archives pour garder son nom, et suppression de la collection active
+  const handleDeleteUser = async (userObj) => {
+    if (window.confirm(`Voulez-vous vraiment supprimer ${userObj.name} ? Il n'aura plus accès au site, mais son nom sera conservé dans l'historique des effectifs.`)) {
+      try {
+        // 1. Ajouter dans la collection "archivedUsers"
+        await addDoc(collection(db, "archivedUsers"), {
+          name: userObj.name,
+          email: userObj.email,
+          phone: userObj.phone || '',
+          role: userObj.role,
+          projectCode: userObj.projectCode || myProjectCode,
+          joinedAt: userObj.joinedAt || '',
+          deletedAt: new Date().toISOString().split('T')[0]
+        });
+
+        // 2. Supprimer de la collection active "users"
+        await deleteDoc(doc(db, "users", userObj.firestoreId));
+      } catch (e) {
+        console.error("Erreur suppression utilisateur :", e);
+      }
     }
   };
 
-  const handleApproveAccount = async (firestoreId) => {
-    try { await updateDoc(doc(db, "users", firestoreId), { status: 'approved' }); } catch (e) { console.error(e); }
+  const handleOpenApproveModal = (user) => {
+    setUserToApprove(user);
+    setSelectedRoleToAssign('Employé');
+    setShowApproveModal(true);
+  };
+
+  const handleConfirmApprove = async (e) => {
+    e.preventDefault();
+    if (!userToApprove) return;
+    try {
+      await updateDoc(doc(db, "users", userToApprove.firestoreId), { 
+        status: 'approved',
+        role: selectedRoleToAssign 
+      });
+      setShowApproveModal(false);
+      setUserToApprove(null);
+    } catch (e) { 
+      console.error("Erreur approbation :", e); 
+    }
   };
 
   const handleRejectAccount = async (firestoreId) => {
@@ -736,7 +795,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE PLANNING (DESIGN PRO & ÉPURÉ) --- */}
+        {/* --- MODULE PLANNING --- */}
         {activeTab === 'planning' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-cyan-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -759,7 +818,6 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {visiblePlans.map(plan => (
                 <div key={plan.firestoreId} className="bg-white border border-slate-200/80 hover:border-cyan-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-bl-full pointer-events-none group-hover:bg-cyan-500/10 transition-colors" />
                   <div>
                     <div className="flex justify-between items-center text-xs mb-3">
                       <span className="px-3 py-1 rounded-xl font-mono font-bold bg-cyan-50 text-cyan-700 border border-cyan-100">📅 {plan.formattedDate || formatDateFr(plan.date)}</span>
@@ -889,7 +947,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE EFFECTIFS --- */}
+        {/* --- MODULE EFFECTIFS (AVEC APPEL DIRECT ET NUMÉROS FORMATÉS 2 PAR 2) --- */}
         {activeTab === 'workers' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-emerald-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -917,10 +975,20 @@ export default function App() {
                       <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl border border-emerald-200">{user.role}</span>
                     </div>
 
-                    <div className="mt-4 flex items-center gap-3 text-xs text-slate-700 bg-slate-50 p-3 rounded-2xl border border-slate-200/60">
-                      <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl"><Phone className="w-4 h-4" /></div>
-                      <span className="font-mono font-bold">{user.phone || 'Non renseigné'}</span>
-                    </div>
+                    {/* Bloc Téléphone avec lien d'appel direct et format 2 par 2 */}
+                    <a 
+                      href={`tel:${user.phone ? user.phone.replace(/\s+/g, '') : ''}`}
+                      className="mt-4 flex items-center gap-3 text-xs text-slate-700 bg-emerald-50/50 hover:bg-emerald-100/80 p-3 rounded-2xl border border-emerald-200/60 transition-colors group cursor-pointer"
+                      title="Cliquer pour appeler"
+                    >
+                      <div className="p-2 bg-emerald-600 text-white rounded-xl shadow-sm group-hover:scale-110 transition-transform">
+                        <Phone className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-emerald-700 font-bold uppercase tracking-wider">Téléphone (Appel direct)</span>
+                        <span className="font-mono font-bold text-slate-900 text-sm">{formatPhoneFr(user.phone)}</span>
+                      </div>
+                    </a>
 
                     <div className="mt-2 text-[11px] text-slate-400 font-medium">Inscrit le : {user.joinedAt}</div>
                   </div>
@@ -929,7 +997,7 @@ export default function App() {
                     <div className="pt-3 border-t border-slate-100 flex gap-2">
                       <button onClick={() => handleOpenUserModal(user)} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors">Modifier</button>
                       {isAdmin && user.email !== currentUser.email && (
-                        <button onClick={() => handleDeleteUser(user.firestoreId)} className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded-xl transition-colors font-bold">🗑️</button>
+                        <button onClick={() => handleDeleteUser(user)} className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded-xl transition-colors font-bold" title="Supprimer et archiver">🗑️</button>
                       )}
                     </div>
                   )}
@@ -946,6 +1014,30 @@ export default function App() {
                 </div>
               )}
             </div>
+
+            {/* Historique des personnes supprimées (pour l'Admin) */}
+            {isAdmin && projectArchivedUsers.length > 0 && (
+              <div className="mt-12 space-y-4 pt-8 border-t border-slate-200">
+                <div className="flex items-center gap-2 text-slate-700">
+                  <Archive className="w-5 h-5 text-slate-500" />
+                  <h3 className="text-base font-bold">Historique des effectifs archivés (Anciens du chantier)</h3>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="divide-y divide-slate-100">
+                    {projectArchivedUsers.map((arch, idx) => (
+                      <div key={idx} className="p-4 flex justify-between items-center text-xs">
+                        <div>
+                          <span className="font-bold text-slate-800 text-sm">{arch.name}</span>
+                          <span className="ml-2 px-2 py-0.5 bg-slate-100 text-slate-600 rounded-lg">{arch.role}</span>
+                          <p className="text-slate-400 mt-0.5">Tél : {formatPhoneFr(arch.phone)} | Supprimé le : {arch.deletedAt}</p>
+                        </div>
+                        <span className="px-2.5 py-1 bg-red-50 text-red-600 font-semibold rounded-xl border border-red-100">Accès révoqué</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1074,7 +1166,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- VALIDATION COMPTES (ADMIN) --- */}
+        {/* --- VALIDATION COMPTES (ADMIN) AVEC CHOIX DU RÔLE --- */}
         {activeTab === 'accounts' && isAdmin && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-purple-900/40 flex items-center gap-4">
@@ -1092,10 +1184,10 @@ export default function App() {
                 <div key={user.firestoreId} className="bg-white border border-slate-200/80 p-6 rounded-3xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
                   <div>
                     <h3 className="text-base font-bold text-slate-900">{user.name} <span className="text-xs font-normal text-slate-500">({user.email})</span></h3>
-                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-emerald-600" /> <span className="font-mono">{user.phone}</span></p>
+                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-emerald-600" /> <span className="font-mono">{formatPhoneFr(user.phone)}</span></p>
                   </div>
                   <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <button onClick={() => handleApproveAccount(user.firestoreId)} className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all">Approuver</button>
+                    <button onClick={() => handleOpenApproveModal(user)} className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all">Approuver & Assigner un rôle</button>
                     <button onClick={() => handleRejectAccount(user.firestoreId)} className="flex-1 sm:flex-none px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-colors">Refuser</button>
                   </div>
                 </div>
@@ -1115,7 +1207,35 @@ export default function App() {
         )}
       </main>
 
-      {/* --- MODALES --- */}
+      {/* --- MODALE DE VALIDATION AVEC CHOIX DU RÔLE --- */}
+      {showApproveModal && userToApprove && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleConfirmApprove} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl border border-slate-200">
+            <h3 className="text-lg font-bold text-slate-900">Approuver l'accès pour {userToApprove.name}</h3>
+            <p className="text-xs text-slate-500">Veuillez choisir le rôle à attribuer à ce collaborateur au sein de votre équipe :</p>
+            
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Rôle dans l'équipe</label>
+              <select 
+                value={selectedRoleToAssign} 
+                onChange={e => setSelectedRoleToAssign(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none font-semibold"
+              >
+                <option value="Employé">👷‍♂️ Employé</option>
+                <option value="Intérimaire">⚡ Intérimaire</option>
+                <option value="admin">🛡️ Admin (Co-chef de chantier)</option>
+              </select>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setShowApproveModal(false)} className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 font-bold rounded-xl transition-colors">Annuler</button>
+              <button type="submit" className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-xs text-white font-bold rounded-xl shadow-md transition-all">Valider l'entrée</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* --- AUTRES MODALES --- */}
       {showAddVideoModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreateVideo} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
