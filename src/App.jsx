@@ -27,8 +27,6 @@ import {
   Phone,
   Search,
   Settings,
-  Video,
-  Play,
   ShieldAlert,
   Sparkles,
   ArrowUpRight,
@@ -36,7 +34,8 @@ import {
   Layers,
   SlidersHorizontal,
   FolderOpen,
-  Archive
+  Archive,
+  Smartphone
 } from 'lucide-react';
 
 export default function App() {
@@ -58,17 +57,19 @@ export default function App() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [userModalData, setUserModalData] = useState({ firestoreId: '', name: '', phone: '', role: 'Employé', password: '' });
 
-  // Modale pour choisir le rôle lors de l'approbation d'un compte
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [userToApprove, setUserToApprove] = useState(null);
   const [selectedRoleToAssign, setSelectedRoleToAssign] = useState('Employé');
 
   const [users, setUsers] = useState([]);
-  const [archivedUsers, setArchivedUsers] = useState([]); // Pour garder la trace des supprimés
+  const [archivedUsers, setArchivedUsers] = useState([]);
   const [equipment, setEquipment] = useState([]);
   const [requests, setRequests] = useState([]);
   const [plans, setPlans] = useState([]);
-  const [videos, setVideos] = useState([]);
+
+  // État pour la gestion du prompt d'installation PWA
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isStandalone, setIsStandalone] = useState(false);
 
   const [toolSearch, setToolSearch] = useState('');
   const [toolStatusFilter, setToolStatusFilter] = useState('all');
@@ -87,9 +88,6 @@ export default function App() {
     assignedTo: 'Dépôt Central' 
   });
 
-  const [showAddVideoModal, setShowAddVideoModal] = useState(false);
-  const [newVideoData, setNewVideoData] = useState({ title: '', category: 'Sécurité & Posture', url: '', description: '' });
-
   const [showAddPlanModal, setShowAddPlanModal] = useState(false);
   const [selectedWorkerFilter, setSelectedWorkerFilter] = useState('all');
   const [newPlanData, setNewPlanData] = useState({ title: '', targetUserId: 'all', date: new Date().toISOString().split('T')[0], description: '', files: [] });
@@ -101,7 +99,32 @@ export default function App() {
   const [workerSearch, setWorkerSearch] = useState('');
   const [workerRoleFilter, setWorkerRoleFilter] = useState('all');
 
-  // Formater un numéro de téléphone 2 par 2 (ex: 0612345678 -> 06 12 34 56 78)
+  // Détection si l'application est déjà installée sur l'écran d'accueil
+  useEffect(() => {
+    const checkStandalone = () => {
+      const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+      setIsStandalone(isInStandaloneMode);
+    };
+    checkStandalone();
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    });
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    } else {
+      alert("Pour installer l'application sur votre iPhone ou téléphone :\n1. Ouvrez le menu de votre navigateur (Partager ou 3 points).\n2. Sélectionnez 'Ajouter à l'écran d'accueil'.");
+    }
+  };
+
   const formatPhoneFr = (phoneStr) => {
     if (!phoneStr) return 'Non renseigné';
     const cleaned = phoneStr.replace(/\s+/g, '');
@@ -147,26 +170,12 @@ export default function App() {
       setPlans(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
 
-    const unsubVideos = onSnapshot(collection(db, "videos"), (snapshot) => {
-      const vList = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
-      if (vList.length === 0) {
-        const defaultVideos = [
-          { title: 'Prévention des TMS - Motion Design', category: 'Sécurité & Posture', url: 'http://www.youtube.com/watch?v=a4niEbOorAk', description: 'Vidéo de sensibilisation en motion design sur la prévention des Troubles Musculosquelettiques (TMS).' },
-          { title: 'Technique de sertissage Multicouche REMS', category: 'Technique Plomberie', url: 'https://www.youtube.com/watch?v=zlmTvpTUdNM', description: 'Procédure standard de préparation du tube, ébavurage et sertissage sécurisé.' }
-        ];
-        defaultVideos.forEach(v => addDoc(collection(db, "videos"), v));
-      } else {
-        setVideos(vList);
-      }
-    });
-
     return () => {
       unsubUsers();
       unsubArchived();
       unsubEquipment();
       unsubRequests();
       unsubPlans();
-      unsubVideos();
     };
   }, []);
 
@@ -284,20 +293,6 @@ export default function App() {
     } catch (e) { console.error(e); }
   };
 
-  const handleCreateVideo = async (e) => {
-    e.preventDefault();
-    if (!newVideoData.title || !newVideoData.url) return;
-    try {
-      await addDoc(collection(db, "videos"), newVideoData);
-      setShowAddVideoModal(false);
-      setNewVideoData({ title: '', category: 'Sécurité & Posture', url: '', description: '' });
-    } catch (e) { console.error(e); }
-  };
-
-  const handleDeleteVideo = async (firestoreId) => {
-    try { if (firestoreId) await deleteDoc(doc(db, "videos", firestoreId)); } catch (e) { console.error(e); }
-  };
-
   const handleRequestAttachmentChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -375,11 +370,9 @@ export default function App() {
     } catch (e) { console.error(e); }
   };
 
-  // Suppression d'un utilisateur : sauvegarde dans les archives pour garder son nom, et suppression de la collection active
   const handleDeleteUser = async (userObj) => {
     if (window.confirm(`Voulez-vous vraiment supprimer ${userObj.name} ? Il n'aura plus accès au site, mais son nom sera conservé dans l'historique des effectifs.`)) {
       try {
-        // 1. Ajouter dans la collection "archivedUsers"
         await addDoc(collection(db, "archivedUsers"), {
           name: userObj.name,
           email: userObj.email,
@@ -389,8 +382,6 @@ export default function App() {
           joinedAt: userObj.joinedAt || '',
           deletedAt: new Date().toISOString().split('T')[0]
         });
-
-        // 2. Supprimer de la collection active "users"
         await deleteDoc(doc(db, "users", userObj.firestoreId));
       } catch (e) {
         console.error("Erreur suppression utilisateur :", e);
@@ -681,6 +672,28 @@ export default function App() {
       </div>
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-8">
+        
+        {/* BANDEAU D'INSTALLATION PWA (S'affiche uniquement si l'app n'est PAS installée) */}
+        {!isStandalone && (
+          <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-blue-950 text-white p-4 rounded-3xl shadow-lg border border-blue-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-md">
+                <Smartphone className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold">Installez BÂTIR+ PRO sur votre téléphone !</h4>
+                <p className="text-xs text-slate-300 mt-0.5">Accédez au chantier en un clic depuis votre écran d'accueil, sans passer par le navigateur.</p>
+              </div>
+            </div>
+            <button 
+              onClick={handleInstallClick}
+              className="w-full sm:w-auto px-5 py-2.5 bg-blue-500 hover:bg-blue-400 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
+            >
+              📱 Installer l'application
+            </button>
+          </div>
+        )}
+
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
             <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white rounded-3xl p-8 md:p-10 shadow-xl border border-blue-900/50">
@@ -758,20 +771,6 @@ export default function App() {
                   <p className="text-xs text-slate-500 mt-1">Suivi des sertisseuses, carotteuses et entretien.</p>
                 </div>
                 <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-indigo-600">
-                  <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
-                </div>
-              </div>
-
-              <div onClick={() => setActiveTab('videos')} className="group bg-white border border-slate-200/80 hover:border-rose-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-3.5 bg-rose-50 text-rose-600 rounded-2xl"><Video className="w-6 h-6" /></div>
-                    <span className="px-2.5 py-1 bg-rose-50 text-rose-700 text-xs font-bold rounded-full">{videos.length} vidéos</span>
-                  </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-rose-600">Tutos & Sécurité</h3>
-                  <p className="text-xs text-slate-500 mt-1">Vidéos de prévention et bonnes pratiques.</p>
-                </div>
-                <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-rose-600">
                   <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
                 </div>
               </div>
@@ -947,7 +946,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE EFFECTIFS (AVEC APPEL DIRECT ET NUMÉROS FORMATÉS 2 PAR 2) --- */}
+        {/* --- MODULE EFFECTIFS --- */}
         {activeTab === 'workers' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-emerald-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -975,7 +974,6 @@ export default function App() {
                       <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl border border-emerald-200">{user.role}</span>
                     </div>
 
-                    {/* Bloc Téléphone avec lien d'appel direct et format 2 par 2 */}
                     <a 
                       href={`tel:${user.phone ? user.phone.replace(/\s+/g, '') : ''}`}
                       className="mt-4 flex items-center gap-3 text-xs text-slate-700 bg-emerald-50/50 hover:bg-emerald-100/80 p-3 rounded-2xl border border-emerald-200/60 transition-colors group cursor-pointer"
@@ -1015,7 +1013,6 @@ export default function App() {
               )}
             </div>
 
-            {/* Historique des personnes supprimées (pour l'Admin) */}
             {isAdmin && projectArchivedUsers.length > 0 && (
               <div className="mt-12 space-y-4 pt-8 border-t border-slate-200">
                 <div className="flex items-center gap-2 text-slate-700">
@@ -1038,59 +1035,6 @@ export default function App() {
                 </div>
               </div>
             )}
-          </div>
-        )}
-
-        {/* --- MODULE TUTOS & SÉCURITÉ --- */}
-        {activeTab === 'videos' && (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-rose-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div className="flex items-center gap-4">
-                <div className="p-4 bg-rose-600/20 border border-rose-400/30 rounded-2xl">
-                  <Video className="w-7 h-7 text-rose-400" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-black tracking-wide">Tutos, Postures & Sécurité Chantiers</h2>
-                  <p className="text-xs text-slate-300 mt-0.5">Vidéos de formation et prévention des risques professionnels.</p>
-                </div>
-              </div>
-              {isAdmin && (
-                <button onClick={() => setShowAddVideoModal(true)} className="px-4 py-2.5 bg-rose-500 hover:bg-rose-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-rose-500/20 transition-all">
-                  <Plus className="w-4 h-4" /> Ajouter une vidéo
-                </button>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {videos.map(vid => (
-                <div key={vid.firestoreId} className="bg-white border border-slate-200/80 hover:border-rose-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
-                  <div>
-                    <span className="px-3 py-1 bg-rose-50 text-rose-700 text-xs font-bold rounded-xl border border-rose-200">🎬 {vid.category}</span>
-                    <h3 className="text-base font-bold text-slate-900 mt-3">{vid.title}</h3>
-                    {vid.description && <p className="text-xs text-slate-600 mt-1 leading-relaxed">{vid.description}</p>}
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-100 flex gap-2">
-                    <a href={vid.url} target="_blank" rel="noopener noreferrer" className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl text-center flex items-center justify-center gap-1.5 shadow-md shadow-rose-600/20 transition-all">
-                      <Play className="w-3.5 h-3.5 fill-current" /> Regarder la vidéo
-                    </a>
-                    {isAdmin && (
-                      <button onClick={() => handleDeleteVideo(vid.firestoreId)} className="px-3.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded-xl transition-colors font-bold">🗑️</button>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              {videos.length === 0 && (
-                <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
-                  <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl mx-auto flex items-center justify-center">
-                    <Video className="w-6 h-6" />
-                  </div>
-                  <h4 className="text-sm font-bold text-slate-800">Aucune vidéo disponible</h4>
-                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Aucun tutoriel ou module de sécurité n'a été publié pour l'instant.</p>
-                </div>
-              )}
-            </div>
           </div>
         )}
 
@@ -1166,7 +1110,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- VALIDATION COMPTES (ADMIN) AVEC CHOIX DU RÔLE --- */}
+        {/* --- VALIDATION COMPTES (ADMIN) --- */}
         {activeTab === 'accounts' && isAdmin && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-purple-900/40 flex items-center gap-4">
@@ -1207,7 +1151,7 @@ export default function App() {
         )}
       </main>
 
-      {/* --- MODALE DE VALIDATION AVEC CHOIX DU RÔLE --- */}
+      {/* --- MODALES --- */}
       {showApproveModal && userToApprove && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleConfirmApprove} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl border border-slate-200">
@@ -1231,23 +1175,6 @@ export default function App() {
               <button type="button" onClick={() => setShowApproveModal(false)} className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 font-bold rounded-xl transition-colors">Annuler</button>
               <button type="submit" className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-xs text-white font-bold rounded-xl shadow-md transition-all">Valider l'entrée</button>
             </div>
-          </form>
-        </div>
-      )}
-
-      {/* --- AUTRES MODALES --- */}
-      {showAddVideoModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleCreateVideo} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-900">Ajouter une vidéo</h3>
-            <input type="text" placeholder="Titre" value={newVideoData.title} onChange={e => setNewVideoData({...newVideoData, title: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
-            <select value={newVideoData.category} onChange={e => setNewVideoData({...newVideoData, category: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
-              <option value="Sécurité & Posture">Sécurité & Posture</option>
-              <option value="Technique Plomberie">Technique Plomberie</option>
-            </select>
-            <input type="url" placeholder="Lien YouTube" value={newVideoData.url} onChange={e => setNewVideoData({...newVideoData, url: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
-            <textarea placeholder="Description" value={newVideoData.description} onChange={e => setNewVideoData({...newVideoData, description: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs h-20" />
-            <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowAddVideoModal(false)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl">Annuler</button><button type="submit" className="px-4 py-2 bg-rose-600 text-white text-xs rounded-xl font-semibold">Publier</button></div>
           </form>
         </div>
       )}
