@@ -64,17 +64,18 @@ export default function App() {
   const [showAddToolModal, setShowAddToolModal] = useState(false);
   const [newToolData, setNewToolData] = useState({ id: '', name: '', brand: 'REMS', category: 'Sertissage', status: 'Disponible' });
 
-  // États Spécifiques au Planning Avancé
+  // États Planning & PDF Réel
   const [showAddPlanModal, setShowAddPlanModal] = useState(false);
-  const [planningViewMode, setPlanningViewMode] = useState('week'); // 'week' ou 'month'
+  const [planningViewMode, setPlanningViewMode] = useState('week');
   const [selectedWorkerFilter, setSelectedWorkerFilter] = useState('all');
   
   const [newPlanData, setNewPlanData] = useState({
     title: '',
     targetUserId: 'all',
     date: new Date().toISOString().split('T')[0],
-    pdfName: '',
-    description: ''
+    description: '',
+    fileName: '',
+    fileData: '' // Stockera le fichier en base64
   });
 
   // Synchronisation Firestore
@@ -212,7 +213,22 @@ export default function App() {
     }
   };
 
-  // --- LOGIQUE PLANNING & ATTACHEMENT PDF ---
+  // --- GESTION UPLOAD FICHIER PDF RÉEL ---
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewPlanData(prev => ({
+          ...prev,
+          fileName: file.name,
+          fileData: reader.result // Base64 du PDF
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleUploadPlan = async (e) => {
     e.preventDefault();
     if (!newPlanData.title) return;
@@ -227,13 +243,14 @@ export default function App() {
       await addDoc(collection(db, "plans"), {
         title: newPlanData.title,
         description: newPlanData.description || '',
-        fileName: newPlanData.pdfName ? `${newPlanData.pdfName}.pdf` : 'Plan_Execution.pdf',
+        fileName: newPlanData.fileName || 'Plan_Execution.pdf',
+        fileData: newPlanData.fileData || '',
         targetUserId: newPlanData.targetUserId === 'all' ? 'all' : Number(newPlanData.targetUserId),
         targetName: targetName,
         date: newPlanData.date
       });
       setShowAddPlanModal(false);
-      setNewPlanData({ title: '', targetUserId: 'all', date: new Date().toISOString().split('T')[0], pdfName: '', description: '' });
+      setNewPlanData({ title: '', targetUserId: 'all', date: new Date().toISOString().split('T')[0], description: '', fileName: '', fileData: '' });
     } catch (error) {
       console.error("Erreur ajout planning :", error);
     }
@@ -245,6 +262,20 @@ export default function App() {
     } catch (error) {
       console.error(error);
     }
+  };
+
+  // Fonction de téléchargement réel du PDF
+  const handleDownloadPdf = (plan) => {
+    if (!plan.fileData) {
+      alert("Aucun fichier PDF rattaché à cette tâche.");
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = plan.fileData;
+    link.download = plan.fileName || 'document.pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleLogin = (e) => {
@@ -300,16 +331,11 @@ export default function App() {
   const pendingUsers = useMemo(() => users.filter(u => u.status === 'pending'), [users]);
   const approvedUsers = useMemo(() => users.filter(u => u.status === 'approved'), [users]);
   
-  // FILTRAGE STRICT DU PLANNING
   const visiblePlans = useMemo(() => {
     if (!currentUser) return [];
-    
-    // Si l'utilisateur est ouvrier, il ne voit QUE ce qui lui est attribué ou collectif
     if (currentUser.role !== 'admin') {
       return plans.filter(p => p.targetUserId === 'all' || p.targetUserId === currentUser.id);
     }
-
-    // Si Admin, il peut filtrer par ouvrier ou voir tout
     if (selectedWorkerFilter === 'all') return plans;
     return plans.filter(p => p.targetUserId === Number(selectedWorkerFilter));
   }, [plans, currentUser, selectedWorkerFilter]);
@@ -532,7 +558,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE PLANNING ULTRA COMPLET (SEMAINE / MOIS + PDF) --- */}
+        {/* --- MODULE PLANNING & PDF RÉEL --- */}
         {activeTab === 'planning' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-md">
@@ -546,7 +572,6 @@ export default function App() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                {/* Sélecteur Vue Semaine / Mois */}
                 <div className="flex rounded-xl bg-slate-950 p-1 border border-slate-800">
                   <button 
                     onClick={() => setPlanningViewMode('week')}
@@ -562,7 +587,6 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Filtre Ouvrier pour l'Admin */}
                 {isAdmin && (
                   <select 
                     value={selectedWorkerFilter}
@@ -584,7 +608,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* VUE GRILLE DE PLANNING */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {visiblePlans.map(plan => (
                 <div key={plan.firestoreId || plan.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3 shadow-md flex flex-col justify-between">
@@ -597,14 +620,18 @@ export default function App() {
                     <h3 className="text-sm font-bold text-white mt-2">{plan.title}</h3>
                     {plan.description && <p className="text-xs text-slate-300 mt-1">{plan.description}</p>}
 
-                    {/* Bloc PDF téléchargeable */}
+                    {/* Vrai Bloc PDF Téléchargeable */}
                     <div className="mt-3 p-2.5 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-red-400" />
-                        <span className="text-xs text-slate-200 font-medium truncate max-w-[150px]">{plan.fileName}</span>
+                        <FileText className="w-4 h-4 text-red-400 shrink-0" />
+                        <span className="text-xs text-slate-200 font-medium truncate max-w-[160px]">{plan.fileName}</span>
                       </div>
-                      <button onClick={() => alert(`Téléchargement simulé de : ${plan.fileName}`)} className="p-1 text-cyan-400 hover:text-cyan-300" title="Télécharger PDF">
-                        <Download className="w-4 h-4" />
+                      <button 
+                        onClick={() => handleDownloadPdf(plan)} 
+                        className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white text-xs rounded-lg flex items-center gap-1 font-semibold transition-colors"
+                        title="Télécharger le PDF"
+                      >
+                        <Download className="w-3.5 h-3.5" /> Ouvrir / Télécharger
                       </button>
                     </div>
                   </div>
@@ -747,7 +774,7 @@ export default function App() {
         )}
       </main>
 
-      {/* --- MODALE CREATION TÂCHE & PDF (ADMIN) --- */}
+      {/* --- MODALE CREATION TÂCHE & UPLOAD PDF RÉEL --- */}
       {showAddPlanModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
           <form onSubmit={handleUploadPlan} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
@@ -774,8 +801,14 @@ export default function App() {
             </div>
 
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Nom du Plan / Fichier PDF</label>
-              <input type="text" placeholder="ex: Plan_Plomberie_BatA" value={newPlanData.pdfName} onChange={e => setNewPlanData({...newPlanData, pdfName: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+              <label className="block text-xs text-slate-400 mb-1">Sélectionner le fichier PDF (Plan / Fiche)</label>
+              <input 
+                type="file" 
+                accept=".pdf" 
+                onChange={handleFileChange} 
+                required 
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500" 
+              />
             </div>
 
             <div>
@@ -791,7 +824,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALES ANCIENNES */}
+      {/* MODALES SECONDAIRES */}
       {showAddSiteModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreateSite} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4">
