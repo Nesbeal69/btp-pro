@@ -228,9 +228,16 @@ export default function App() {
     e.preventDefault();
     if (!newToolData.name || !newToolData.id) return;
     try {
+      const initialNote = {
+        id: Date.now(),
+        author: currentUser ? currentUser.name : 'Admin',
+        date: new Date().toISOString().split('T')[0],
+        text: `Création de la machine et affectation initiale à : ${newToolData.assignedTo} (Statut: ${newToolData.status})`
+      };
+
       await addDoc(collection(db, "equipment"), {
         ...newToolData,
-        notes: []
+        notes: [initialNote]
       });
       setShowAddToolModal(false);
       setNewToolData({ id: '', name: '', brand: 'REMS', category: 'Sertissage', status: 'Disponible', assignedTo: 'Dépôt Central' });
@@ -252,14 +259,38 @@ export default function App() {
     setEditToolForm({ assignedTo: tool.assignedTo || 'Dépôt Central', status: tool.status || 'Disponible' });
   };
 
+  // Enregistrement de la modification de l'outil avec ajout automatique d'une note d'historique
   const handleSaveToolEdit = async (e) => {
     e.preventDefault();
     if (!editingTool || !editingTool.firestoreId) return;
+
     try {
-      await updateDoc(doc(db, "equipment", editingTool.firestoreId), {
+      const toolRef = doc(db, "equipment", editingTool.firestoreId);
+      
+      // Construction d'une note automatique retraçant le changement
+      let changesText = [];
+      if (editingTool.assignedTo !== editToolForm.assignedTo) {
+        changesText.push(`Réassigné de [${editingTool.assignedTo || 'Dépôt'}] vers [${editToolForm.assignedTo}]`);
+      }
+      if (editingTool.status !== editToolForm.status) {
+        changesText.push(`Statut modifié de [${editingTool.status || 'Disponible'}] vers [${editToolForm.status}]`);
+      }
+
+      const newHistoryNote = {
+        id: Date.now(),
+        author: currentUser ? currentUser.name : 'Admin',
+        date: new Date().toISOString().split('T')[0],
+        text: changesText.length > 0 ? changesText.join(' | ') : 'Mise à jour des informations de la machine.'
+      };
+
+      const updatedNotes = [newHistoryNote, ...(editingTool.notes || [])];
+
+      await updateDoc(toolRef, {
         assignedTo: editToolForm.assignedTo,
-        status: editToolForm.status
+        status: editToolForm.status,
+        notes: updatedNotes
       });
+
       setEditingTool(null);
     } catch (error) {
       console.error(error);
@@ -1261,14 +1292,14 @@ export default function App() {
             </div>
 
             <div className="space-y-2 pt-2 border-t border-slate-100">
-              <span className="text-xs font-bold text-slate-700">Historique des notes :</span>
+              <span className="text-xs font-bold text-slate-700">Historique des notes et modifications :</span>
               {selectedTool.notes && selectedTool.notes.map((note) => (
                 <div key={note.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
                   <div className="flex justify-between text-[11px] text-slate-400 font-medium">
                     <span>Par {note.author}</span>
                     <span>{note.date}</span>
                   </div>
-                  <p className="text-slate-700">{note.text}</p>
+                  <p className="text-slate-700 font-medium">{note.text}</p>
                 </div>
               ))}
               {(!selectedTool.notes || selectedTool.notes.length === 0) && (
