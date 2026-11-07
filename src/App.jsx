@@ -66,7 +66,7 @@ const INITIAL_PLANS = [
   { id: 2, title: 'Feuille de route - Thomas Bernard', fileName: 'Route_Thomas_Olives.pdf', targetUserId: 3, targetName: 'Thomas Bernard', date: '2026-11-06' }
 ];
 
-export default function App() 
+export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authMode, setAuthMode] = useState('login');
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -821,3 +821,4 @@ const handleValidateRequest = (reqId) => {
         </div>
       )}
     </div>  );
+}
