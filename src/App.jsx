@@ -1281,3 +1281,91 @@ export default function App() {
     </div>
   );
 }
+// --- COMPOSANT MODALE AJOUTER TÂCHE ---
+export function ModalAjouterTache({ isOpen, onClose, onSubmit }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
+      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+        
+        {/* Entête */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+          <div>
+            <h3 className="text-lg font-semibold text-white">Assigner une tâche</h3>
+            <p className="text-xs text-slate-400 mt-0.5">Renseignez les détails de l'intervention pour vos équipes.</p>
+          </div>
+          <button 
+            onClick={onClose}
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Formulaire */}
+        <form onSubmit={onSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">Titre de l'intervention</label>
+            <input
+              type="text"
+              placeholder="Ex: Pose raccordement sanitaire Bâtiment A"
+              className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">Attribuer à</label>
+            <select className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="all">Toute l'équipe</option>
+              <option value="eq1">Équipe Plomberie</option>
+              <option value="eq2">Équipe Chauffage</option>
+            </select>
+          </div>
+
+          {/* Champ Date avec ouverture au clic partout */}
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">Date d'exécution</label>
+            <div className="relative cursor-pointer" onClick={(e) => {
+              const input = e.currentTarget.querySelector('input[type="date"]');
+              if (input && input.showPicker) input.showPicker();
+            }}>
+              <input
+                type="date"
+                defaultValue={new Date().toISOString().split('T')[0]}
+                className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">Consignes spécifiques</label>
+            <textarea
+              rows="3"
+              placeholder="Détails du travail, matériel requis..."
+              className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            ></textarea>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800 mt-6">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-xl shadow-lg shadow-blue-600/20"
+            >
+              Publier l'intervention
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+  );
+}
