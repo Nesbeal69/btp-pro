@@ -8,6 +8,7 @@ import {
   ClipboardList, 
   UserCheck, 
   Plus, 
+  Minus,
   X, 
   Clock, 
   MapPin, 
@@ -79,12 +80,15 @@ export default function App() {
     files: []
   });
 
-  // États Module Demandes de Matériel
+  // États Module Demandes de Matériel avec Quantité et Pièce jointe optionnelle
   const [showAddRequestModal, setShowAddRequestModal] = useState(false);
   const [newRequestData, setNewRequestData] = useState({
     items: '',
-    urgency: 'Normal', // Normal, Urgent, Critique
-    description: ''
+    quantity: 1,
+    urgency: 'Normal',
+    description: '',
+    attachmentName: '',
+    attachmentData: ''
   });
 
   const formatDateFr = (dateString) => {
@@ -233,6 +237,21 @@ export default function App() {
   };
 
   // --- GESTION DEMANDES DE MATÉRIEL ---
+  const handleRequestAttachmentChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewRequestData(prev => ({
+          ...prev,
+          attachmentName: file.name,
+          attachmentData: reader.result
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleCreateRequest = async (e) => {
     e.preventDefault();
     if (!newRequestData.items || !currentUser) return;
@@ -240,16 +259,19 @@ export default function App() {
     try {
       await addDoc(collection(db, "requests"), {
         items: newRequestData.items,
+        quantity: newRequestData.quantity || 1,
         urgency: newRequestData.urgency,
         description: newRequestData.description || '',
         requester: currentUser.name,
         requesterId: currentUser.id,
-        status: 'En attente', // En attente, Validé, Reçu au dépôt, Refusé
+        status: 'En attente', // En attente, Validé / Commandé, Reçu au dépôt, Refusé
         createdAt: new Date().toISOString().split('T')[0],
-        receivedDate: null
+        receivedDate: null,
+        attachmentName: newRequestData.attachmentName || '',
+        attachmentData: newRequestData.attachmentData || ''
       });
       setShowAddRequestModal(false);
-      setNewRequestData({ items: '', urgency: 'Normal', description: '' });
+      setNewRequestData({ items: '', quantity: 1, urgency: 'Normal', description: '', attachmentName: '', attachmentData: '' });
     } catch (error) {
       console.error("Erreur création demande :", error);
     }
@@ -275,6 +297,13 @@ export default function App() {
       console.error(error);
     }
   };
+
+  // Filtrer les demandes selon le rôle (Admin voit tout, Ouvrier voit seulement les siennes)
+  const visibleRequests = useMemo(() => {
+    if (!currentUser) return [];
+    if (currentUser.role === 'admin') return requests;
+    return requests.filter(r => r.requesterId === currentUser.id);
+  }, [requests, currentUser]);
 
   // Gestion de plusieurs fichiers PDF Planning
   const handleMultipleFilesChange = (e) => {
@@ -562,7 +591,7 @@ export default function App() {
                 <div>
                   <div className="flex justify-between items-start mb-3">
                     <span className="text-3xl p-2.5 bg-amber-500/10 rounded-xl">📋</span>
-                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[11px] font-bold rounded-full">{requests.length} demandes</span>
+                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[11px] font-bold rounded-full">{visibleRequests.length} demandes</span>
                   </div>
                   <h3 className="text-base font-bold text-white group-hover:text-amber-400">Demandes de Matériel</h3>
                   <p className="text-xs text-slate-400 mt-1">Besoins en raccords, tubes et fournitures.</p>
@@ -733,7 +762,7 @@ export default function App() {
                   <ClipboardList className="w-5 h-5 text-amber-400" /> Demandes de matériel & fournitures
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  {isAdmin ? "Gérez les besoins chantier, validez ou refusez les commandes" : "Faites vos demandes de matériel en quelques clics"}
+                  {isAdmin ? "Gérez les besoins chantier, validez ou refusez les commandes" : "Retrouvez vos demandes de matériel et suivez leur statut"}
                 </p>
               </div>
 
@@ -742,17 +771,12 @@ export default function App() {
               </button>
             </div>
 
-            {/* Liste des demandes */}
+            {/* Liste des demandes (Admin voit tout, Ouvrier voit seulement les siennes) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {requests.map(req => {
+              {visibleRequests.map(req => {
                 let urgencyBadge = <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold rounded">Normal</span>;
                 if (req.urgency === 'Urgent') urgencyBadge = <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded">⚡ Urgent</span>;
                 if (req.urgency === 'Critique') urgencyBadge = <span className="px-2 py-0.5 bg-red-500/20 text-red-300 text-[10px] font-bold rounded">🔥 Critique</span>;
-
-                let statusBadge = <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 text-xs font-bold rounded-lg flex items-center gap-1">⏳ En attente</span>;
-                if (req.status === 'Validé') statusBadge = <span className="px-2.5 py-1 bg-blue-500/20 text-blue-300 text-xs font-bold rounded-lg flex items-center gap-1">✅ Validé / Commandé</span>;
-                if (req.status === 'Reçu au dépôt') statusBadge = <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 text-xs font-bold rounded-lg flex items-center gap-1">📦 Reçu ({req.receivedDate})</span>;
-                if (req.status === 'Refusé') statusBadge = <span className="px-2.5 py-1 bg-red-500/20 text-red-300 text-xs font-bold rounded-lg flex items-center gap-1">❌ Refusé</span>;
 
                 return (
                   <div key={req.firestoreId} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3 shadow-md flex flex-col justify-between">
@@ -762,37 +786,72 @@ export default function App() {
                         {urgencyBadge}
                       </div>
 
-                      <h3 className="text-sm font-bold text-white">{req.items}</h3>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-white">{req.items}</h3>
+                        <span className="px-2 py-0.5 bg-slate-800 text-cyan-300 text-xs font-mono font-bold rounded-lg">Qté : {req.quantity || 1}</span>
+                      </div>
+
                       {req.description && <p className="text-xs text-slate-300 mt-1">{req.description}</p>}
+
+                      {/* Pièce jointe optionnelle si présente */}
+                      {req.attachmentData && (
+                        <div className="mt-2 p-2 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-cyan-400 shrink-0" />
+                            <span className="text-xs text-slate-200 font-medium truncate max-w-[140px]">{req.attachmentName || 'Pièce jointe'}</span>
+                          </div>
+                          <button onClick={() => handleDownloadSinglePdf({ name: req.attachmentName, data: req.attachmentData })} className="px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] rounded-lg font-semibold flex items-center gap-1">
+                            <Download className="w-3 h-3" /> Ouvrir
+                          </button>
+                        </div>
+                      )}
 
                       <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between">
                         <span className="text-[11px] text-slate-400">Statut :</span>
-                        {statusBadge}
+                        {isAdmin ? (
+                          /* Menu déroulant pour l'Admin */
+                          <select 
+                            value={req.status} 
+                            onChange={(e) => handleUpdateRequestStatus(req.firestoreId, e.target.value)}
+                            className={`px-2.5 py-1 text-xs font-semibold rounded-xl border border-slate-700 focus:outline-none ${
+                              req.status === 'Validé / Commandé' ? 'bg-blue-600/30 text-blue-300' :
+                              req.status === 'Reçu au dépôt' ? 'bg-emerald-600/30 text-emerald-300' :
+                              req.status === 'Refusé' ? 'bg-red-600/30 text-red-300' :
+                              'bg-amber-600/30 text-amber-300'
+                            }`}
+                          >
+                            <option value="En attente" className="bg-slate-900 text-amber-300">⏳ En attente</option>
+                            <option value="Validé / Commandé" className="bg-slate-900 text-blue-300">✅ Validé / Commandé</option>
+                            <option value="Reçu au dépôt" className="bg-slate-900 text-emerald-300">📦 Reçu au dépôt</option>
+                            <option value="Refusé" className="bg-slate-900 text-red-300">❌ Refusé</option>
+                          </select>
+                        ) : (
+                          /* Affichage simple pour l'Ouvrier */
+                          <span className={`px-2.5 py-1 text-xs font-bold rounded-lg ${
+                            req.status === 'Validé / Commandé' ? 'bg-blue-500/20 text-blue-300' :
+                            req.status === 'Reçu au dépôt' ? 'bg-emerald-500/20 text-emerald-300' :
+                            req.status === 'Refusé' ? 'bg-red-500/20 text-red-300' :
+                            'bg-amber-500/20 text-amber-300'
+                          }`}>
+                            {req.status === 'Reçu au dépôt' ? `📦 Reçu (${req.receivedDate})` : req.status}
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    {/* Actions Admin pour valider, marquer comme reçu, refuser ou supprimer */}
-                    <div className="pt-3 border-t border-slate-800">
-                      {isAdmin ? (
-                        <div className="space-y-1.5">
-                          <div className="flex gap-1">
-                            <button onClick={() => handleUpdateRequestStatus(req.firestoreId, 'Validé')} className="flex-1 py-1 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 text-[11px] font-semibold rounded-lg">Valider</button>
-                            <button onClick={() => handleUpdateRequestStatus(req.firestoreId, 'Reçu au dépôt')} className="flex-1 py-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 text-[11px] font-semibold rounded-lg">Reçu</button>
-                          </div>
-                          <div className="flex gap-1">
-                            <button onClick={() => handleUpdateRequestStatus(req.firestoreId, 'Refusé')} className="flex-1 py-1 bg-red-600/30 hover:bg-red-600/50 text-red-300 text-[11px] font-semibold rounded-lg">Refuser</button>
-                            <button onClick={() => handleDeleteRequest(req.firestoreId)} className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] rounded-lg">🗑️ Supprimer</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-[11px] text-slate-400 italic">Demandé le {req.createdAt}</div>
-                      )}
-                    </div>
+                    {/* Bouton Supprimer pour l'Admin */}
+                    {isAdmin && (
+                      <div className="pt-3 border-t border-slate-800 flex justify-end">
+                        <button onClick={() => handleDeleteRequest(req.firestoreId)} className="px-2.5 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs rounded-lg transition-colors flex items-center gap-1">
+                          🗑️ Supprimer
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
 
-              {requests.length === 0 && (
+              {visibleRequests.length === 0 && (
                 <div className="col-span-full py-8 text-center bg-slate-900 border border-slate-800 rounded-2xl text-slate-400 text-xs italic">Aucune demande de matériel en cours.</div>
               )}
             </div>
@@ -893,15 +952,37 @@ export default function App() {
         )}
       </main>
 
-      {/* --- MODALE NOUVELLE DEMANDE DE MATÉRIEL --- */}
+      {/* --- MODALE NOUVELLE DEMANDE DE MATÉRIEL (AVEC BOUTONS + / - ET PIÈCE JOINTE OPTIONNELLE) --- */}
       {showAddRequestModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleCreateRequest} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-white">Demande de Matériel</h3>
+          <form onSubmit={handleCreateRequest} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold text-white">Nouvelle Demande de Matériel</h3>
             
             <div>
               <label className="block text-xs text-slate-400 mb-1">Matériel / Fournitures souhaitées</label>
-              <input type="text" placeholder="ex: 3 couronnes multicouche Ø16, coudes..." value={newRequestData.items} onChange={e => setNewRequestData({...newRequestData, items: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+              <input type="text" placeholder="ex: Couronnes multicouche Ø16, coudes..." value={newRequestData.items} onChange={e => setNewRequestData({...newRequestData, items: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+            </div>
+
+            {/* Gestion de la quantité avec boutons + et - */}
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Quantité</label>
+              <div className="flex items-center gap-3 bg-slate-950 p-2 rounded-xl border border-slate-800 w-fit">
+                <button 
+                  type="button" 
+                  onClick={() => setNewRequestData(prev => ({ ...prev, quantity: Math.max(1, prev.quantity - 1) }))}
+                  className="w-8 h-8 bg-slate-800 hover:bg-slate-700 text-white rounded-lg flex items-center justify-center font-bold text-sm transition-colors"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <span className="w-10 text-center font-mono font-bold text-sm text-cyan-400">{newRequestData.quantity}</span>
+                <button 
+                  type="button" 
+                  onClick={() => setNewRequestData(prev => ({ ...prev, quantity: prev.quantity + 1 }))}
+                  className="w-8 h-8 bg-slate-800 hover:bg-slate-700 text-white rounded-lg flex items-center justify-center font-bold text-sm transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             <div>
@@ -911,6 +992,21 @@ export default function App() {
                 <option value="Urgent">⚡ Urgent</option>
                 <option value="Critique">🔥 Critique (Chantier bloqué)</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Pièce jointe (Optionnel : Photo ou PDF)</label>
+              <input 
+                type="file" 
+                accept="image/*,.pdf" 
+                onChange={handleRequestAttachmentChange} 
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-600 file:text-white hover:file:bg-amber-500 cursor-pointer" 
+              />
+              {newRequestData.attachmentName && (
+                <div className="mt-1.5 text-[11px] text-emerald-400 flex items-center gap-1">
+                  <span>📎 Fichier joint : {newRequestData.attachmentName}</span>
+                </div>
+              )}
             </div>
 
             <div>
