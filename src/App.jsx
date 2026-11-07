@@ -70,6 +70,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authMode, setAuthMode] = useState('login');
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [toolSearch, setToolSearch] = useState('');
 
   const [editingTool, setEditingTool] = useState(null);
   const [editToolForm, setEditToolForm] = useState({ assignedTo: '', status: '' });
@@ -87,14 +88,25 @@ export default function App() {
   const [equipment, setEquipment] = useState(INITIAL_EQUIPMENT);
   const [requests, setRequests] = useState(INITIAL_REQUESTS);
   const [plans, setPlans] = useState(INITIAL_PLANS);
+  const filteredEquipment = useMemo(() => {
+  return equipment.filter(tool => {
+    const query = toolSearch.toLowerCase().trim();
+    return (
+      tool.name.toLowerCase().includes(query) ||
+      tool.id.toLowerCase().includes(query) ||
+      tool.brand.toLowerCase().includes(query) ||
+      (tool.assignedTo && tool.assignedTo.toLowerCase().includes(query))
+    );
+  });
+}, [equipment, toolSearch]);
 
-  const handleOpenEditModal = (tool) => {
+  function handleOpenEditModal(tool) {
     setEditingTool(tool);
     setEditToolForm({
       assignedTo: tool.assignedTo || '',
       status: tool.status || 'Disponible'
     });
-  };
+  }
 
   const handleDeleteTool = (toolId) => {
     setEquipment(equipment.filter(t => t.id !== toolId));
@@ -683,17 +695,26 @@ export default function App() {
 
 {activeTab === 'tools' && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>🔧</span> Parc Outillage & Matériel</h2>
-              {isAdmin && (
-                <button onClick={() => setShowAddToolModal(true)} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 transition-colors text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow">
-                  <Plus className="w-4 h-4" /> Ajouter une machine
-                </button>
-              )}
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <input 
+                  type="text"
+                  value={toolSearch}
+                  onChange={e => setToolSearch(e.target.value)}
+                  placeholder="Rechercher (nom, ID, assigné...)"
+                  className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white w-full sm:w-64 focus:outline-none focus:border-indigo-500"
+                />
+                {isAdmin && (
+                  <button onClick={() => setShowAddToolModal(true)} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 transition-colors text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow shrink-0">
+                    <Plus className="w-4 h-4" /> Ajouter une machine
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {equipment.map(tool => (
+              {filteredEquipment.map(tool => (
                 <div key={tool.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 shadow-md flex flex-col justify-between">
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs">
@@ -742,6 +763,9 @@ export default function App() {
                   </div>
                 </div>
               ))}
+              {filteredEquipment.length === 0 && (
+                <p className="text-xs text-slate-400 italic col-span-full">Aucun outil ne correspond à votre recherche.</p>
+              )}
             </div>
           </div>
         )}
