@@ -23,15 +23,15 @@ import {
   Filter,
   CheckCircle2,
   AlertCircle,
-  PackageCheck
+  PackageCheck,
+  Phone,
+  Search
 } from 'lucide-react';
 
 const INITIAL_USERS = [
-  { id: 1, name: 'Jean Dupont', email: 'admin@btppro.fr', role: 'admin', team: 'Direction', siteId: null, status: 'approved', joinedAt: '2024-01-10' },
-  { id: 2, name: 'Marc Vasseur', email: 'marc@btppro.fr', role: 'chef', team: 'Équipe Chauffage', siteId: 1, status: 'approved', joinedAt: '2024-02-15' },
-  { id: 3, name: 'Thomas Bernard', email: 'thomas@btppro.fr', role: 'ouvrier', team: 'Équipe Plomberie 1', siteId: 1, status: 'approved', joinedAt: '2024-03-01' },
-  { id: 4, name: 'Lucas Morel', email: 'lucas@btppro.fr', role: 'ouvrier', team: 'Équipe Sanitaire', siteId: 2, status: 'pending', joinedAt: '2026-11-05' },
-  { id: 5, name: 'Antoine Girard', email: 'antoine@btppro.fr', role: 'chef', team: 'Équipe Chauffage', siteId: null, status: 'pending', joinedAt: '2026-11-06' }
+  { id: 1, name: 'Jean Dupont', email: 'admin@btppro.fr', phone: '06 12 34 56 78', role: 'admin', team: 'Direction', status: 'approved', joinedAt: '2024-01-10' },
+  { id: 2, name: 'Marc Vasseur', email: 'marc@btppro.fr', phone: '06 98 76 54 32', role: 'Employé', team: 'Équipe Chauffage', status: 'approved', joinedAt: '2024-02-15' },
+  { id: 3, name: 'Thomas Bernard', email: 'thomas@btppro.fr', phone: '06 11 22 33 44', role: 'Intérimaire', team: 'Équipe Plomberie 1', status: 'approved', joinedAt: '2024-03-01' }
 ];
 
 export default function App() {
@@ -47,9 +47,13 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState('');
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
+  const [regPhone, setRegPhone] = useState('');
   const [regPassword, setRegPassword] = useState('');
-  const [regRole, setRegRole] = useState('ouvrier');
   const [authError, setAuthError] = useState('');
+
+  // États pour la modification d'un utilisateur par l'Admin dans l'onglet Effectifs
+  const [editingUser, setEditingUser] = useState(null);
+  const [editUserRole, setEditUserRole] = useState('Employé');
 
   // Données Firestore
   const [users, setUsers] = useState(INITIAL_USERS);
@@ -82,7 +86,7 @@ export default function App() {
 
   // États Module Demandes de Matériel & Filtre de statut
   const [showAddRequestModal, setShowAddRequestModal] = useState(false);
-  const [requestStatusFilter, setRequestStatusFilter] = useState('all'); // all, En attente, Validé / Commandé, Reçu au dépôt, Refusé
+  const [requestStatusFilter, setRequestStatusFilter] = useState('all');
   const [newRequestData, setNewRequestData] = useState({
     items: '',
     quantity: 1,
@@ -91,6 +95,10 @@ export default function App() {
     attachmentName: '',
     attachmentData: ''
   });
+
+  // États Module Effectifs (Recherche & Filtre)
+  const [workerSearch, setWorkerSearch] = useState('');
+  const [workerRoleFilter, setWorkerRoleFilter] = useState('all');
 
   const formatDateFr = (dateString) => {
     if (!dateString) return '';
@@ -299,7 +307,6 @@ export default function App() {
     }
   };
 
-  // Filtrer les demandes selon le rôle (Admin voit tout, Ouvrier voit ses demandes) ET selon le filtre de statut choisi
   const visibleRequests = useMemo(() => {
     if (!currentUser) return [];
     let list = currentUser.role === 'admin' ? requests : requests.filter(r => r.requesterId === currentUser.id);
@@ -309,6 +316,28 @@ export default function App() {
     }
     return list;
   }, [requests, currentUser, requestStatusFilter]);
+
+  // --- GESTION EFFECTIFS & UTILISATEURS ---
+  const approvedUsers = useMemo(() => users.filter(u => u.status === 'approved'), [users]);
+
+  const filteredWorkers = useMemo(() => {
+    return approvedUsers.filter(user => {
+      const matchesSearch = user.name.toLowerCase().includes(workerSearch.toLowerCase().trim());
+      const matchesRole = workerRoleFilter === 'all' || user.role === workerRoleFilter;
+      return matchesSearch && matchesRole;
+    });
+  }, [approvedUsers, workerSearch, workerRoleFilter]);
+
+  const handleUpdateUserRole = (userId, newRole) => {
+    setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    setEditingUser(null);
+  };
+
+  const handleDeleteUser = (userId) => {
+    if (window.confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ? Il n'aura plus accès à l'application.")) {
+      setUsers(users.filter(u => u.id !== userId));
+    }
+  };
 
   // Gestion de plusieurs fichiers PDF Planning
   const handleMultipleFilesChange = (e) => {
@@ -411,22 +440,23 @@ export default function App() {
   const handleRegister = (e) => {
     e.preventDefault();
     setAuthError('');
-    if (!regName || !regEmail || !regPassword) {
-      setAuthError('Veuillez remplir tous les champs.');
+    if (!regName || !regEmail || !regPhone || !regPassword) {
+      setAuthError('Veuillez remplir tous les champs, y compris le numéro de téléphone.');
       return;
     }
     const newUser = {
       id: Date.now(),
       name: regName,
       email: regEmail,
-      role: regRole,
-      team: regRole === 'chef' ? 'Chef d\'équipe' : 'Ouvrier',
-      siteId: null,
-      status: 'pending',
+      phone: regPhone,
+      role: 'Employé', // Rôle par défaut, l'admin pourra le changer
+      team: 'Ouvriers',
+      status: 'approved', // Accepté direct pour l'exemple ou en attente selon besoin
       joinedAt: new Date().toISOString().split('T')[0]
     };
     setUsers([...users, newUser]);
-    setAuthMode('pending');
+    setCurrentUser(newUser);
+    setActiveTab('dashboard');
   };
 
   const handleLogout = () => {
@@ -443,7 +473,6 @@ export default function App() {
   };
 
   const pendingUsers = useMemo(() => users.filter(u => u.status === 'pending'), [users]);
-  const approvedUsers = useMemo(() => users.filter(u => u.status === 'approved'), [users]);
   
   const visiblePlans = useMemo(() => {
     if (!currentUser) return [];
@@ -505,22 +534,19 @@ export default function App() {
                   <form onSubmit={handleRegister} className="space-y-4">
                     <div>
                       <label className="block text-xs text-slate-400 mb-1">Nom complet</label>
-                      <input type="text" required value={regName} onChange={e => setRegName(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                      <input type="text" required value={regName} onChange={e => setRegName(e.target.value)} placeholder="Jean Martin" className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
                     </div>
                     <div>
                       <label className="block text-xs text-slate-400 mb-1">Email</label>
-                      <input type="email" required value={regEmail} onChange={e => setRegEmail(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                      <input type="email" required value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="jean@btppro.fr" className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Numéro de téléphone <span className="text-red-400">*</span></label>
+                      <input type="tel" required value={regPhone} onChange={e => setRegPhone(e.target.value)} placeholder="06 12 34 56 78" className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
                     </div>
                     <div>
                       <label className="block text-xs text-slate-400 mb-1">Mot de passe</label>
-                      <input type="password" required value={regPassword} onChange={e => setRegPassword(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-slate-400 mb-1">Rôle</label>
-                      <select value={regRole} onChange={e => setRegRole(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
-                        <option value="ouvrier">Ouvrier / Plombier</option>
-                        <option value="chef">Chef d'équipe</option>
-                      </select>
+                      <input type="password" required value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
                     </div>
                     <button type="submit" className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 transition-colors font-semibold rounded-xl text-xs shadow-lg">S'inscrire</button>
                   </form>
@@ -614,7 +640,7 @@ export default function App() {
                     <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-[11px] font-bold rounded-full">{approvedUsers.length} actifs</span>
                   </div>
                   <h3 className="text-base font-bold text-white group-hover:text-emerald-400">Gestion des Effectifs</h3>
-                  <p className="text-xs text-slate-400 mt-1">Suivi des plombiers et chefs d'équipe.</p>
+                  <p className="text-xs text-slate-400 mt-1">Annuaire, rôles et coordonnées.</p>
                 </div>
                 <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-emerald-400">
                   <span>Accéder au module</span>
@@ -772,7 +798,6 @@ export default function App() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                {/* Filtre de statut pour Admin et Ouvrier */}
                 <select 
                   value={requestStatusFilter} 
                   onChange={e => setRequestStatusFilter(e.target.value)}
@@ -791,7 +816,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Liste des demandes filtrées */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {visibleRequests.map(req => {
                 let urgencyBadge = <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold rounded">Normal</span>;
@@ -874,6 +898,117 @@ export default function App() {
           </div>
         )}
 
+        {/* --- MODULE EFFECTIFS (ANNUAIRE INSCRITS) --- */}
+        {activeTab === 'workers' && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-md">
+              <div>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Users className="w-5 h-5 text-emerald-400" /> Annuaire des Effectifs Inscrits
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Liste de tous les collaborateurs validés. {isAdmin ? "Vous pouvez modifier leurs rôles ou supprimer des accès." : ""}
+                </p>
+              </div>
+
+              {/* Barre de recherche par nom et Filtre par rôle (Intérimaire, Employé, Admin) */}
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input 
+                    type="text" 
+                    value={workerSearch} 
+                    onChange={e => setWorkerSearch(e.target.value)} 
+                    placeholder="Rechercher par nom..." 
+                    className="pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white w-full sm:w-48" 
+                  />
+                </div>
+
+                <select 
+                  value={workerRoleFilter} 
+                  onChange={e => setWorkerRoleFilter(e.target.value)}
+                  className="px-3 py-2 bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl focus:outline-none"
+                >
+                  <option value="all">🔍 Tous les rôles</option>
+                  <option value="Employé">Employé</option>
+                  <option value="Intérimaire">Intérimaire</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Grille des membres */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredWorkers.map(user => {
+                let roleBadge = <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 text-xs font-bold rounded-lg">Employé</span>;
+                if (user.role === 'Intérimaire') roleBadge = <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 text-xs font-bold rounded-lg">⚡ Intérimaire</span>;
+                if (user.role === 'admin') roleBadge = <span className="px-2.5 py-1 bg-purple-500/20 text-purple-300 text-xs font-bold rounded-lg">🛡️ Admin</span>;
+
+                return (
+                  <div key={user.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3 shadow-md flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-start">
+                        <h3 className="text-sm font-bold text-white">{user.name}</h3>
+                        {roleBadge}
+                      </div>
+
+                      {/* Affichage du Numéro de téléphone (pas d'e-mail affiché) */}
+                      <div className="mt-3 flex items-center gap-2 text-xs text-slate-300 bg-slate-950 p-2 rounded-xl border border-slate-800">
+                        <Phone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span className="font-mono font-medium">{user.phone || 'Non renseigné'}</span>
+                      </div>
+
+                      <div className="mt-2 text-[11px] text-slate-500">Inscrit le : {user.joinedAt}</div>
+                    </div>
+
+                    {/* Actions Admin : Modifier le rôle ou Supprimer le compte */}
+                    {isAdmin && (
+                      <div className="pt-3 border-t border-slate-800 space-y-2">
+                        {editingUser === user.id ? (
+                          <div className="flex gap-2 items-center">
+                            <select 
+                              value={editUserRole} 
+                              onChange={e => setEditUserRole(e.target.value)}
+                              className="px-2 py-1 bg-slate-950 border border-slate-700 text-xs text-white rounded-lg flex-1"
+                            >
+                              <option value="Employé">Employé</option>
+                              <option value="Intérimaire">Intérimaire</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                            <button onClick={() => handleUpdateUserRole(user.id, editUserRole)} className="px-2 py-1 bg-emerald-600 text-white text-xs rounded-lg font-semibold">OK</button>
+                            <button onClick={() => setEditingUser(null)} className="px-2 py-1 bg-slate-800 text-slate-300 text-xs rounded-lg">✕</button>
+                          </div>
+                        ) : (
+                          <div className="flex justify-between items-center gap-2">
+                            <button 
+                              onClick={() => { setEditingUser(user.id); setEditUserRole(user.role); }} 
+                              className="flex-1 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg font-medium transition-colors"
+                            >
+                              Modifier rôle
+                            </button>
+                            {user.id !== currentUser.id && (
+                              <button 
+                                onClick={() => handleDeleteUser(user.id)} 
+                                className="px-3 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs rounded-lg transition-colors"
+                              >
+                                🗑️ Supprimer
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {filteredWorkers.length === 0 && (
+                <div className="col-span-full py-8 text-center bg-slate-900 border border-slate-800 rounded-2xl text-slate-400 text-xs italic">Aucun collaborateur ne correspond à votre recherche.</div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* --- MODULES SECONDAIRES --- */}
         {activeTab === 'sites' && (
           <div className="space-y-4">
@@ -932,30 +1067,15 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === 'workers' && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold text-white">Équipes & Effectifs actifs</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {approvedUsers.map(user => (
-                <div key={user.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2">
-                  <h3 className="text-sm font-bold text-white">{user.name}</h3>
-                  <p className="text-xs text-slate-400">{user.email}</p>
-                  <p className="text-xs text-slate-500">Équipe : {user.team}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {activeTab === 'accounts' && isAdmin && (
           <div className="space-y-4">
-            <h2 className="text-lg font-bold text-white">Validation des comptes</h2>
+            <h2 className="text-lg font-bold text-white">Validation des comptes en attente</h2>
             <div className="space-y-3">
               {pendingUsers.map(user => (
                 <div key={user.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center">
                   <div>
                     <p className="text-sm font-bold text-white">{user.name} ({user.email})</p>
-                    <p className="text-xs text-slate-400">Rôle : {user.role}</p>
+                    <p className="text-xs text-slate-400">Téléphone : {user.phone || 'Non renseigné'}</p>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => handleApproveAccount(user.id)} className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg">Approuver</button>
@@ -963,6 +1083,9 @@ export default function App() {
                   </div>
                 </div>
               ))}
+              {pendingUsers.length === 0 && (
+                <div className="py-6 text-center text-slate-400 text-xs italic bg-slate-900 border border-slate-800 rounded-xl">Aucun compte en attente de validation.</div>
+              )}
             </div>
           </div>
         )}
@@ -1037,7 +1160,7 @@ export default function App() {
         </div>
       )}
 
-      {/* --- MODALE CREATION TÂCHE PLANNING (GARDÉE) --- */}
+      {/* --- MODALE CREATION TÂCHE PLANNING --- */}
       {showAddPlanModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
           <form onSubmit={handleUploadPlan} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
