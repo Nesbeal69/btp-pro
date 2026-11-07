@@ -26,7 +26,9 @@ import {
   PackageCheck,
   Phone,
   Search,
-  Settings
+  Settings,
+  Video,
+  Play
 } from 'lucide-react';
 
 export default function App() {
@@ -52,16 +54,13 @@ export default function App() {
 
   // Données Firestore
   const [users, setUsers] = useState([]);
-  const [sites, setSites] = useState([]);
   const [equipment, setEquipment] = useState([]);
   const [requests, setRequests] = useState([]);
   const [plans, setPlans] = useState([]);
+  const [videos, setVideos] = useState([]);
 
   const [selectedTool, setSelectedTool] = useState(null);
   const [newNoteText, setNewNoteText] = useState('');
-  
-  const [showAddSiteModal, setShowAddSiteModal] = useState(false);
-  const [newSiteData, setNewSiteData] = useState({ name: '', client: '', address: '', manager: 'Marc Vasseur' });
   
   const [showAddToolModal, setShowAddToolModal] = useState(false);
   const [newToolData, setNewToolData] = useState({ 
@@ -71,6 +70,14 @@ export default function App() {
     category: 'Sertissage', 
     status: 'Disponible',
     assignedTo: 'Dépôt Central' 
+  });
+
+  const [showAddVideoModal, setShowAddVideoModal] = useState(false);
+  const [newVideoData, setNewVideoData] = useState({
+    title: '',
+    category: 'Sécurité & Posture',
+    url: '',
+    description: ''
   });
 
   const [showAddPlanModal, setShowAddPlanModal] = useState(false);
@@ -153,10 +160,6 @@ export default function App() {
       }
     });
 
-    const unsubSites = onSnapshot(collection(db, "sites"), (snapshot) => {
-      setSites(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
-    });
-
     const unsubRequests = onSnapshot(collection(db, "requests"), (snapshot) => {
       setRequests(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
@@ -165,12 +168,25 @@ export default function App() {
       setPlans(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
 
+    const unsubVideos = onSnapshot(collection(db, "videos"), (snapshot) => {
+      const vList = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
+      if (vList.length === 0) {
+        const defaultVideos = [
+          { title: 'Postures de levage & Prévention TMS', category: 'Sécurité & Posture', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', description: 'Rappel sur les bonnes positions pour porter les charges lourdes et les sertisseuses sans forcer sur les lombaires.' },
+          { title: 'Technique de sertissage Multicouche REMS', category: 'Technique Plomberie', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', description: 'Procédure standard de préparation du tube, ébavurage et sertissage sécurisé.' }
+        ];
+        defaultVideos.forEach(v => addDoc(collection(db, "videos"), v));
+      } else {
+        setVideos(vList);
+      }
+    });
+
     return () => {
       unsubUsers();
       unsubEquipment();
-      unsubSites();
       unsubRequests();
       unsubPlans();
+      unsubVideos();
     };
   }, []);
 
@@ -196,33 +212,6 @@ export default function App() {
       return matchesSearch && matchesStatus;
     });
   }, [equipment, toolSearch, toolStatusFilter]);
-
-  const handleCreateSite = async (e) => {
-    e.preventDefault();
-    if (!newSiteData.name) return;
-    try {
-      await addDoc(collection(db, "sites"), {
-        name: newSiteData.name,
-        client: newSiteData.client || 'Client Privé',
-        address: newSiteData.address || 'Adresse à préciser',
-        status: 'En cours',
-        manager: newSiteData.manager,
-        workersCount: 0
-      });
-      setShowAddSiteModal(false);
-      setNewSiteData({ name: '', client: '', address: '', manager: 'Marc Vasseur' });
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const handleDeleteSite = async (firestoreId) => {
-    try {
-      if (firestoreId) await deleteDoc(doc(db, "sites", firestoreId));
-    } catch (error) {
-      console.error(error);
-    }
-  };
 
   const handleCreateTool = async (e) => {
     e.preventDefault();
@@ -259,7 +248,6 @@ export default function App() {
     setEditToolForm({ assignedTo: tool.assignedTo || 'Dépôt Central', status: tool.status || 'Disponible' });
   };
 
-  // Enregistrement de la modification de l'outil avec ajout automatique d'une note d'historique
   const handleSaveToolEdit = async (e) => {
     e.preventDefault();
     if (!editingTool || !editingTool.firestoreId) return;
@@ -267,7 +255,6 @@ export default function App() {
     try {
       const toolRef = doc(db, "equipment", editingTool.firestoreId);
       
-      // Construction d'une note automatique retraçant le changement
       let changesText = [];
       if (editingTool.assignedTo !== editToolForm.assignedTo) {
         changesText.push(`Réassigné de [${editingTool.assignedTo || 'Dépôt'}] vers [${editToolForm.assignedTo}]`);
@@ -311,6 +298,26 @@ export default function App() {
       await updateDoc(toolRef, { notes: updatedNotes });
       setNewNoteText('');
       setSelectedTool(prev => ({ ...prev, notes: updatedNotes }));
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleCreateVideo = async (e) => {
+    e.preventDefault();
+    if (!newVideoData.title || !newVideoData.url) return;
+    try {
+      await addDoc(collection(db, "videos"), newVideoData);
+      setShowAddVideoModal(false);
+      setNewVideoData({ title: '', category: 'Sécurité & Posture', url: '', description: '' });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleDeleteVideo = async (firestoreId) => {
+    try {
+      if (firestoreId) await deleteDoc(doc(db, "videos", firestoreId));
     } catch (error) {
       console.error(error);
     }
@@ -742,7 +749,7 @@ export default function App() {
                 <span>👋 Bienvenue sur ton espace, {currentUser.name}</span>
               </h2>
               <p className="text-xs text-slate-600 mt-1">
-                Sélectionne un module ci-dessous pour gérer tes chantiers, plannings, matériel ou effectifs.
+                Sélectionne un module ci-dessous pour gérer tes plannings, matériel, effectifs et vidéos de formation.
               </p>
             </div>
 
@@ -792,21 +799,6 @@ export default function App() {
                 </div>
               </div>
 
-              <div onClick={() => setActiveTab('sites')} className="group bg-white border border-slate-200 hover:border-blue-400 p-5 rounded-2xl cursor-pointer shadow-sm hover:shadow-md transform hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="text-3xl p-2.5 bg-blue-50 rounded-xl border border-blue-100">🏗️</span>
-                    <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-full border border-blue-200">{sites.length} chantiers</span>
-                  </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600">Chantiers</h3>
-                  <p className="text-xs text-slate-500 mt-1">Suivi des résidences et travaux.</p>
-                </div>
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-blue-600">
-                  <span>Accéder au module</span>
-                  <ChevronRight className="w-4 h-4" />
-                </div>
-              </div>
-
               <div onClick={() => setActiveTab('tools')} className="group bg-white border border-slate-200 hover:border-indigo-400 p-5 rounded-2xl cursor-pointer shadow-sm hover:shadow-md transform hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-3">
@@ -817,6 +809,21 @@ export default function App() {
                   <p className="text-xs text-slate-500 mt-1">Sertisseuses, carotteuses et entretien.</p>
                 </div>
                 <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-indigo-600">
+                  <span>Accéder au module</span>
+                  <ChevronRight className="w-4 h-4" />
+                </div>
+              </div>
+
+              <div onClick={() => setActiveTab('videos')} className="group bg-white border border-slate-200 hover:border-rose-400 p-5 rounded-2xl cursor-pointer shadow-sm hover:shadow-md transform hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-start mb-3">
+                    <span className="text-3xl p-2.5 bg-rose-50 rounded-xl border border-rose-100">🎬</span>
+                    <span className="px-2 py-0.5 bg-rose-50 text-rose-700 text-[11px] font-bold rounded-full border border-rose-200">{videos.length} vidéos</span>
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-rose-600">Tutos & Sécurité</h3>
+                  <p className="text-xs text-slate-500 mt-1">Vidéos de formation, postes et bonnes pratiques.</p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-rose-600">
                   <span>Accéder au module</span>
                   <ChevronRight className="w-4 h-4" />
                 </div>
@@ -1131,24 +1138,57 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULES SECONDAIRES --- */}
-        {activeTab === 'sites' && (
+        {/* --- NOUVEAU MODULE : TUTOS & SÉCURITÉ --- */}
+        {activeTab === 'videos' && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900">Chantiers en cours</h2>
-              {isAdmin && (<button onClick={() => setShowAddSiteModal(true)} className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow-sm"><Plus className="w-4 h-4" /> Nouveau Chantier</button>)}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Video className="w-5 h-5 text-rose-600" /> Tutos, Postures & Sécurité Chantiers
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">Vidéos de formation, prévention des risques et bonnes pratiques métiers</p>
+              </div>
+
+              {isAdmin && (
+                <button onClick={() => setShowAddVideoModal(true)} className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow-sm">
+                  <Plus className="w-4 h-4" /> Ajouter une vidéo
+                </button>
+              )}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {sites.map(site => (
-                <div key={site.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl space-y-2 shadow-sm">
-                  <div className="flex justify-between items-start">
-                    <h3 className="text-sm font-bold text-slate-900">{site.name}</h3>
-                    {isAdmin && <button onClick={() => handleDeleteSite(site.firestoreId)} className="text-red-500 hover:text-red-700 text-xs font-medium">🗑️</button>}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {videos.map(vid => (
+                <div key={vid.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl space-y-3 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-center text-xs mb-2">
+                      <span className="px-2.5 py-0.5 bg-rose-50 text-rose-700 font-bold rounded-full border border-rose-200">🎬 {vid.category || 'Formation'}</span>
+                      {isAdmin && (
+                        <button onClick={() => handleDeleteVideo(vid.firestoreId)} className="text-red-500 hover:text-red-700 text-xs">🗑️ Supprimer</button>
+                      )}
+                    </div>
+
+                    <h3 className="text-sm font-bold text-slate-900">{vid.title}</h3>
+                    {vid.description && <p className="text-xs text-slate-600 mt-1">{vid.description}</p>}
                   </div>
-                  <p className="text-xs text-slate-600">Client : {site.client}</p>
-                  <p className="text-xs text-slate-600">Adresse : {site.address}</p>
+
+                  <div className="pt-3 border-t border-slate-100">
+                    <a 
+                      href={vid.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-colors"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current" /> Regarder la vidéo
+                    </a>
+                  </div>
                 </div>
               ))}
+
+              {videos.length === 0 && (
+                <div className="col-span-full py-12 text-center bg-white border border-slate-200 rounded-2xl text-slate-500 text-xs italic shadow-sm">
+                  Aucune vidéo partagée pour le moment.
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1264,6 +1304,39 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* --- MODALE AJOUT VIDÉO TUTO --- */}
+      {showAddVideoModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleCreateVideo} className="bg-white border border-slate-200 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900">Ajouter une vidéo tuto</h3>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Titre de la vidéo</label>
+              <input type="text" placeholder="ex: Postures de levage & sécurité" value={newVideoData.title} onChange={e => setNewVideoData({...newVideoData, title: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Catégorie</label>
+              <select value={newVideoData.category} onChange={e => setNewVideoData({...newVideoData, category: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none">
+                <option value="Sécurité & Posture">🛡️ Sécurité & Posture</option>
+                <option value="Technique Plomberie">🔧 Technique Plomberie</option>
+                <option value="Chauffage & Essais">🔥 Chauffage & Essais</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Lien YouTube / Vidéo (URL)</label>
+              <input type="url" placeholder="https://www.youtube.com/watch?v=..." value={newVideoData.url} onChange={e => setNewVideoData({...newVideoData, url: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Description / Consignes</label>
+              <textarea placeholder="Résumé de ce que les gars doivent retenir..." value={newVideoData.description} onChange={e => setNewVideoData({...newVideoData, description: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 h-20 focus:outline-none" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setShowAddVideoModal(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-xl font-medium border border-slate-200">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-xs text-white font-semibold rounded-xl shadow-sm">Publier</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* --- MODALE NOTES / HISTORIQUE OUTIL --- */}
       {selectedTool && (
@@ -1528,20 +1601,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALES SECONDAIRES */}
-      {showAddSiteModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleCreateSite} className="bg-white border border-slate-200 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-900">Nouveau Chantier</h3>
-            <input type="text" placeholder="Nom du chantier" value={newSiteData.name} onChange={e => setNewSiteData({...newSiteData, name: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" />
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setShowAddSiteModal(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-xl font-medium border border-slate-200">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-xs text-white rounded-xl shadow-sm">Créer</button>
-            </div>
-          </form>
-        </div>
-      )}
-
+      {/* MODALE AJOUT MACHINE */}
       {showAddToolModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreateTool} className="bg-white border border-slate-200 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
