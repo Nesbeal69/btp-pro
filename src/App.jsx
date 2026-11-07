@@ -712,12 +712,16 @@ const handleValidateRequest = (reqId) => {
                     <button onClick={() => setSelectedTool(tool)} className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 transition-colors text-xs text-slate-200 font-medium rounded-lg">
                       Carnet ({tool.notes?.length || 0})
                     </button>
-                    <button
-  onClick={() => setEditingTool(tool)}
-  className="px-2.5 py-1.5 bg-amber-600/25 hover:bg-amber-600/40 text-amber-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
->
-  ✏️ Modifier
-</button>
+                    {isAdmin && (
+  <button
+    onClick={() => setEditingTool(tool)}
+    className="px-2.5 py-1.5 bg-amber-600/25 hover:bg-amber-600/40 text-amber-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+  >
+    ✏️ Modifier
+  </button>
+)}
+
+
                     {isAdmin && (
                       <button onClick={() => handleDeleteTool(tool.id)} className="px-2.5 py-1.5 bg-red-600/25 hover:bg-red-600/40 text-red-200 text-xs rounded-lg transition-colors" title="Supprimer l'outil">
                         🗑️
