@@ -254,7 +254,7 @@ export default function App() {
             <div className="inline-flex p-3 bg-white/10 rounded-2xl mb-3">
               <Building2 className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-xl font-bold text-white">Bâtir+.</h1>
+            <h1 className="text-xl font-bold text-white">BÂTIR+</h1>
             <p className="text-xs text-blue-200 mt-1">Plateforme Chantiers, Matériel & Équipes</p>
           </div>
 
@@ -330,7 +330,7 @@ export default function App() {
       <header className="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
           <Building2 className="w-5 h-5 text-blue-500" />
-          <span className="font-bold text-sm text-white tracking-wide">BTP PRO MANAGEMENT</span>
+          <span className="font-bold text-sm text-white tracking-wide">BÂTIR+</span>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right text-xs">
