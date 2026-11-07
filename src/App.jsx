@@ -621,7 +621,7 @@ export default function App() {
 
                     {!regIsAdmin && (
                       <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1">Code de chantier de votre administrateur</label>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Code chantier de votre administrateur</label>
                         <input type="text" required={!regIsAdmin} value={regProjectCode} onChange={e => setRegProjectCode(e.target.value)} placeholder="ex: CHANTIER-4821" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 uppercase font-mono tracking-wider focus:outline-none" />
                       </div>
                     )}
