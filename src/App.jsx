@@ -72,24 +72,27 @@ export default function App() {
   const [newPlanData, setNewPlanData] = useState({
     title: '',
     targetUserId: 'all',
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toISOString().split('T')[0], // Format ISO pour l'input date natif
     description: '',
     fileName: '',
     fileData: ''
   });
 
-  // Fonction pour formater joliment la date (ex: LUNDI 9 NOVEMBRE 2026)
+  // Fonction robuste pour transformer 2026-11-09 en LUNDI 9 NOVEMBRE 2026
   const formatDateFr = (dateString) => {
     if (!dateString) return '';
     try {
       const parts = dateString.split('-');
       if (parts.length === 3) {
-        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        const d = new Date(year, month, day);
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         return d.toLocaleDateString('fr-FR', options).toUpperCase();
       }
     } catch (e) {
-      // Si format invalide
+      console.error(e);
     }
     return dateString;
   };
@@ -263,7 +266,7 @@ export default function App() {
         targetUserId: newPlanData.targetUserId === 'all' ? 'all' : Number(newPlanData.targetUserId),
         targetName: targetName,
         date: newPlanData.date,
-        formattedDate: formatDateFr(newPlanData.date)
+        formattedDate: formatDateFr(newPlanData.date) // Enregistre la date en toutes lettres
       });
       setShowAddPlanModal(false);
       setNewPlanData({ title: '', targetUserId: 'all', date: new Date().toISOString().split('T')[0], description: '', fileName: '', fileData: '' });
@@ -629,7 +632,7 @@ export default function App() {
                   <div>
                     <div className="flex justify-between items-center text-xs">
                       <span className="px-2 py-0.5 rounded font-mono font-bold bg-cyan-500/20 text-cyan-300">
-                        📅 {plan.formattedDate || plan.date}
+                        📅 {plan.formattedDate || formatDateFr(plan.date)}
                       </span>
                       <span className="text-slate-400 font-medium">Pour : <strong className="text-slate-200">{plan.targetName}</strong></span>
                     </div>
@@ -812,7 +815,7 @@ export default function App() {
             </div>
 
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Date d'intervention (Ouvre le calendrier)</label>
+              <label className="block text-xs text-slate-400 mb-1">Date d'intervention (Clique pour ouvrir le calendrier)</label>
               <input 
                 type="date" 
                 value={newPlanData.date} 
