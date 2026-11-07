@@ -28,7 +28,10 @@ import {
   Search,
   Settings,
   Video,
-  Play
+  Play,
+  ShieldAlert,
+  Sparkles,
+  ArrowUpRight
 } from 'lucide-react';
 
 export default function App() {
@@ -750,110 +753,167 @@ export default function App() {
         </div>
       </div>
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-8">
         {activeTab === 'dashboard' && (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-r from-blue-50 via-indigo-50/50 to-white border border-blue-100 rounded-2xl p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <span>👋 Bienvenue sur ton espace, {currentUser.name}</span>
-              </h2>
-              <p className="text-xs text-slate-600 mt-1">
-                Sélectionne un module ci-dessous pour gérer tes plannings, matériel, effectifs et vidéos de formation.
-              </p>
+          <div className="space-y-8">
+            
+            {/* --- NOUVEAU HERO BANNER ULTRA PRO (Logo centré + Bienvenue) --- */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white rounded-3xl p-8 md:p-10 shadow-xl border border-blue-900/50">
+              {/* Effet décoratif en arrière-plan */}
+              <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -left-10 -top-10 w-64 h-64 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="relative z-10 flex flex-col items-center text-center">
+                {/* Logo central brillant */}
+                <div className="p-4 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-2xl shadow-lg shadow-blue-500/30 mb-4 border border-blue-400/30">
+                  <Building2 className="w-10 h-10 text-white" />
+                </div>
+                
+                <h1 className="text-2xl md:text-3xl font-black tracking-wide">BÂTIR+ <span className="text-blue-400 font-light">PRO</span></h1>
+                <p className="text-xs md:text-sm text-slate-300 mt-1 max-w-md">
+                  Espace de gestion centralisé, plannings chantiers, outillage et sécurité pour les équipes.
+                </p>
+
+                {/* Badge utilisateur connecté */}
+                <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md rounded-full border border-white/10 text-xs font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Connecté en tant que <strong className="text-white">{currentUser.name}</strong> 
+                  <span className="ml-1 px-2 py-0.5 bg-blue-600/60 rounded-full text-[10px] font-bold uppercase">{isAdmin ? 'Admin' : currentUser.role}</span>
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              <div onClick={() => setActiveTab('planning')} className="group bg-white border border-slate-200 hover:border-cyan-400 p-5 rounded-2xl cursor-pointer shadow-sm hover:shadow-md transform hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+            {/* --- GRILLE DES MODULES AVEC DESIGN MODERNE --- */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              
+              {/* MODULE PLANNING */}
+              <div onClick={() => setActiveTab('planning')} className="group bg-white border border-slate-200/80 hover:border-cyan-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl group-hover:bg-cyan-500/10 transition-colors" />
                 <div>
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="text-3xl p-2.5 bg-cyan-50 rounded-xl border border-cyan-100">📅</span>
-                    <span className="px-2 py-0.5 bg-cyan-50 text-cyan-700 text-[11px] font-bold rounded-full border border-cyan-200">{visiblePlans.length} dispo</span>
-                  </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-cyan-600">Planning & PDF</h3>
-                  <p className="text-xs text-slate-500 mt-1">Feuilles de route et plans d'exécution nominatifs.</p>
-                </div>
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-cyan-600">
-                  <span>Accéder au module</span>
-                  <ChevronRight className="w-4 h-4" />
-                </div>
-              </div>
-
-              <div onClick={() => setActiveTab('requests')} className="group bg-white border border-slate-200 hover:border-amber-400 p-5 rounded-2xl cursor-pointer shadow-sm hover:shadow-md transform hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="text-3xl p-2.5 bg-amber-50 rounded-xl border border-amber-100">📋</span>
-                    <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[11px] font-bold rounded-full border border-amber-200">{visibleRequests.length} demandes</span>
-                  </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-600">Demandes de Matériel</h3>
-                  <p className="text-xs text-slate-500 mt-1">Besoins en raccords, tubes et fournitures.</p>
-                </div>
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-amber-600">
-                  <span>Accéder au module</span>
-                  <ChevronRight className="w-4 h-4" />
-                </div>
-              </div>
-
-              <div onClick={() => setActiveTab('workers')} className="group bg-white border border-slate-200 hover:border-emerald-400 p-5 rounded-2xl cursor-pointer shadow-sm hover:shadow-md transform hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="text-3xl p-2.5 bg-emerald-50 rounded-xl border border-emerald-100">👷‍♂️</span>
-                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[11px] font-bold rounded-full border border-emerald-200">{approvedUsers.length} actifs</span>
-                  </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-emerald-600">Gestion des Effectifs</h3>
-                  <p className="text-xs text-slate-500 mt-1">Annuaire, rôles et coordonnées.</p>
-                </div>
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-emerald-600">
-                  <span>Accéder au module</span>
-                  <ChevronRight className="w-4 h-4" />
-                </div>
-              </div>
-
-              <div onClick={() => setActiveTab('tools')} className="group bg-white border border-slate-200 hover:border-indigo-400 p-5 rounded-2xl cursor-pointer shadow-sm hover:shadow-md transform hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="text-3xl p-2.5 bg-indigo-50 rounded-xl border border-indigo-100">🔧</span>
-                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[11px] font-bold rounded-full border border-indigo-200">{equipment.length} machines</span>
-                  </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600">Parc Outillage</h3>
-                  <p className="text-xs text-slate-500 mt-1">Sertisseuses, carotteuses et entretien.</p>
-                </div>
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-indigo-600">
-                  <span>Accéder au module</span>
-                  <ChevronRight className="w-4 h-4" />
-                </div>
-              </div>
-
-              <div onClick={() => setActiveTab('videos')} className="group bg-white border border-slate-200 hover:border-rose-400 p-5 rounded-2xl cursor-pointer shadow-sm hover:shadow-md transform hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="text-3xl p-2.5 bg-rose-50 rounded-xl border border-rose-100">🎬</span>
-                    <span className="px-2 py-0.5 bg-rose-50 text-rose-700 text-[11px] font-bold rounded-full border border-rose-200">{videos.length} vidéos</span>
-                  </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-rose-600">Tutos & Sécurité</h3>
-                  <p className="text-xs text-slate-500 mt-1">Vidéos de formation, postes et bonnes pratiques.</p>
-                </div>
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-rose-600">
-                  <span>Accéder au module</span>
-                  <ChevronRight className="w-4 h-4" />
-                </div>
-              </div>
-
-              {isAdmin && (
-                <div onClick={() => setActiveTab('accounts')} className="group bg-white border border-slate-200 hover:border-purple-400 p-5 rounded-2xl cursor-pointer shadow-sm hover:shadow-md transform hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
-                  <div>
-                    <div className="flex justify-between items-start mb-3">
-                      <span className="text-3xl p-2.5 bg-purple-50 rounded-xl border border-purple-100">🛡️</span>
-                      <span className="px-2 py-0.5 bg-purple-50 text-purple-700 text-[11px] font-bold rounded-full border border-purple-200">{pendingUsers.length} à valider</span>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-3.5 bg-cyan-50 text-cyan-600 rounded-2xl border border-cyan-100 group-hover:scale-110 transition-transform">
+                      <CalendarIcon className="w-6 h-6" />
                     </div>
-                    <h3 className="text-base font-bold text-slate-900 group-hover:text-purple-600">Validation des Comptes</h3>
-                    <p className="text-xs text-slate-500 mt-1">Validation des accès collaborateurs.</p>
+                    <span className="px-2.5 py-1 bg-cyan-50 text-cyan-700 text-xs font-bold rounded-full border border-cyan-200">{visiblePlans.length} dispo</span>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-purple-600">
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-cyan-600 transition-colors">Planning & PDF</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">Feuilles de route, plannings nominatifs et documents d'exécution.</p>
+                </div>
+                <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-cyan-600">
+                  <span>Accéder au module</span>
+                  <div className="w-7 h-7 rounded-xl bg-cyan-50 flex items-center justify-center group-hover:bg-cyan-600 group-hover:text-white transition-colors">
+                    <ArrowUpRight className="w-4 h-4" />
+                  </div>
+                </div>
+              </div>
+
+              {/* MODULE DEMANDES DE MATÉRIEL */}
+              <div onClick={() => setActiveTab('requests')} className="group bg-white border border-slate-200/80 hover:border-amber-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-colors" />
+                <div>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-3.5 bg-amber-50 text-amber-600 rounded-2xl border border-amber-100 group-hover:scale-110 transition-transform">
+                      <ClipboardList className="w-6 h-6" />
+                    </div>
+                    <span className="px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-200">{visibleRequests.length} demandes</span>
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-600 transition-colors">Demandes de Matériel</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">Besoins en raccords, tubes, colliers et fournitures chantier.</p>
+                </div>
+                <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-amber-600">
+                  <span>Accéder au module</span>
+                  <div className="w-7 h-7 rounded-xl bg-amber-50 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                    <ArrowUpRight className="w-4 h-4" />
+                  </div>
+                </div>
+              </div>
+
+              {/* MODULE EFFECTIFS */}
+              <div onClick={() => setActiveTab('workers')} className="group bg-white border border-slate-200/80 hover:border-emerald-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-colors" />
+                <div>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 group-hover:scale-110 transition-transform">
+                      <Users className="w-6 h-6" />
+                    </div>
+                    <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">{approvedUsers.length} actifs</span>
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">Gestion des Effectifs</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">Annuaire des 14 collaborateurs, rôles et numéros de téléphone.</p>
+                </div>
+                <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-emerald-600">
+                  <span>Accéder au module</span>
+                  <div className="w-7 h-7 rounded-xl bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                    <ArrowUpRight className="w-4 h-4" />
+                  </div>
+                </div>
+              </div>
+
+              {/* MODULE PARC OUTILLAGE */}
+              <div onClick={() => setActiveTab('tools')} className="group bg-white border border-slate-200/80 hover:border-indigo-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-colors" />
+                <div>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100 group-hover:scale-110 transition-transform">
+                      <Wrench className="w-6 h-6" />
+                    </div>
+                    <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full border border-indigo-200">{equipment.length} machines</span>
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">Parc Outillage</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">Suivi des sertisseuses, carotteuses, affectations et historique notes.</p>
+                </div>
+                <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-indigo-600">
+                  <span>Accéder au module</span>
+                  <div className="w-7 h-7 rounded-xl bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                    <ArrowUpRight className="w-4 h-4" />
+                  </div>
+                </div>
+              </div>
+
+              {/* MODULE TUTOS & SÉCURITÉ */}
+              <div onClick={() => setActiveTab('videos')} className="group bg-white border border-slate-200/80 hover:border-rose-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full blur-2xl group-hover:bg-rose-500/10 transition-colors" />
+                <div>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-3.5 bg-rose-50 text-rose-600 rounded-2xl border border-rose-100 group-hover:scale-110 transition-transform">
+                      <Video className="w-6 h-6" />
+                    </div>
+                    <span className="px-2.5 py-1 bg-rose-50 text-rose-700 text-xs font-bold rounded-full border border-rose-200">{videos.length} vidéos</span>
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-rose-600 transition-colors">Tutos & Sécurité</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">Vidéos de prévention, bonnes pratiques et formations métiers.</p>
+                </div>
+                <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-rose-600">
+                  <span>Accéder au module</span>
+                  <div className="w-7 h-7 rounded-xl bg-rose-50 flex items-center justify-center group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                    <ArrowUpRight className="w-4 h-4" />
+                  </div>
+                </div>
+              </div>
+
+              {/* VALIDATION DES COMPTES (ADMIN) */}
+              {isAdmin && (
+                <div onClick={() => setActiveTab('accounts')} className="group bg-white border border-slate-200/80 hover:border-purple-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10 transition-colors" />
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="p-3.5 bg-purple-50 text-purple-600 rounded-2xl border border-purple-100 group-hover:scale-110 transition-transform">
+                        <UserCheck className="w-6 h-6" />
+                      </div>
+                      <span className="px-2.5 py-1 bg-purple-50 text-purple-700 text-xs font-bold rounded-full border border-purple-200">{pendingUsers.length} en attente</span>
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900 group-hover:text-purple-600 transition-colors">Validation des Comptes</h3>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">Gérez les demandes d'accès des nouveaux collaborateurs.</p>
+                  </div>
+                  <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-purple-600">
                     <span>Accéder au module</span>
-                    <ChevronRight className="w-4 h-4" />
+                    <div className="w-7 h-7 rounded-xl bg-purple-50 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                      <ArrowUpRight className="w-4 h-4" />
+                    </div>
                   </div>
                 </div>
               )}
+
             </div>
           </div>
         )}
