@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { 
   Building2, 
   Users, 
@@ -25,7 +25,8 @@ import {
   AlertCircle,
   PackageCheck,
   Phone,
-  Search
+  Search,
+  Settings
 } from 'lucide-react';
 
 export default function App() {
@@ -45,8 +46,9 @@ export default function App() {
   const [regPassword, setRegPassword] = useState('');
   const [authError, setAuthError] = useState('');
 
-  const [editingUser, setEditingUser] = useState(null);
-  const [editUserRole, setEditUserRole] = useState('Employé');
+  // État pour la modale d'édition de profil (Admin ou Mon Profil)
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [userModalData, setUserModalData] = useState({ firestoreId: '', name: '', phone: '', role: 'Employé', password: '' });
 
   // Données Firestore
   const [users, setUsers] = useState([]);
@@ -108,12 +110,11 @@ export default function App() {
     return dateString;
   };
 
-  // Synchronisation Firestore (Utilisateurs, Équipements, Chantiers, Demandes, Plannings)
+  // Synchronisation Firestore
   useEffect(() => {
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
       const usersList = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
       
-      // Si la base est vide (premier lancement), on crée un compte Admin par défaut dans Firestore
       if (usersList.length === 0) {
         const defaultAdmin = {
           userIdNum: 1,
@@ -156,6 +157,16 @@ export default function App() {
       unsubPlans();
     };
   }, []);
+
+  // Met à jour currentUser en temps réel si ses données changent dans Firestore
+  useEffect(() => {
+    if (currentUser) {
+      const updated = users.find(u => u.firestoreId === currentUser.firestoreId);
+      if (updated) {
+        setCurrentUser(updated);
+      }
+    }
+  }, [users]);
 
   const filteredEquipment = useMemo(() => {
     return equipment.filter(tool => {
@@ -340,12 +351,39 @@ export default function App() {
     });
   }, [approvedUsers, workerSearch, workerRoleFilter]);
 
-  const handleUpdateUserRole = async (firestoreId, newRole) => {
+  // --- GESTION MODIFICATION UTILISATEUR (ADMIN OU PROPRE PROFIL) ---
+  const handleOpenUserModal = (userToEdit) => {
+    setUserModalData({
+      firestoreId: userToEdit.firestoreId,
+      name: userToEdit.name,
+      phone: userToEdit.phone || '',
+      role: userToEdit.role,
+      password: userToEdit.password || ''
+    });
+    setShowUserModal(true);
+  };
+
+  const handleSaveUserModal = async (e) => {
+    e.preventDefault();
+    if (!userModalData.firestoreId) return;
+
     try {
-      await updateDoc(doc(db, "users", firestoreId), { role: newRole });
-      setEditingUser(null);
+      const userRef = doc(db, "users", userModalData.firestoreId);
+      const updatePayload = {
+        name: userModalData.name,
+        phone: userModalData.phone,
+        password: userModalData.password
+      };
+      // Seul l'admin peut modifier le rôle d'un utilisateur
+      if (currentUser.role === 'admin') {
+        updatePayload.role = userModalData.role;
+      }
+
+      await updateDoc(userRef, updatePayload);
+      setShowUserModal(false);
     } catch (error) {
-      console.error("Erreur mise à jour rôle :", error);
+      console.error("Erreur mise à jour profil :", error);
+      alert("Erreur lors de la mise à jour.");
     }
   };
 
@@ -440,7 +478,6 @@ export default function App() {
     document.body.removeChild(link);
   };
 
-  // --- CONNEXION SÉCURISÉE ---
   const handleLogin = (e) => {
     e.preventDefault();
     setAuthError('');
@@ -465,7 +502,6 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
-  // --- INSCRIPTION (SAUVEGARDE DANS FIRESTORE) ---
   const handleRegister = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -555,7 +591,7 @@ export default function App() {
               <div className="text-center py-6 space-y-4">
                 <Clock className="w-12 h-12 text-amber-400 mx-auto" />
                 <h2 className="text-lg font-semibold text-amber-300">Compte en Attente de Validation</h2>
-                <p className="text-xs text-slate-300">Votre inscription a bien été enregistrée[cite: 5]. L'administrateur doit valider votre compte et vous attribuer un rôle avant de vous donner l'accès[cite: 5].</p>
+                <p className="text-xs text-slate-300">Votre inscription a bien été enregistrée. L'administrateur doit valider votre compte et vous attribuer un rôle avant de vous donner l'accès.</p>
                 <button onClick={() => { setAuthMode('login'); setAuthError(''); }} className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl transition-colors">Retour à la connexion</button>
               </div>
             ) : (
@@ -623,7 +659,17 @@ export default function App() {
             <span className="font-bold text-white">{currentUser.name}</span>
             <span className="text-[10px] ml-2 px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-semibold">{isAdmin ? 'ADMIN' : currentUser.role.toUpperCase()}</span>
           </div>
-          <button onClick={handleLogout} className="p-1.5 text-slate-400 hover:text-red-400 transition-colors">
+          
+          {/* Bouton Mon Profil pour n'importe quel utilisateur */}
+          <button 
+            onClick={() => handleOpenUserModal(currentUser)} 
+            title="Modifier mon profil"
+            className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors flex items-center gap-1 text-xs px-2.5"
+          >
+            <Settings className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Mon Profil</span>
+          </button>
+
+          <button onClick={handleLogout} title="Se déconnecter" className="p-1.5 text-slate-400 hover:text-red-400 transition-colors">
             <LogOut className="w-4 h-4" />
           </button>
         </div>
@@ -959,7 +1005,7 @@ export default function App() {
                   <Users className="w-5 h-5 text-emerald-400" /> Annuaire des Effectifs Inscrits
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Liste de tous les collaborateurs validés. {isAdmin ? "Vous pouvez modifier leurs rôles ou supprimer des accès." : ""}
+                  Liste de tous les collaborateurs validés. {isAdmin ? "Vous pouvez modifier leurs rôles/fiches ou supprimer des accès." : ""}
                 </p>
               </div>
 
@@ -1010,39 +1056,21 @@ export default function App() {
                       <div className="mt-2 text-[11px] text-slate-500">Inscrit le : {user.joinedAt}</div>
                     </div>
 
-                    {isAdmin && (
-                      <div className="pt-3 border-t border-slate-800 space-y-2">
-                        {editingUser === user.firestoreId ? (
-                          <div className="flex gap-2 items-center">
-                            <select 
-                              value={editUserRole} 
-                              onChange={e => setEditUserRole(e.target.value)}
-                              className="px-2 py-1 bg-slate-950 border border-slate-700 text-xs text-white rounded-lg flex-1"
-                            >
-                              <option value="Employé">Employé</option>
-                              <option value="Intérimaire">Intérimaire</option>
-                              <option value="admin">Admin</option>
-                            </select>
-                            <button onClick={() => handleUpdateUserRole(user.firestoreId, editUserRole)} className="px-2 py-1 bg-emerald-600 text-white text-xs rounded-lg font-semibold">OK</button>
-                            <button onClick={() => setEditingUser(null)} className="px-2 py-1 bg-slate-800 text-slate-300 text-xs rounded-lg">✕</button>
-                          </div>
-                        ) : (
-                          <div className="flex justify-between items-center gap-2">
-                            <button 
-                              onClick={() => { setEditingUser(user.firestoreId); setEditUserRole(user.role); }} 
-                              className="flex-1 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg font-medium transition-colors"
-                            >
-                              Modifier rôle
-                            </button>
-                            {user.email !== currentUser.email && (
-                              <button 
-                                onClick={() => handleDeleteUser(user.firestoreId)} 
-                                className="px-3 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs rounded-lg transition-colors"
-                              >
-                                🗑️ Supprimer
-                              </button>
-                            )}
-                          </div>
+                    {(isAdmin || user.email === currentUser.email) && (
+                      <div className="pt-3 border-t border-slate-800 flex items-center gap-2">
+                        <button 
+                          onClick={() => handleOpenUserModal(user)} 
+                          className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg font-medium transition-colors"
+                        >
+                          ✏️ Modifier la fiche
+                        </button>
+                        {isAdmin && user.email !== currentUser.email && (
+                          <button 
+                            onClick={() => handleDeleteUser(user.firestoreId)} 
+                            className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs rounded-lg transition-colors"
+                          >
+                            🗑️ Supprimer
+                          </button>
                         )}
                       </div>
                     )}
@@ -1138,6 +1166,70 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* --- MODALE MODIFICATION FICHE UTILISATEUR / PROFIL --- */}
+      {showUserModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleSaveUserModal} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>✏️ Modifier la fiche</span>
+            </h3>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Nom complet</label>
+              <input 
+                type="text" 
+                required 
+                value={userModalData.name} 
+                onChange={e => setUserModalData({...userModalData, name: e.target.value})} 
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" 
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Numéro de téléphone</label>
+              <input 
+                type="tel" 
+                required 
+                value={userModalData.phone} 
+                onChange={e => setUserModalData({...userModalData, phone: e.target.value})} 
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" 
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Nouveau mot de passe (optionnel)</label>
+              <input 
+                type="password" 
+                value={userModalData.password} 
+                onChange={e => setUserModalData({...userModalData, password: e.target.value})} 
+                placeholder="Laisser vide ou entrer un nouveau mdp" 
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" 
+              />
+            </div>
+
+            {isAdmin && (
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Rôle (Réservé Admin)</label>
+                <select 
+                  value={userModalData.role} 
+                  onChange={e => setUserModalData({...userModalData, role: e.target.value})}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl focus:outline-none"
+                >
+                  <option value="Employé">Employé</option>
+                  <option value="Intérimaire">Intérimaire</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setShowUserModal(false)} className="px-4 py-2 bg-slate-800 text-xs text-slate-300 rounded-xl">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-emerald-600 text-xs text-white font-semibold rounded-xl">Enregistrer les modifications</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* --- MODALE NOUVELLE DEMANDE DE MATÉRIEL --- */}
       {showAddRequestModal && (
