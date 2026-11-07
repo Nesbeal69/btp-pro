@@ -32,7 +32,10 @@ import {
   ShieldAlert,
   Sparkles,
   ArrowUpRight,
-  Key
+  Key,
+  Layers,
+  SlidersHorizontal,
+  FolderOpen
 } from 'lucide-react';
 
 export default function App() {
@@ -154,7 +157,6 @@ export default function App() {
     }
   }, [users]);
 
-  // Sécurité : si currentUser est null, on ne calcule rien pour éviter les erreurs de type
   const myProjectCode = currentUser ? (currentUser.projectCode || currentUser.adminProjectCode) : null;
 
   const projectEquipment = useMemo(() => {
@@ -734,211 +736,380 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE PLANNING --- */}
+        {/* --- MODULE PLANNING (DESIGN PRO & ÉPURÉ) --- */}
         {activeTab === 'planning' && (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><CalendarIcon className="w-5 h-5 text-cyan-600" /> Planning des interventions</h2>
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-cyan-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-cyan-600/20 border border-cyan-400/30 rounded-2xl">
+                  <CalendarIcon className="w-7 h-7 text-cyan-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black tracking-wide">Planning & Feuilles de Route</h2>
+                  <p className="text-xs text-slate-300 mt-0.5">Suivi des interventions chantier et documents techniques associés.</p>
+                </div>
+              </div>
               {isAdmin && (
-                <button onClick={() => setShowAddPlanModal(true)} className="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1">
+                <button onClick={() => setShowAddPlanModal(true)} className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-cyan-500/20 transition-all">
                   <Plus className="w-4 h-4" /> Assigner Tâche & PDFs
                 </button>
               )}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {visiblePlans.map(plan => (
-                <div key={plan.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl space-y-3 shadow-sm flex flex-col justify-between">
+                <div key={plan.firestoreId} className="bg-white border border-slate-200/80 hover:border-cyan-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-bl-full pointer-events-none group-hover:bg-cyan-500/10 transition-colors" />
                   <div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="px-2 py-0.5 rounded font-mono font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">📅 {plan.formattedDate || formatDateFr(plan.date)}</span>
+                    <div className="flex justify-between items-center text-xs mb-3">
+                      <span className="px-3 py-1 rounded-xl font-mono font-bold bg-cyan-50 text-cyan-700 border border-cyan-100">📅 {plan.formattedDate || formatDateFr(plan.date)}</span>
                       <span className="text-slate-500 font-medium">Pour : <strong className="text-slate-800">{plan.targetName}</strong></span>
                     </div>
-                    <h3 className="text-sm font-bold text-slate-900 mt-2">{plan.title}</h3>
-                    {plan.description && <p className="text-xs text-slate-600 mt-1">{plan.description}</p>}
-                    <div className="mt-3 space-y-2">
-                      <span className="text-[11px] text-slate-500 font-semibold">Documents ({plan.files ? plan.files.length : 0}) :</span>
+
+                    <h3 className="text-base font-bold text-slate-900">{plan.title}</h3>
+                    {plan.description && <p className="text-xs text-slate-600 mt-1 leading-relaxed">{plan.description}</p>}
+
+                    <div className="mt-4 space-y-2 pt-3 border-t border-slate-100">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Documents ({plan.files ? plan.files.length : 0})</span>
                       {plan.files && plan.files.map((fileObj, fIdx) => (
-                        <div key={fIdx} className="p-2 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
-                          <span className="text-xs text-slate-800 font-medium truncate max-w-[140px]">📄 {fileObj.name}</span>
-                          <button onClick={() => handleDownloadSinglePdf(fileObj)} className="px-2 py-1 bg-cyan-600 text-white text-[11px] rounded-lg font-semibold flex items-center gap-1"><Download className="w-3 h-3" /> Ouvrir</button>
+                        <div key={fIdx} className="p-2.5 bg-slate-50 hover:bg-cyan-50/50 rounded-2xl border border-slate-200/60 flex items-center justify-between transition-colors">
+                          <div className="flex items-center gap-2.5">
+                            <div className="p-2 bg-red-50 text-red-500 rounded-xl"><FileText className="w-4 h-4" /></div>
+                            <span className="text-xs text-slate-800 font-semibold truncate max-w-[130px]">{fileObj.name}</span>
+                          </div>
+                          <button onClick={() => handleDownloadSinglePdf(fileObj)} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] rounded-xl font-bold flex items-center gap-1 shadow-sm transition-all">
+                            <Download className="w-3 h-3" /> Ouvrir
+                          </button>
                         </div>
                       ))}
                     </div>
                   </div>
-                  {isAdmin && <div className="pt-2 border-t border-slate-100 flex justify-end"><button onClick={() => handleDeletePlan(plan.firestoreId)} className="text-xs text-red-600 font-medium">Supprimer</button></div>}
+
+                  {isAdmin && (
+                    <div className="pt-3 border-t border-slate-100 flex justify-end">
+                      <button onClick={() => handleDeletePlan(plan.firestoreId)} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded-xl font-semibold transition-colors">Supprimer</button>
+                    </div>
+                  )}
                 </div>
               ))}
-              {visiblePlans.length === 0 && <div className="col-span-full py-8 text-center bg-white border border-slate-200 rounded-2xl text-slate-500 text-xs italic">Aucune tâche assignée.</div>}
+
+              {visiblePlans.length === 0 && (
+                <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                  <div className="w-12 h-12 bg-cyan-50 text-cyan-600 rounded-2xl mx-auto flex items-center justify-center">
+                    <FolderOpen className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">Aucune tâche assignée</h4>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Il n'y a actuellement aucun planning ou feuille de route à afficher pour cette période.</p>
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {/* --- MODULE DEMANDES DE MATÉRIEL --- */}
         {activeTab === 'requests' && (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><ClipboardList className="w-5 h-5 text-amber-600" /> Demandes de matériel</h2>
-              <div className="flex gap-2">
-                <select value={requestStatusFilter} onChange={e => setRequestStatusFilter(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-xl">
-                  <option value="all">🔍 Tous les statuts</option>
-                  <option value="En attente">⏳ En attente</option>
-                  <option value="Validé / Commandé">✅ Validé / Commandé</option>
-                  <option value="Reçu au dépôt">📦 Reçu au dépôt</option>
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-slate-900 via-amber-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-amber-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-amber-600/20 border border-amber-400/30 rounded-2xl">
+                  <ClipboardList className="w-7 h-7 text-amber-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black tracking-wide">Demandes de Matériel & Fournitures</h2>
+                  <p className="text-xs text-slate-300 mt-0.5">Suivi des besoins en raccords, tubes et équipements pour les chantiers.</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <select value={requestStatusFilter} onChange={e => setRequestStatusFilter(e.target.value)} className="px-3.5 py-2.5 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none">
+                  <option value="all" className="bg-slate-900">🔍 Tous les statuts</option>
+                  <option value="En attente" className="bg-slate-900">⏳ En attente</option>
+                  <option value="Validé / Commandé" className="bg-slate-900">✅ Validé / Commandé</option>
+                  <option value="Reçu au dépôt" className="bg-slate-900">📦 Reçu au dépôt</option>
                 </select>
-                <button onClick={() => setShowAddRequestModal(true)} className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1">
+                <button onClick={() => setShowAddRequestModal(true)} className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all">
                   <Plus className="w-4 h-4" /> Nouvelle Demande
                 </button>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {visibleRequests.map(req => (
-                <div key={req.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl space-y-3 shadow-sm flex flex-col justify-between">
+                <div key={req.firestoreId} className="bg-white border border-slate-200/80 hover:border-amber-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative overflow-hidden group">
                   <div>
-                    <div className="flex justify-between items-center text-xs mb-2">
-                      <span className="text-slate-500">Par : <strong>{req.requester}</strong></span>
-                      <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-bold rounded-full">{req.urgency}</span>
+                    <div className="flex justify-between items-center text-xs mb-3">
+                      <span className="text-slate-500 font-medium">Par : <strong className="text-slate-800">{req.requester}</strong></span>
+                      <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full ${req.urgency === 'Urgent' ? 'bg-amber-50 text-amber-700 border border-amber-200' : req.urgency === 'Critique' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>{req.urgency}</span>
                     </div>
-                    <h3 className="text-sm font-bold text-slate-900">{req.items} (Qté : {req.quantity})</h3>
-                    {req.description && <p className="text-xs text-slate-600 mt-1">{req.description}</p>}
+                    
+                    <h3 className="text-base font-bold text-slate-900">{req.items}</h3>
+                    <div className="inline-block mt-1.5 px-2.5 py-0.5 bg-slate-100 text-slate-700 font-mono text-xs font-bold rounded-lg border border-slate-200">Qté : {req.quantity}</div>
+
+                    {req.description && <p className="text-xs text-slate-600 mt-2 leading-relaxed">{req.description}</p>}
+
                     {req.attachmentData && (
-                      <div className="mt-2 p-2 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
-                        <span className="text-xs text-slate-800 truncate max-w-[140px]">{req.attachmentName}</span>
-                        <button onClick={() => handleDownloadSinglePdf({ name: req.attachmentName, data: req.attachmentData })} className="px-2 py-1 bg-cyan-600 text-white text-[11px] rounded-lg">Ouvrir</button>
+                      <div className="mt-3 p-2.5 bg-slate-50 rounded-2xl border border-slate-200/60 flex items-center justify-between">
+                        <span className="text-xs text-slate-800 font-medium truncate max-w-[130px]">📎 {req.attachmentName}</span>
+                        <button onClick={() => handleDownloadSinglePdf({ name: req.attachmentName, data: req.attachmentData })} className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-[11px] rounded-xl font-bold">Ouvrir</button>
                       </div>
                     )}
-                    <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
-                      <span className="text-[11px] text-slate-500">Statut :</span>
+
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-400">STATUT</span>
                       {isAdmin ? (
-                        <select value={req.status} onChange={(e) => handleUpdateRequestStatus(req.firestoreId, e.target.value)} className="px-2.5 py-1 text-xs font-semibold rounded-xl border bg-slate-50">
+                        <select value={req.status} onChange={(e) => handleUpdateRequestStatus(req.firestoreId, e.target.value)} className="px-3 py-1.5 text-xs font-semibold rounded-xl border bg-slate-50 border-slate-200 focus:outline-none">
                           <option value="En attente">⏳ En attente</option>
                           <option value="Validé / Commandé">✅ Validé / Commandé</option>
                           <option value="Reçu au dépôt">📦 Reçu au dépôt</option>
                           <option value="Refusé">❌ Refusé</option>
                         </select>
                       ) : (
-                        <span className="px-2 py-1 text-xs font-bold rounded-lg bg-slate-100">{req.status}</span>
+                        <span className="px-3 py-1 text-xs font-bold rounded-xl bg-amber-50 text-amber-800 border border-amber-200">{req.status}</span>
                       )}
                     </div>
                   </div>
-                  {isAdmin && <div className="pt-2 border-t border-slate-100 flex justify-end"><button onClick={() => handleDeleteRequest(req.firestoreId)} className="text-xs text-red-600">Supprimer</button></div>}
+
+                  {isAdmin && (
+                    <div className="pt-3 border-t border-slate-100 flex justify-end">
+                      <button onClick={() => handleDeleteRequest(req.firestoreId)} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold rounded-xl transition-colors">Supprimer</button>
+                    </div>
+                  )}
                 </div>
               ))}
-              {visibleRequests.length === 0 && <div className="col-span-full py-8 text-center bg-white border border-slate-200 rounded-2xl text-slate-500 text-xs italic">Aucune demande.</div>}
+
+              {visibleRequests.length === 0 && (
+                <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                  <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl mx-auto flex items-center justify-center">
+                    <ClipboardList className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">Aucune demande de matériel</h4>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Aucune commande ou besoin matériel n'a été enregistré pour le moment.</p>
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {/* --- MODULE EFFECTIFS --- */}
         {activeTab === 'workers' && (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Users className="w-5 h-5 text-emerald-600" /> Annuaire de l'équipe</h2>
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input type="text" value={workerSearch} onChange={e => setWorkerSearch(e.target.value)} placeholder="Rechercher..." className="pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs" />
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-emerald-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-emerald-600/20 border border-emerald-400/30 rounded-2xl">
+                  <Users className="w-7 h-7 text-emerald-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black tracking-wide">Annuaire & Gestion des Effectifs</h2>
+                  <p className="text-xs text-slate-300 mt-0.5">Liste des collaborateurs rattachés à votre chantier.</p>
+                </div>
+              </div>
+              <div className="relative w-full sm:w-64">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                <input type="text" value={workerSearch} onChange={e => setWorkerSearch(e.target.value)} placeholder="Rechercher un collaborateur..." className="w-full pl-10 pr-4 py-2.5 bg-black/40 border border-white/20 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none" />
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredWorkers.map(user => (
-                <div key={user.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl space-y-3 shadow-sm flex flex-col justify-between">
+                <div key={user.firestoreId} className="bg-white border border-slate-200/80 hover:border-emerald-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">{user.name}</h3>
-                    <div className="mt-2 flex items-center gap-2 text-xs text-slate-700 bg-slate-50 p-2 rounded-xl">
-                      <Phone className="w-3.5 h-3.5 text-emerald-600" /> <span className="font-mono">{user.phone || 'Non renseigné'}</span>
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-base font-bold text-slate-900">{user.name}</h3>
+                      <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl border border-emerald-200">{user.role}</span>
                     </div>
+
+                    <div className="mt-4 flex items-center gap-3 text-xs text-slate-700 bg-slate-50 p-3 rounded-2xl border border-slate-200/60">
+                      <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl"><Phone className="w-4 h-4" /></div>
+                      <span className="font-mono font-bold">{user.phone || 'Non renseigné'}</span>
+                    </div>
+
+                    <div className="mt-2 text-[11px] text-slate-400 font-medium">Inscrit le : {user.joinedAt}</div>
                   </div>
+
                   {(isAdmin || user.email === currentUser.email) && (
-                    <div className="pt-2 border-t border-slate-100 flex gap-2">
-                      <button onClick={() => handleOpenUserModal(user)} className="flex-1 py-1.5 bg-slate-100 text-slate-700 text-xs rounded-lg font-medium">Modifier</button>
-                      {isAdmin && user.email !== currentUser.email && <button onClick={() => handleDeleteUser(user.firestoreId)} className="px-3 py-1.5 bg-red-50 text-red-600 text-xs rounded-lg">🗑️</button>}
+                    <div className="pt-3 border-t border-slate-100 flex gap-2">
+                      <button onClick={() => handleOpenUserModal(user)} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors">Modifier</button>
+                      {isAdmin && user.email !== currentUser.email && (
+                        <button onClick={() => handleDeleteUser(user.firestoreId)} className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded-xl transition-colors font-bold">🗑️</button>
+                      )}
                     </div>
                   )}
                 </div>
               ))}
+
+              {filteredWorkers.length === 0 && (
+                <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                  <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl mx-auto flex items-center justify-center">
+                    <Users className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">Aucun collaborateur trouvé</h4>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Aucun membre ne correspond à votre recherche ou l'équipe est vide.</p>
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {/* --- MODULE TUTOS & SÉCURITÉ --- */}
         {activeTab === 'videos' && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Video className="w-5 h-5 text-rose-600" /> Tutos & Sécurité</h2>
-              {isAdmin && <button onClick={() => setShowAddVideoModal(true)} className="px-3 py-2 bg-rose-600 text-white text-xs font-semibold rounded-xl"><Plus className="w-4 h-4" /> Ajouter</button>}
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-rose-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-rose-600/20 border border-rose-400/30 rounded-2xl">
+                  <Video className="w-7 h-7 text-rose-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black tracking-wide">Tutos, Postures & Sécurité Chantiers</h2>
+                  <p className="text-xs text-slate-300 mt-0.5">Vidéos de formation et prévention des risques professionnels.</p>
+                </div>
+              </div>
+              {isAdmin && (
+                <button onClick={() => setShowAddVideoModal(true)} className="px-4 py-2.5 bg-rose-500 hover:bg-rose-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-rose-500/20 transition-all">
+                  <Plus className="w-4 h-4" /> Ajouter une vidéo
+                </button>
+              )}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {videos.map(vid => (
-                <div key={vid.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl space-y-3 shadow-sm flex flex-col justify-between">
+                <div key={vid.firestoreId} className="bg-white border border-slate-200/80 hover:border-rose-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                   <div>
-                    <span className="px-2 py-0.5 bg-rose-50 text-rose-700 text-xs font-bold rounded-full">{vid.category}</span>
-                    <h3 className="text-sm font-bold text-slate-900 mt-2">{vid.title}</h3>
-                    {vid.description && <p className="text-xs text-slate-600 mt-1">{vid.description}</p>}
+                    <span className="px-3 py-1 bg-rose-50 text-rose-700 text-xs font-bold rounded-xl border border-rose-200">🎬 {vid.category}</span>
+                    <h3 className="text-base font-bold text-slate-900 mt-3">{vid.title}</h3>
+                    {vid.description && <p className="text-xs text-slate-600 mt-1 leading-relaxed">{vid.description}</p>}
                   </div>
-                  <div className="pt-3 border-t border-slate-100 flex gap-2">
-                    <a href={vid.url} target="_blank" rel="noopener noreferrer" className="flex-1 py-2 bg-rose-600 text-white text-xs font-semibold rounded-xl text-center flex items-center justify-center gap-1"><Play className="w-3.5 h-3.5 fill-current" /> Regarder</a>
-                    {isAdmin && <button onClick={() => handleDeleteVideo(vid.firestoreId)} className="px-3 bg-red-50 text-red-600 text-xs rounded-xl">🗑️</button>}
+
+                  <div className="pt-4 border-t border-slate-100 flex gap-2">
+                    <a href={vid.url} target="_blank" rel="noopener noreferrer" className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl text-center flex items-center justify-center gap-1.5 shadow-md shadow-rose-600/20 transition-all">
+                      <Play className="w-3.5 h-3.5 fill-current" /> Regarder la vidéo
+                    </a>
+                    {isAdmin && (
+                      <button onClick={() => handleDeleteVideo(vid.firestoreId)} className="px-3.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded-xl transition-colors font-bold">🗑️</button>
+                    )}
                   </div>
                 </div>
               ))}
+
+              {videos.length === 0 && (
+                <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                  <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl mx-auto flex items-center justify-center">
+                    <Video className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">Aucune vidéo disponible</h4>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Aucun tutoriel ou module de sécurité n'a été publié pour l'instant.</p>
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {/* --- MODULE PARC OUTILLAGE --- */}
         {activeTab === 'tools' && (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Wrench className="w-5 h-5 text-indigo-600" /> Parc Outillage</h2>
-              <div className="flex gap-2">
-                <select value={toolStatusFilter} onChange={e => setToolStatusFilter(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-xl">
-                  <option value="all">🔍 Tous</option>
-                  <option value="Disponible">🟢 Disponible</option>
-                  <option value="En service">⚡ En service</option>
-                  <option value="En révision">🛠️ En révision</option>
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-indigo-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-indigo-600/20 border border-indigo-400/30 rounded-2xl">
+                  <Wrench className="w-7 h-7 text-indigo-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black tracking-wide">Parc Outillage & Matériel</h2>
+                  <p className="text-xs text-slate-300 mt-0.5">Suivi des sertisseuses, carotteuses et de leur affectation.</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <select value={toolStatusFilter} onChange={e => setToolStatusFilter(e.target.value)} className="px-3.5 py-2.5 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none">
+                  <option value="all" className="bg-slate-900">🔍 Tous les statuts</option>
+                  <option value="Disponible" className="bg-slate-900">🟢 Disponible</option>
+                  <option value="En service" className="bg-slate-900">⚡ En service</option>
+                  <option value="En révision" className="bg-slate-900">🛠️ En révision</option>
                 </select>
-                {isAdmin && <button onClick={() => setShowAddToolModal(true)} className="px-3 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl"><Plus className="w-4 h-4" /> Machine</button>}
+                {isAdmin && (
+                  <button onClick={() => setShowAddToolModal(true)} className="px-4 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all">
+                    <Plus className="w-4 h-4" /> Machine
+                  </button>
+                )}
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredEquipment.map(tool => (
-                <div key={tool.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl space-y-3 shadow-sm flex flex-col justify-between">
+                <div key={tool.firestoreId} className="bg-white border border-slate-200/80 hover:border-indigo-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                   <div>
-                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 font-mono text-xs font-bold rounded">{tool.id}</span>
-                    <h3 className="text-sm font-bold text-slate-900 mt-2">{tool.name}</h3>
-                    <div className="mt-3 space-y-1.5 text-xs bg-slate-50 p-2 rounded-lg">
-                      <div className="flex justify-between"><span className="text-slate-500">Statut :</span><span className="font-semibold text-emerald-600">{tool.status}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Affecté :</span><span className="font-semibold">{tool.assignedTo}</span></div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-mono text-xs font-bold rounded-xl border border-indigo-100">{tool.id}</span>
+                      <span className="text-xs text-slate-500 font-medium">{tool.brand || 'REMS'}</span>
+                    </div>
+
+                    <h3 className="text-base font-bold text-slate-900">{tool.name}</h3>
+
+                    <div className="mt-4 space-y-2 text-xs bg-slate-50 p-3 rounded-2xl border border-slate-200/60">
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Statut :</span><span className="font-bold text-emerald-600">{tool.status}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Affecté à :</span><span className="font-bold text-slate-800">{tool.assignedTo}</span></div>
                     </div>
                   </div>
-                  <div className="pt-3 border-t border-slate-100 flex gap-2">
-                    <button onClick={() => setSelectedTool(tool)} className="flex-1 py-1.5 bg-slate-100 text-xs rounded-lg">💬 Notes ({tool.notes?.length || 0})</button>
-                    {isAdmin && <button onClick={() => handleOpenEditModal(tool)} className="px-3 py-1.5 bg-amber-50 text-amber-700 text-xs rounded-lg">Modifier</button>}
-                    {isAdmin && <button onClick={() => handleDeleteTool(tool.firestoreId)} className="px-3 py-1.5 bg-red-50 text-red-600 text-xs rounded-lg">🗑️</button>}
+
+                  <div className="pt-4 border-t border-slate-100 flex items-center gap-2">
+                    <button onClick={() => setSelectedTool(tool)} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 font-bold rounded-xl transition-colors">
+                      💬 Notes ({tool.notes?.length || 0})
+                    </button>
+                    {isAdmin && (
+                      <>
+                        <button onClick={() => handleOpenEditModal(tool)} className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold rounded-xl transition-colors">Modifier</button>
+                        <button onClick={() => handleDeleteTool(tool.firestoreId)} className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-colors">🗑️</button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
+
+              {filteredEquipment.length === 0 && (
+                <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                  <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl mx-auto flex items-center justify-center">
+                    <Wrench className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">Aucune machine trouvée</h4>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Aucun outil ne correspond à votre recherche ou le parc est vide.</p>
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {/* --- VALIDATION COMPTES (ADMIN) --- */}
         {activeTab === 'accounts' && isAdmin && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold text-slate-900">Validation des collaborateurs (Code : {myProjectCode})</h2>
-            <div className="space-y-3">
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-purple-900/40 flex items-center gap-4">
+              <div className="p-4 bg-purple-600/20 border border-purple-400/30 rounded-2xl">
+                <UserCheck className="w-7 h-7 text-purple-400" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black tracking-wide">Validation des Collaborateurs</h2>
+                <p className="text-xs text-slate-300 mt-0.5">Gérez les demandes d'accès des ouvriers utilisant votre code : <strong className="font-mono text-white">{myProjectCode}</strong></p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
               {pendingUsers.map(user => (
-                <div key={user.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl flex justify-between items-center shadow-sm">
+                <div key={user.firestoreId} className="bg-white border border-slate-200/80 p-6 rounded-3xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
                   <div>
-                    <p className="text-sm font-bold text-slate-900">{user.name} ({user.email})</p>
-                    <p className="text-xs text-slate-500">Tél : {user.phone}</p>
+                    <h3 className="text-base font-bold text-slate-900">{user.name} <span className="text-xs font-normal text-slate-500">({user.email})</span></h3>
+                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-emerald-600" /> <span className="font-mono">{user.phone}</span></p>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => handleApproveAccount(user.firestoreId)} className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg font-semibold">Approuver</button>
-                    <button onClick={() => handleRejectAccount(user.firestoreId)} className="px-3 py-1.5 bg-red-50 text-red-600 text-xs rounded-lg">Refuser</button>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button onClick={() => handleApproveAccount(user.firestoreId)} className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all">Approuver</button>
+                    <button onClick={() => handleRejectAccount(user.firestoreId)} className="flex-1 sm:flex-none px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-colors">Refuser</button>
                   </div>
                 </div>
               ))}
-              {pendingUsers.length === 0 && <div className="py-6 text-center text-slate-500 text-xs italic bg-white border border-slate-200 rounded-xl">Aucune attente.</div>}
+
+              {pendingUsers.length === 0 && (
+                <div className="py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                  <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl mx-auto flex items-center justify-center">
+                    <UserCheck className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">Aucun compte en attente</h4>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Tous les collaborateurs utilisant votre code de chantier ont été validés.</p>
+                </div>
+              )}
             </div>
           </div>
         )}
