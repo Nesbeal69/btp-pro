@@ -64,7 +64,7 @@ export default function App() {
   const [showAddToolModal, setShowAddToolModal] = useState(false);
   const [newToolData, setNewToolData] = useState({ id: '', name: '', brand: 'REMS', category: 'Sertissage', status: 'Disponible' });
 
-  // États Planning
+  // États Planning (avec gestion de plusieurs fichiers)
   const [showAddPlanModal, setShowAddPlanModal] = useState(false);
   const [planningViewMode, setPlanningViewMode] = useState('week');
   const [selectedWorkerFilter, setSelectedWorkerFilter] = useState('all');
@@ -74,8 +74,7 @@ export default function App() {
     targetUserId: 'all',
     date: new Date().toISOString().split('T')[0],
     description: '',
-    fileName: '',
-    fileData: ''
+    files: [] // Tableau pour stocker plusieurs fichiers PDF
   });
 
   const formatDateFr = (dateString) => {
@@ -231,19 +230,38 @@ export default function App() {
     }
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
+  // Gestion de plusieurs fichiers PDF
+  const handleMultipleFilesChange = (e) => {
+    const selectedFiles = Array.from(e.target.files);
+    if (selectedFiles.length === 0) return;
+
+    let processedFiles = [];
+    let loadedCount = 0;
+
+    selectedFiles.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setNewPlanData(prev => ({
-          ...prev,
-          fileName: file.name,
-          fileData: reader.result
-        }));
+        processedFiles.push({
+          name: file.name,
+          data: reader.result
+        });
+        loadedCount++;
+        if (loadedCount === selectedFiles.length) {
+          setNewPlanData(prev => ({
+            ...prev,
+            files: [...prev.files, ...processedFiles]
+          }));
+        }
       };
       reader.readAsDataURL(file);
-    }
+    });
+  };
+
+  const handleRemoveFileIndex = (indexToRemove) => {
+    setNewPlanData(prev => ({
+      ...prev,
+      files: prev.files.filter((_, idx) => idx !== indexToRemove)
+    }));
   };
 
   const handleUploadPlan = async (e) => {
@@ -260,15 +278,14 @@ export default function App() {
       await addDoc(collection(db, "plans"), {
         title: newPlanData.title,
         description: newPlanData.description || '',
-        fileName: newPlanData.fileName || 'Plan_Execution.pdf',
-        fileData: newPlanData.fileData || '',
+        files: newPlanData.files || [], // Sauvegarde le tableau de fichiers
         targetUserId: newPlanData.targetUserId === 'all' ? 'all' : Number(newPlanData.targetUserId),
         targetName: targetName,
         date: newPlanData.date,
         formattedDate: formatDateFr(newPlanData.date)
       });
       setShowAddPlanModal(false);
-      setNewPlanData({ title: '', targetUserId: 'all', date: new Date().toISOString().split('T')[0], description: '', fileName: '', fileData: '' });
+      setNewPlanData({ title: '', targetUserId: 'all', date: new Date().toISOString().split('T')[0], description: '', files: [] });
     } catch (error) {
       console.error("Erreur ajout planning :", error);
     }
@@ -282,14 +299,14 @@ export default function App() {
     }
   };
 
-  const handleDownloadPdf = (plan) => {
-    if (!plan.fileData) {
-      alert("Aucun fichier PDF rattaché à cette tâche.");
+  const handleDownloadSinglePdf = (fileObj) => {
+    if (!fileObj.data) {
+      alert("Fichier introuvable.");
       return;
     }
     const link = document.createElement('a');
-    link.href = plan.fileData;
-    link.download = plan.fileName || 'document.pdf';
+    link.href = fileObj.data;
+    link.download = fileObj.name || 'document.pdf';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -619,7 +636,7 @@ export default function App() {
 
                 {isAdmin && (
                   <button onClick={() => setShowAddPlanModal(true)} className="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow">
-                    <Plus className="w-4 h-4" /> Assigner Tâche & PDF
+                    <Plus className="w-4 h-4" /> Assigner Tâche & PDFs
                   </button>
                 )}
               </div>
@@ -639,18 +656,41 @@ export default function App() {
                     <h3 className="text-sm font-bold text-white mt-2">{plan.title}</h3>
                     {plan.description && <p className="text-xs text-slate-300 mt-1">{plan.description}</p>}
 
-                    <div className="mt-3 p-2.5 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-red-400 shrink-0" />
-                        <span className="text-xs text-slate-200 font-medium truncate max-w-[160px]">{plan.fileName}</span>
-                      </div>
-                      <button 
-                        onClick={() => handleDownloadPdf(plan)} 
-                        className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white text-xs rounded-lg flex items-center gap-1 font-semibold transition-colors"
-                        title="Télécharger le PDF"
-                      >
-                        <Download className="w-3.5 h-3.5" /> Ouvrir / Télécharger
-                      </button>
+                    {/* Liste des fichiers PDF multiples rattachés à la tâche */}
+                    <div className="mt-3 space-y-2">
+                      <span className="text-[11px] text-slate-400 font-semibold">Documents associés ({plan.files ? plan.files.length : (plan.fileName ? 1 : 0)}) :</span>
+                      
+                      {/* Rétrocompatibilité si un ancien plan a un seul fichier */}
+                      {(!plan.files || plan.files.length === 0) && plan.fileData && (
+                        <div className="p-2 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-red-400 shrink-0" />
+                            <span className="text-xs text-slate-200 font-medium truncate max-w-[140px]">{plan.fileName}</span>
+                          </div>
+                          <button 
+                            onClick={() => handleDownloadSinglePdf({ name: plan.fileName, data: plan.fileData })} 
+                            className="px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] rounded-lg font-semibold"
+                          >
+                            Ouvrir
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Affichage multiple */}
+                      {plan.files && plan.files.map((fileObj, fIdx) => (
+                        <div key={fIdx} className="p-2 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-red-400 shrink-0" />
+                            <span className="text-xs text-slate-200 font-medium truncate max-w-[140px]">{fileObj.name}</span>
+                          </div>
+                          <button 
+                            onClick={() => handleDownloadSinglePdf(fileObj)} 
+                            className="px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] rounded-lg font-semibold flex items-center gap-1"
+                          >
+                            <Download className="w-3 h-3" /> Ouvrir
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -792,11 +832,11 @@ export default function App() {
         )}
       </main>
 
-      {/* --- MODALE CREATION TÂCHE AVEC CALENDRIER CLIQUABLE PARTOUT & ICONE BLANCHE --- */}
+      {/* --- MODALE CREATION TÂCHE MULTI-PDF & CALENDRIER --- */}
       {showAddPlanModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleUploadPlan} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-white">Assigner Tâche & Plan PDF</h3>
+          <form onSubmit={handleUploadPlan} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold text-white">Assigner Tâche & Plusieurs PDFs</h3>
             
             <div>
               <label className="block text-xs text-slate-400 mb-1">Titre de l'intervention / Chantier</label>
@@ -814,7 +854,7 @@ export default function App() {
             </div>
 
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Date d'intervention (Clique n'importe où pour ouvrir)</label>
+              <label className="block text-xs text-slate-400 mb-1">Date d'intervention</label>
               <input 
                 type="date" 
                 value={newPlanData.date} 
@@ -827,14 +867,33 @@ export default function App() {
             </div>
 
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Sélectionner le fichier PDF (Plan / Fiche)</label>
+              <label className="block text-xs text-slate-400 mb-1">Sélectionner un ou plusieurs fichiers PDF</label>
               <input 
                 type="file" 
                 accept=".pdf" 
-                onChange={handleFileChange} 
-                required 
+                multiple 
+                onChange={handleMultipleFilesChange} 
                 className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer" 
               />
+              
+              {/* Liste des fichiers sélectionnés en attente d'envoi */}
+              {newPlanData.files.length > 0 && (
+                <div className="mt-2 space-y-1.5 bg-slate-950 p-2 rounded-xl border border-slate-800">
+                  <span className="text-[10px] text-cyan-400 font-bold">Fichiers prêts à être joints ({newPlanData.files.length}) :</span>
+                  {newPlanData.files.map((file, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-xs text-slate-200 bg-slate-900 px-2 py-1 rounded-lg">
+                      <span className="truncate max-w-[200px]">📄 {file.name}</span>
+                      <button 
+                        type="button" 
+                        onClick={() => handleRemoveFileIndex(idx)} 
+                        className="text-red-400 hover:text-red-300 font-bold px-1"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>
