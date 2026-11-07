@@ -51,7 +51,6 @@ export default function App() {
   const [regPassword, setRegPassword] = useState('');
   const [authError, setAuthError] = useState('');
 
-  // États pour la modification d'un utilisateur par l'Admin dans l'annuaire
   const [editingUser, setEditingUser] = useState(null);
   const [editUserRole, setEditUserRole] = useState('Employé');
 
@@ -71,7 +70,6 @@ export default function App() {
   const [showAddToolModal, setShowAddToolModal] = useState(false);
   const [newToolData, setNewToolData] = useState({ id: '', name: '', brand: 'REMS', category: 'Sertissage', status: 'Disponible' });
 
-  // États Planning
   const [showAddPlanModal, setShowAddPlanModal] = useState(false);
   const [planningViewMode, setPlanningViewMode] = useState('week');
   const [selectedWorkerFilter, setSelectedWorkerFilter] = useState('all');
@@ -84,7 +82,6 @@ export default function App() {
     files: []
   });
 
-  // États Module Demandes de Matériel & Filtre de statut
   const [showAddRequestModal, setShowAddRequestModal] = useState(false);
   const [requestStatusFilter, setRequestStatusFilter] = useState('all');
   const [newRequestData, setNewRequestData] = useState({
@@ -96,7 +93,6 @@ export default function App() {
     attachmentData: ''
   });
 
-  // États Module Effectifs (Recherche & Filtre)
   const [workerSearch, setWorkerSearch] = useState('');
   const [workerRoleFilter, setWorkerRoleFilter] = useState('all');
 
@@ -118,7 +114,6 @@ export default function App() {
     return dateString;
   };
 
-  // Synchronisation Firestore
   useEffect(() => {
     const unsubEquipment = onSnapshot(collection(db, "equipment"), (snapshot) => {
       setEquipment(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
@@ -245,7 +240,6 @@ export default function App() {
     }
   };
 
-  // --- GESTION DEMANDES DE MATÉRIEL ---
   const handleRequestAttachmentChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -317,7 +311,6 @@ export default function App() {
     return list;
   }, [requests, currentUser, requestStatusFilter]);
 
-  // --- GESTION EFFECTIFS & UTILISATEURS ---
   const approvedUsers = useMemo(() => users.filter(u => u.status === 'approved'), [users]);
 
   const filteredWorkers = useMemo(() => {
@@ -339,7 +332,6 @@ export default function App() {
     }
   };
 
-  // Gestion de plusieurs fichiers PDF Planning
   const handleMultipleFilesChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
     if (selectedFiles.length === 0) return;
@@ -421,26 +413,23 @@ export default function App() {
     document.body.removeChild(link);
   };
 
-  // --- CONNEXION SÉCURISÉE ---
+  // --- CONNEXION SÉCURISÉE STRICTE ---
   const handleLogin = (e) => {
     e.preventDefault();
     setAuthError('');
     
-    // 1. Vérifier si l'e-mail existe dans la base
     const found = users.find(u => u.email.toLowerCase() === loginEmail.toLowerCase().trim());
     if (!found) {
       setAuthError("Adresse email introuvable. Veuillez vous inscrire d'abord.");
       return;
     }
 
-    // 2. Vérifier si le mot de passe correspond (si défini, sinon valeur par défaut)
-    const validPassword = found.password || 'password123';
-    if (loginPassword !== validPassword) {
+    // Vérification stricte du mot de passe
+    if (loginPassword !== found.password) {
       setAuthError("Mot de passe incorrect.");
       return;
     }
 
-    // 3. Vérifier si le compte est en attente de validation par l'admin
     if (found.status === 'pending') {
       setAuthMode('pending');
       return;
@@ -459,7 +448,6 @@ export default function App() {
       return;
     }
 
-    // Vérifier si l'e-mail est déjà utilisé
     const existing = users.find(u => u.email.toLowerCase() === regEmail.toLowerCase().trim());
     if (existing) {
       setAuthError('Cette adresse email est déjà utilisée.');
@@ -471,10 +459,10 @@ export default function App() {
       name: regName,
       email: regEmail,
       phone: regPhone,
-      password: regPassword, // Enregistrement du mot de passe
+      password: regPassword, 
       role: 'Employé', 
       team: 'Ouvriers',
-      status: 'pending', // 🛑 Mis en attente obligatoire pour validation par l'admin
+      status: 'pending', 
       joinedAt: new Date().toISOString().split('T')[0]
     };
     
@@ -527,7 +515,7 @@ export default function App() {
               <div className="text-center py-6 space-y-4">
                 <Clock className="w-12 h-12 text-amber-400 mx-auto" />
                 <h2 className="text-lg font-semibold text-amber-300">Compte en Attente de Validation</h2>
-                <p className="text-xs text-slate-300">Votre inscription a bien été enregistrée. L'administrateur doit valider votre compte et vous attribuer un rôle avant de vous donner l'accès[cite: 5].</p>
+                <p className="text-xs text-slate-300">Votre inscription a bien été enregistrée[cite: 5]. L'administrateur doit valider votre compte et vous attribuer un rôle[cite: 5].</p>
                 <button onClick={() => { setAuthMode('login'); setAuthError(''); }} className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl transition-colors">Retour à la connexion</button>
               </div>
             ) : (
@@ -809,7 +797,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE DEMANDES DE MATÉRIEL (REQUESTS) --- */}
+        {/* --- MODULE DEMANDES DE MATÉRIEL --- */}
         {activeTab === 'requests' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-md">
@@ -923,7 +911,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE EFFECTIFS (ANNUAIRE INSCRITS) --- */}
+        {/* --- MODULE EFFECTIFS --- */}
         {activeTab === 'workers' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-md">
