@@ -386,8 +386,8 @@ export default function App() {
                     <span className="text-3xl p-2.5 bg-cyan-500/10 rounded-xl group-hover:scale-110 transition-transform">📅</span>
                     <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-300 text-[11px] font-bold rounded-full">{visiblePlans.length} dispo</span>
                   </div>
-                  <h3 className="text-base font-bold text-white group-hover:text-cyan-400 transition-colors">Plannings & PDFs</h3>
-                  <p className="text-xs text-slate-400 mt-1">Consultez ou partagez les plannings de chantier personnalisés.</p>
+                  <h3 className="text-base font-bold text-white group-hover:text-cyan-400 transition-colors">Planning</h3>
+                  <p className="text-xs text-slate-400 mt-1">Consulter les plannings partagés.</p>
                 </div>
                 <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-cyan-400">
                   <span>Accéder au module</span>
@@ -525,7 +525,14 @@ export default function App() {
 
                   <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
                     <button 
-                      onClick={() => alert(`Téléchargement simulé du fichier : ${plan.fileName}`)}
+                      onClick={() => {
+  const link = document.createElement('a');
+  link.href = plan.fileUrl; // Remplace par la variable qui contient l'URL ou le lien du fichier PDF
+  link.download = plan.fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}}
                       className="flex-1 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold rounded-lg transition-colors text-center"
                     >
                       📄 Télécharger PDF
