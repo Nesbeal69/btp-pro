@@ -51,7 +51,7 @@ export default function App() {
   const [regPassword, setRegPassword] = useState('');
   const [authError, setAuthError] = useState('');
 
-  // États pour la modification d'un utilisateur par l'Admin dans l'onglet Effectifs
+  // États pour la modification d'un utilisateur par l'Admin dans l'annuaire
   const [editingUser, setEditingUser] = useState(null);
   const [editUserRole, setEditUserRole] = useState('Employé');
 
@@ -449,14 +449,13 @@ export default function App() {
       name: regName,
       email: regEmail,
       phone: regPhone,
-      role: 'Employé', // Rôle par défaut, l'admin pourra le changer
+      role: 'Employé', // Rôle initial par défaut avant validation par l'admin
       team: 'Ouvriers',
-      status: 'approved', // Accepté direct pour l'exemple ou en attente selon besoin
+      status: 'pending', // 🛑 Mis en attente obligatoire pour validation par l'admin
       joinedAt: new Date().toISOString().split('T')[0]
     };
     setUsers([...users, newUser]);
-    setCurrentUser(newUser);
-    setActiveTab('dashboard');
+    setAuthMode('pending');
   };
 
   const handleLogout = () => {
@@ -502,8 +501,8 @@ export default function App() {
               <div className="text-center py-6 space-y-4">
                 <Clock className="w-12 h-12 text-amber-400 mx-auto" />
                 <h2 className="text-lg font-semibold text-amber-300">Compte en Attente de Validation</h2>
-                <p className="text-xs text-slate-300">L'administrateur doit approuver votre compte.</p>
-                <button onClick={() => setAuthMode('login')} className="w-full py-2 bg-slate-800 text-slate-200 text-xs rounded-xl">Retour</button>
+                <p className="text-xs text-slate-300">Votre inscription a bien été enregistrée. L'administrateur doit valider votre compte et vous attribuer un rôle avant de vous donner l'accès[cite: 5].</p>
+                <button onClick={() => setAuthMode('login')} className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl transition-colors">Retour à la connexion</button>
               </div>
             ) : (
               <>
@@ -911,7 +910,6 @@ export default function App() {
                 </p>
               </div>
 
-              {/* Barre de recherche par nom et Filtre par rôle (Intérimaire, Employé, Admin) */}
               <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <div className="relative">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
@@ -937,7 +935,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Grille des membres */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredWorkers.map(user => {
                 let roleBadge = <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 text-xs font-bold rounded-lg">Employé</span>;
@@ -952,7 +949,6 @@ export default function App() {
                         {roleBadge}
                       </div>
 
-                      {/* Affichage du Numéro de téléphone (pas d'e-mail affiché) */}
                       <div className="mt-3 flex items-center gap-2 text-xs text-slate-300 bg-slate-950 p-2 rounded-xl border border-slate-800">
                         <Phone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                         <span className="font-mono font-medium">{user.phone || 'Non renseigné'}</span>
@@ -961,7 +957,6 @@ export default function App() {
                       <div className="mt-2 text-[11px] text-slate-500">Inscrit le : {user.joinedAt}</div>
                     </div>
 
-                    {/* Actions Admin : Modifier le rôle ou Supprimer le compte */}
                     {isAdmin && (
                       <div className="pt-3 border-t border-slate-800 space-y-2">
                         {editingUser === user.id ? (
@@ -1078,7 +1073,7 @@ export default function App() {
                     <p className="text-xs text-slate-400">Téléphone : {user.phone || 'Non renseigné'}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => handleApproveAccount(user.id)} className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg">Approuver</button>
+                    <button onClick={() => handleApproveAccount(user.id)} className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg font-semibold">Approuver</button>
                     <button onClick={() => handleRejectAccount(user.id)} className="px-3 py-1.5 bg-red-600/20 text-red-300 text-xs rounded-lg">Refuser</button>
                   </div>
                 </div>
