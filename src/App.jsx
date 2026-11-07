@@ -563,14 +563,14 @@ export default function App() {
               <Building2 className="w-9 h-9 text-blue-400" />
             </div>
             <h1 className="text-2xl font-black text-white tracking-wider">BÂTIR+ <span className="text-blue-400 font-light">PRO</span></h1>
-            <p className="text-xs text-slate-300 mt-1 font-medium tracking-wide">Plateforme Chantiers, Matériel & Équipes</p>
+            <p className="text-xs text-slate-300 mt-1 font-medium tracking-wide">La solution globale pour le suivi de vos chantiers, matériels et équipes.</p>
           </div>
 
           {authMode === 'pending' ? (
             <div className="text-center py-6 space-y-4">
               <Clock className="w-12 h-12 text-amber-400 mx-auto animate-pulse" />
               <h2 className="text-lg font-semibold text-white">Compte en Attente de Validation</h2>
-              <p className="text-xs text-slate-300">Votre inscription a bien été enregistrée. Votre chef d'équipe doit valider votre accès avec votre code de chantier.</p>
+              <p className="text-xs text-slate-300">Votre inscription a bien été enregistrée. Votre administrateur doit valider votre accès avec votre code de chantier.</p>
               <button onClick={() => { setAuthMode('login'); setAuthError(''); }} className="w-full py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs rounded-xl font-medium transition-colors border border-white/10">Retour à la connexion</button>
             </div>
           ) : (
@@ -602,7 +602,7 @@ export default function App() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-300 mb-1">Email</label>
-                    <input type="email" required value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="jean@btppro.fr" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
+                    <input type="email" required value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="jean@batipluspro.fr" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-300 mb-1">Numéro de téléphone</label>
@@ -616,12 +616,12 @@ export default function App() {
                   <div className="pt-2 border-t border-white/10 space-y-2">
                     <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-200">
                       <input type="checkbox" checked={regIsAdmin} onChange={e => setRegIsAdmin(e.target.checked)} className="rounded border-slate-700 bg-black/40 text-blue-600 focus:ring-blue-500" />
-                      <span>Je suis Chef d'équipe / Je crée un nouveau chantier</span>
+                      <span>Je crée un compte administrateur</span>
                     </label>
 
                     {!regIsAdmin && (
                       <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1">Code de chantier de votre chef</label>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Code de chantier de votre administrateur</label>
                         <input type="text" required={!regIsAdmin} value={regProjectCode} onChange={e => setRegProjectCode(e.target.value)} placeholder="ex: CHANTIER-4821" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 uppercase font-mono tracking-wider focus:outline-none" />
                       </div>
                     )}
@@ -682,7 +682,7 @@ export default function App() {
               </div>
               <div>
                 <h4 className="text-sm font-bold">Installez BÂTIR+ PRO sur votre téléphone !</h4>
-                <p className="text-xs text-slate-300 mt-0.5">Accédez au chantier en un clic depuis votre écran d'accueil, sans passer par le navigateur.</p>
+                <p className="text-xs text-slate-300 mt-0.5">Accédez à l'application en un clic depuis votre écran d'accueil, sans passer par le navigateur.</p>
               </div>
             </div>
             <button 
@@ -707,7 +707,7 @@ export default function App() {
                 {isAdmin && (
                   <div className="mt-4 px-4 py-2 bg-indigo-500/20 border border-indigo-400/30 rounded-2xl text-xs flex items-center gap-2">
                     <Key className="w-4 h-4 text-indigo-300" />
-                    <span>Votre code de chantier à partager à vos gars : <strong className="font-mono font-bold text-white tracking-widest">{myProjectCode}</strong></span>
+                    <span>Votre code de chantier à partager : <strong className="font-mono font-bold text-white tracking-widest">{myProjectCode}</strong></span>
                   </div>
                 )}
 
@@ -725,8 +725,8 @@ export default function App() {
                     <div className="p-3.5 bg-cyan-50 text-cyan-600 rounded-2xl"><CalendarIcon className="w-6 h-6" /></div>
                     <span className="px-2.5 py-1 bg-cyan-50 text-cyan-700 text-xs font-bold rounded-full">{projectPlans.length} dispo</span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-cyan-600">Planning & PDF</h3>
-                  <p className="text-xs text-slate-500 mt-1">Feuilles de route et plans d'exécution.</p>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-cyan-600">Planning </h3>
+                  <p className="text-xs text-slate-500 mt-1"> Retrouvez vos tâches programmées </p>
                 </div>
                 <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-cyan-600">
                   <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
@@ -739,8 +739,8 @@ export default function App() {
                     <div className="p-3.5 bg-amber-50 text-amber-600 rounded-2xl"><ClipboardList className="w-6 h-6" /></div>
                     <span className="px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full">{visibleRequests.length} demandes</span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-600">Demandes de Matériel</h3>
-                  <p className="text-xs text-slate-500 mt-1">Besoins en raccords, tubes et fournitures.</p>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-600">Demandes Matériel & Fournitures </h3>
+                  <p className="text-xs text-slate-500 mt-1">Transmettez tous vos besoins EPI, outillage, fournitures. </p>
                 </div>
                 <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-amber-600">
                   <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
@@ -753,7 +753,7 @@ export default function App() {
                     <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl"><Users className="w-6 h-6" /></div>
                     <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full">{approvedUsers.length} actifs</span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-emerald-600">Gestion des Effectifs</h3>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-emerald-600">Effectifs</h3>
                   <p className="text-xs text-slate-500 mt-1">Annuaire de votre équipe et numéros.</p>
                 </div>
                 <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-emerald-600">
@@ -768,7 +768,7 @@ export default function App() {
                     <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full">{projectEquipment.length} machines</span>
                   </div>
                   <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600">Parc Outillage</h3>
-                  <p className="text-xs text-slate-500 mt-1">Suivi des sertisseuses, carotteuses et entretien.</p>
+                  <p className="text-xs text-slate-500 mt-1">Suivi du parc et des maintenances.</p>
                 </div>
                 <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-indigo-600">
                   <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
@@ -783,7 +783,7 @@ export default function App() {
                       <span className="px-2.5 py-1 bg-purple-50 text-purple-700 text-xs font-bold rounded-full">{pendingUsers.length} en attente</span>
                     </div>
                     <h3 className="text-base font-bold text-slate-900 group-hover:text-purple-600">Validation des Comptes</h3>
-                    <p className="text-xs text-slate-500 mt-1">Validez les gars qui ont utilisé votre code.</p>
+                    <p className="text-xs text-slate-500 mt-1">Validez les comptes qui ont utilisé votre code.</p>
                   </div>
                   <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-purple-600">
                     <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
@@ -809,7 +809,7 @@ export default function App() {
               </div>
               {isAdmin && (
                 <button onClick={() => setShowAddPlanModal(true)} className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-cyan-500/20 transition-all">
-                  <Plus className="w-4 h-4" /> Assigner Tâche & PDFs
+                  <Plus className="w-4 h-4" /> Assigner une Tâche 
                 </button>
               )}
             </div>
@@ -880,8 +880,8 @@ export default function App() {
                 <select value={requestStatusFilter} onChange={e => setRequestStatusFilter(e.target.value)} className="px-3.5 py-2.5 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none">
                   <option value="all" className="bg-slate-900">🔍 Tous les statuts</option>
                   <option value="En attente" className="bg-slate-900">⏳ En attente</option>
-                  <option value="Validé / Commandé" className="bg-slate-900">✅ Validé / Commandé</option>
-                  <option value="Reçu au dépôt" className="bg-slate-900">📦 Reçu au dépôt</option>
+                  <option value="Validé / Commandé" className="bg-slate-900">✅ Validé</option>
+                  <option value="Reçu au dépôt" className="bg-slate-900">📦 Reçu</option>
                 </select>
                 <button onClick={() => setShowAddRequestModal(true)} className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all">
                   <Plus className="w-4 h-4" /> Nouvelle Demande
@@ -915,8 +915,8 @@ export default function App() {
                       {isAdmin ? (
                         <select value={req.status} onChange={(e) => handleUpdateRequestStatus(req.firestoreId, e.target.value)} className="px-3 py-1.5 text-xs font-semibold rounded-xl border bg-slate-50 border-slate-200 focus:outline-none">
                           <option value="En attente">⏳ En attente</option>
-                          <option value="Validé / Commandé">✅ Validé / Commandé</option>
-                          <option value="Reçu au dépôt">📦 Reçu au dépôt</option>
+                          <option value="Validé / Commandé">✅ Validé</option>
+                          <option value="Reçu au dépôt">📦 Reçu</option>
                           <option value="Refusé">❌ Refusé</option>
                         </select>
                       ) : (
@@ -1017,7 +1017,7 @@ export default function App() {
               <div className="mt-12 space-y-4 pt-8 border-t border-slate-200">
                 <div className="flex items-center gap-2 text-slate-700">
                   <Archive className="w-5 h-5 text-slate-500" />
-                  <h3 className="text-base font-bold">Historique des effectifs archivés (Anciens du chantier)</h3>
+                  <h3 className="text-base font-bold">Historique des effectifs archivés</h3>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                   <div className="divide-y divide-slate-100">
@@ -1047,20 +1047,20 @@ export default function App() {
                   <Wrench className="w-7 h-7 text-indigo-400" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black tracking-wide">Parc Outillage & Matériel</h2>
-                  <p className="text-xs text-slate-300 mt-0.5">Suivi des sertisseuses, carotteuses et de leur affectation.</p>
+                  <h2 className="text-xl font-black tracking-wide">Parc Outillage</h2>
+                  <p className="text-xs text-slate-300 mt-0.5">Suivi du parc, des maintenances et de leur affectation.</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 w-full sm:w-auto">
                 <select value={toolStatusFilter} onChange={e => setToolStatusFilter(e.target.value)} className="px-3.5 py-2.5 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none">
                   <option value="all" className="bg-slate-900">🔍 Tous les statuts</option>
                   <option value="Disponible" className="bg-slate-900">🟢 Disponible</option>
-                  <option value="En service" className="bg-slate-900">⚡ En service</option>
+                  <option value="En service" className="bg-slate-900">⚡ Attribué</option>
                   <option value="En révision" className="bg-slate-900">🛠️ En révision</option>
                 </select>
                 {isAdmin && (
                   <button onClick={() => setShowAddToolModal(true)} className="px-4 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all">
-                    <Plus className="w-4 h-4" /> Machine
+                    <Plus className="w-4 h-4" /> Ajouter une Machine
                   </button>
                 )}
               </div>
@@ -1119,7 +1119,7 @@ export default function App() {
               </div>
               <div>
                 <h2 className="text-xl font-black tracking-wide">Validation des Collaborateurs</h2>
-                <p className="text-xs text-slate-300 mt-0.5">Gérez les demandes d'accès des ouvriers utilisant votre code : <strong className="font-mono text-white">{myProjectCode}</strong></p>
+                <p className="text-xs text-slate-300 mt-0.5">Gérez les demandes d'accès des utilisateurs : <strong className="font-mono text-white">{myProjectCode}</strong></p>
               </div>
             </div>
 
@@ -1143,7 +1143,7 @@ export default function App() {
                     <UserCheck className="w-6 h-6" />
                   </div>
                   <h4 className="text-sm font-bold text-slate-800">Aucun compte en attente</h4>
-                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Tous les collaborateurs utilisant votre code de chantier ont été validés.</p>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Tous les utilisateurs ayant demandé l'accès avec votre code de chantier ont été validés.</p>
                 </div>
               )}
             </div>
@@ -1167,7 +1167,7 @@ export default function App() {
               >
                 <option value="Employé">👷‍♂️ Employé</option>
                 <option value="Intérimaire">⚡ Intérimaire</option>
-                <option value="admin">🛡️ Admin (Co-chef de chantier)</option>
+                <option value="admin">🛡️ Admin</option>
               </select>
             </div>
 
@@ -1204,12 +1204,12 @@ export default function App() {
           <form onSubmit={handleSaveToolEdit} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
             <h3 className="text-lg font-bold text-slate-900">Modifier l'outil</h3>
             <select value={editToolForm.assignedTo} onChange={e => setEditToolForm({...editToolForm, assignedTo: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
-              <option value="Dépôt Central">📦 Dépôt Central</option>
+              <option value="Dépôt">📦 Dépôt</option>
               {approvedUsers.map(u => <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name}</option>)}
             </select>
             <select value={editToolForm.status} onChange={e => setEditToolForm({...editToolForm, status: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
               <option value="Disponible">🟢 Disponible</option>
-              <option value="En service">⚡ En service</option>
+              <option value="Attribué">⚡ Attribué</option>
               <option value="En révision">🛠️ En révision</option>
             </select>
             <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditingTool(null)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl">Annuler</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white text-xs rounded-xl">Enregistrer</button></div>
@@ -1250,7 +1250,7 @@ export default function App() {
       {showAddPlanModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleUploadPlan} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-900">Assigner Tâche & PDFs</h3>
+            <h3 className="text-lg font-bold text-slate-900">Assigner une Tâche</h3>
             <input type="text" placeholder="Titre intervention" value={newPlanData.title} onChange={e => setNewPlanData({...newPlanData, title: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
             <select value={newPlanData.targetUserId} onChange={e => setNewPlanData({...newPlanData, targetUserId: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
               <option value="all">Toute l'équipe</option>
@@ -1271,7 +1271,7 @@ export default function App() {
             <input type="text" placeholder="ID (ex: REM-04)" value={newToolData.id} onChange={e => setNewToolData({...newToolData, id: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
             <input type="text" placeholder="Nom de la machine" value={newToolData.name} onChange={e => setNewToolData({...newToolData, name: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
             <select value={newToolData.assignedTo} onChange={e => setNewToolData({...newToolData, assignedTo: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
-              <option value="Dépôt Central">📦 Dépôt Central</option>
+              <option value="Dépôt">📦 Dépôt</option>
               {approvedUsers.map(u => <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name}</option>)}
             </select>
             <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowAddToolModal(false)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl">Annuler</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white text-xs rounded-xl font-semibold">Ajouter</button></div>
