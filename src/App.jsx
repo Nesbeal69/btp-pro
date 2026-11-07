@@ -210,7 +210,7 @@ export default function App() {
       id: Date.now(),
       title: newPlanTitle,
       fileName: newPlanFile ? newPlanFile.name : 'Planning_General.pdf',
-      fileUrl: newPlanFile ? URL.createObjectURL(newPlanFile) : '', // <--- Ajoute cette ligne ici
+      fileUrl: newPlanFile ? URL.createObjectURL(newPlanFile) : '',
       targetUserId: newPlanTarget === 'all' ? 'all' : Number(newPlanTarget),
       targetName: targetName,
       date: new Date().toISOString().split('T')[0]
@@ -812,4 +812,3 @@ export default function App() {
       )}
     </div>
   );
-}
