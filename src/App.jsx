@@ -20,7 +20,9 @@ import {
   Download,
   Eye,
   Filter,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle,
+  PackageCheck
 } from 'lucide-react';
 
 const INITIAL_USERS = [
@@ -64,7 +66,7 @@ export default function App() {
   const [showAddToolModal, setShowAddToolModal] = useState(false);
   const [newToolData, setNewToolData] = useState({ id: '', name: '', brand: 'REMS', category: 'Sertissage', status: 'Disponible' });
 
-  // États Planning (avec gestion de plusieurs fichiers)
+  // États Planning
   const [showAddPlanModal, setShowAddPlanModal] = useState(false);
   const [planningViewMode, setPlanningViewMode] = useState('week');
   const [selectedWorkerFilter, setSelectedWorkerFilter] = useState('all');
@@ -74,7 +76,15 @@ export default function App() {
     targetUserId: 'all',
     date: new Date().toISOString().split('T')[0],
     description: '',
-    files: [] // Tableau pour stocker plusieurs fichiers PDF
+    files: []
+  });
+
+  // États Module Demandes de Matériel
+  const [showAddRequestModal, setShowAddRequestModal] = useState(false);
+  const [newRequestData, setNewRequestData] = useState({
+    items: '',
+    urgency: 'Normal', // Normal, Urgent, Critique
+    description: ''
   });
 
   const formatDateFr = (dateString) => {
@@ -222,7 +232,43 @@ export default function App() {
     }
   };
 
-  const handleValidateRequest = async (firestoreId) => {
+  // --- GESTION DEMANDES DE MATÉRIEL ---
+  const handleCreateRequest = async (e) => {
+    e.preventDefault();
+    if (!newRequestData.items || !currentUser) return;
+
+    try {
+      await addDoc(collection(db, "requests"), {
+        items: newRequestData.items,
+        urgency: newRequestData.urgency,
+        description: newRequestData.description || '',
+        requester: currentUser.name,
+        requesterId: currentUser.id,
+        status: 'En attente', // En attente, Validé, Reçu au dépôt, Refusé
+        createdAt: new Date().toISOString().split('T')[0],
+        receivedDate: null
+      });
+      setShowAddRequestModal(false);
+      setNewRequestData({ items: '', urgency: 'Normal', description: '' });
+    } catch (error) {
+      console.error("Erreur création demande :", error);
+    }
+  };
+
+  const handleUpdateRequestStatus = async (firestoreId, newStatus) => {
+    try {
+      const reqRef = doc(db, "requests", firestoreId);
+      const updateData = { status: newStatus };
+      if (newStatus === 'Reçu au dépôt') {
+        updateData.receivedDate = new Date().toISOString().split('T')[0];
+      }
+      await updateDoc(reqRef, updateData);
+    } catch (error) {
+      console.error("Erreur mise à jour statut :", error);
+    }
+  };
+
+  const handleDeleteRequest = async (firestoreId) => {
     try {
       if (firestoreId) await deleteDoc(doc(db, "requests", firestoreId));
     } catch (error) {
@@ -230,7 +276,7 @@ export default function App() {
     }
   };
 
-  // Gestion de plusieurs fichiers PDF
+  // Gestion de plusieurs fichiers PDF Planning
   const handleMultipleFilesChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
     if (selectedFiles.length === 0) return;
@@ -278,7 +324,7 @@ export default function App() {
       await addDoc(collection(db, "plans"), {
         title: newPlanData.title,
         description: newPlanData.description || '',
-        files: newPlanData.files || [], // Sauvegarde le tableau de fichiers
+        files: newPlanData.files || [],
         targetUserId: newPlanData.targetUserId === 'all' ? 'all' : Number(newPlanData.targetUserId),
         targetName: targetName,
         date: newPlanData.date,
@@ -516,7 +562,7 @@ export default function App() {
                 <div>
                   <div className="flex justify-between items-start mb-3">
                     <span className="text-3xl p-2.5 bg-amber-500/10 rounded-xl">📋</span>
-                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[11px] font-bold rounded-full">{requests.length} en attente</span>
+                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[11px] font-bold rounded-full">{requests.length} demandes</span>
                   </div>
                   <h3 className="text-base font-bold text-white group-hover:text-amber-400">Demandes de Matériel</h3>
                   <p className="text-xs text-slate-400 mt-1">Besoins en raccords, tubes et fournitures.</p>
@@ -607,30 +653,14 @@ export default function App() {
 
               <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <div className="flex rounded-xl bg-slate-950 p-1 border border-slate-800">
-                  <button 
-                    onClick={() => setPlanningViewMode('week')}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${planningViewMode === 'week' ? 'bg-cyan-600 text-white' : 'text-slate-400'}`}
-                  >
-                    Vue Semaine
-                  </button>
-                  <button 
-                    onClick={() => setPlanningViewMode('month')}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${planningViewMode === 'month' ? 'bg-cyan-600 text-white' : 'text-slate-400'}`}
-                  >
-                    Vue Mois
-                  </button>
+                  <button onClick={() => setPlanningViewMode('week')} className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${planningViewMode === 'week' ? 'bg-cyan-600 text-white' : 'text-slate-400'}`}>Vue Semaine</button>
+                  <button onClick={() => setPlanningViewMode('month')} className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${planningViewMode === 'month' ? 'bg-cyan-600 text-white' : 'text-slate-400'}`}>Vue Mois</button>
                 </div>
 
                 {isAdmin && (
-                  <select 
-                    value={selectedWorkerFilter}
-                    onChange={e => setSelectedWorkerFilter(e.target.value)}
-                    className="px-3 py-1.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl focus:outline-none"
-                  >
+                  <select value={selectedWorkerFilter} onChange={e => setSelectedWorkerFilter(e.target.value)} className="px-3 py-1.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl focus:outline-none">
                     <option value="all">Tous les ouvriers</option>
-                    {approvedUsers.map(u => (
-                      <option key={u.id} value={u.id}>{u.name}</option>
-                    ))}
+                    {approvedUsers.map(u => (<option key={u.id} value={u.id}>{u.name}</option>))}
                   </select>
                 )}
 
@@ -647,46 +677,31 @@ export default function App() {
                 <div key={plan.firestoreId || plan.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3 shadow-md flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-center text-xs">
-                      <span className="px-2 py-0.5 rounded font-mono font-bold bg-cyan-500/20 text-cyan-300">
-                        📅 {plan.formattedDate || formatDateFr(plan.date)}
-                      </span>
+                      <span className="px-2 py-0.5 rounded font-mono font-bold bg-cyan-500/20 text-cyan-300">📅 {plan.formattedDate || formatDateFr(plan.date)}</span>
                       <span className="text-slate-400 font-medium">Pour : <strong className="text-slate-200">{plan.targetName}</strong></span>
                     </div>
 
                     <h3 className="text-sm font-bold text-white mt-2">{plan.title}</h3>
                     {plan.description && <p className="text-xs text-slate-300 mt-1">{plan.description}</p>}
 
-                    {/* Liste des fichiers PDF multiples rattachés à la tâche */}
                     <div className="mt-3 space-y-2">
                       <span className="text-[11px] text-slate-400 font-semibold">Documents associés ({plan.files ? plan.files.length : (plan.fileName ? 1 : 0)}) :</span>
-                      
-                      {/* Rétrocompatibilité si un ancien plan a un seul fichier */}
                       {(!plan.files || plan.files.length === 0) && plan.fileData && (
                         <div className="p-2 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <FileText className="w-4 h-4 text-red-400 shrink-0" />
                             <span className="text-xs text-slate-200 font-medium truncate max-w-[140px]">{plan.fileName}</span>
                           </div>
-                          <button 
-                            onClick={() => handleDownloadSinglePdf({ name: plan.fileName, data: plan.fileData })} 
-                            className="px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] rounded-lg font-semibold"
-                          >
-                            Ouvrir
-                          </button>
+                          <button onClick={() => handleDownloadSinglePdf({ name: plan.fileName, data: plan.fileData })} className="px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] rounded-lg font-semibold">Ouvrir</button>
                         </div>
                       )}
-
-                      {/* Affichage multiple */}
                       {plan.files && plan.files.map((fileObj, fIdx) => (
                         <div key={fIdx} className="p-2 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <FileText className="w-4 h-4 text-red-400 shrink-0" />
                             <span className="text-xs text-slate-200 font-medium truncate max-w-[140px]">{fileObj.name}</span>
                           </div>
-                          <button 
-                            onClick={() => handleDownloadSinglePdf(fileObj)} 
-                            className="px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] rounded-lg font-semibold flex items-center gap-1"
-                          >
+                          <button onClick={() => handleDownloadSinglePdf(fileObj)} className="px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] rounded-lg font-semibold flex items-center gap-1">
                             <Download className="w-3 h-3" /> Ouvrir
                           </button>
                         </div>
@@ -696,18 +711,89 @@ export default function App() {
 
                   {isAdmin && (
                     <div className="pt-2 border-t border-slate-800 flex justify-end">
-                      <button onClick={() => handleDeletePlan(plan.firestoreId)} className="px-2 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs rounded-lg transition-colors">
-                        Supprimer
-                      </button>
+                      <button onClick={() => handleDeletePlan(plan.firestoreId)} className="px-2 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs rounded-lg transition-colors">Supprimer</button>
                     </div>
                   )}
                 </div>
               ))}
 
               {visiblePlans.length === 0 && (
-                <div className="col-span-full py-8 text-center bg-slate-900 border border-slate-800 rounded-2xl text-slate-400 text-xs italic">
-                  Aucune tâche ou planning attribué pour cette période.
-                </div>
+                <div className="col-span-full py-8 text-center bg-slate-900 border border-slate-800 rounded-2xl text-slate-400 text-xs italic">Aucune tâche ou planning attribué pour cette période.</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* --- MODULE DEMANDES DE MATÉRIEL (REQUESTS) --- */}
+        {activeTab === 'requests' && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-md">
+              <div>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <ClipboardList className="w-5 h-5 text-amber-400" /> Demandes de matériel & fournitures
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {isAdmin ? "Gérez les besoins chantier, validez ou refusez les commandes" : "Faites vos demandes de matériel en quelques clics"}
+                </p>
+              </div>
+
+              <button onClick={() => setShowAddRequestModal(true)} className="px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow">
+                <Plus className="w-4 h-4" /> Nouvelle Demande
+              </button>
+            </div>
+
+            {/* Liste des demandes */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {requests.map(req => {
+                let urgencyBadge = <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold rounded">Normal</span>;
+                if (req.urgency === 'Urgent') urgencyBadge = <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded">⚡ Urgent</span>;
+                if (req.urgency === 'Critique') urgencyBadge = <span className="px-2 py-0.5 bg-red-500/20 text-red-300 text-[10px] font-bold rounded">🔥 Critique</span>;
+
+                let statusBadge = <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 text-xs font-bold rounded-lg flex items-center gap-1">⏳ En attente</span>;
+                if (req.status === 'Validé') statusBadge = <span className="px-2.5 py-1 bg-blue-500/20 text-blue-300 text-xs font-bold rounded-lg flex items-center gap-1">✅ Validé / Commandé</span>;
+                if (req.status === 'Reçu au dépôt') statusBadge = <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 text-xs font-bold rounded-lg flex items-center gap-1">📦 Reçu ({req.receivedDate})</span>;
+                if (req.status === 'Refusé') statusBadge = <span className="px-2.5 py-1 bg-red-500/20 text-red-300 text-xs font-bold rounded-lg flex items-center gap-1">❌ Refusé</span>;
+
+                return (
+                  <div key={req.firestoreId} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3 shadow-md flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-center text-xs mb-2">
+                        <span className="text-slate-400">Demandeur : <strong className="text-slate-200">{req.requester}</strong></span>
+                        {urgencyBadge}
+                      </div>
+
+                      <h3 className="text-sm font-bold text-white">{req.items}</h3>
+                      {req.description && <p className="text-xs text-slate-300 mt-1">{req.description}</p>}
+
+                      <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between">
+                        <span className="text-[11px] text-slate-400">Statut :</span>
+                        {statusBadge}
+                      </div>
+                    </div>
+
+                    {/* Actions Admin pour valider, marquer comme reçu, refuser ou supprimer */}
+                    <div className="pt-3 border-t border-slate-800">
+                      {isAdmin ? (
+                        <div className="space-y-1.5">
+                          <div className="flex gap-1">
+                            <button onClick={() => handleUpdateRequestStatus(req.firestoreId, 'Validé')} className="flex-1 py-1 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 text-[11px] font-semibold rounded-lg">Valider</button>
+                            <button onClick={() => handleUpdateRequestStatus(req.firestoreId, 'Reçu au dépôt')} className="flex-1 py-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 text-[11px] font-semibold rounded-lg">Reçu</button>
+                          </div>
+                          <div className="flex gap-1">
+                            <button onClick={() => handleUpdateRequestStatus(req.firestoreId, 'Refusé')} className="flex-1 py-1 bg-red-600/30 hover:bg-red-600/50 text-red-300 text-[11px] font-semibold rounded-lg">Refuser</button>
+                            <button onClick={() => handleDeleteRequest(req.firestoreId)} className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] rounded-lg">🗑️ Supprimer</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-slate-400 italic">Demandé le {req.createdAt}</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {requests.length === 0 && (
+                <div className="col-span-full py-8 text-center bg-slate-900 border border-slate-800 rounded-2xl text-slate-400 text-xs italic">Aucune demande de matériel en cours.</div>
               )}
             </div>
           </div>
@@ -718,11 +804,7 @@ export default function App() {
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-bold text-white">Chantiers en cours</h2>
-              {isAdmin && (
-                <button onClick={() => setShowAddSiteModal(true)} className="px-3 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl flex items-center gap-1">
-                  <Plus className="w-4 h-4" /> Nouveau Chantier
-                </button>
-              )}
+              {isAdmin && (<button onClick={() => setShowAddSiteModal(true)} className="px-3 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl flex items-center gap-1"><Plus className="w-4 h-4" /> Nouveau Chantier</button>)}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {sites.map(site => (
@@ -745,11 +827,7 @@ export default function App() {
               <h2 className="text-lg font-bold text-white">Parc Outillage</h2>
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <input type="text" value={toolSearch} onChange={e => setToolSearch(e.target.value)} placeholder="Rechercher..." className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white" />
-                {isAdmin && (
-                  <button onClick={() => setShowAddToolModal(true)} className="px-3 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl flex items-center gap-1">
-                    <Plus className="w-4 h-4" /> Machine
-                  </button>
-                )}
+                {isAdmin && (<button onClick={() => setShowAddToolModal(true)} className="px-3 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl flex items-center gap-1"><Plus className="w-4 h-4" /> Machine</button>)}
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -773,23 +851,6 @@ export default function App() {
                       </>
                     )}
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'requests' && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold text-white">Demandes de matériel</h2>
-            <div className="space-y-2">
-              {requests.map(req => (
-                <div key={req.firestoreId} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-bold text-white">{req.items}</p>
-                    <p className="text-xs text-slate-400">Demandeur : {req.requester}</p>
-                  </div>
-                  {isAdmin && <button onClick={() => handleValidateRequest(req.firestoreId)} className="px-3 py-1.5 bg-emerald-600/20 text-emerald-300 text-xs font-semibold rounded-lg">Valider</button>}
                 </div>
               ))}
             </div>
@@ -832,75 +893,78 @@ export default function App() {
         )}
       </main>
 
-      {/* --- MODALE CREATION TÂCHE MULTI-PDF & CALENDRIER --- */}
-      {showAddPlanModal && (
+      {/* --- MODALE NOUVELLE DEMANDE DE MATÉRIEL --- */}
+      {showAddRequestModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleUploadPlan} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-white">Assigner Tâche & Plusieurs PDFs</h3>
+          <form onSubmit={handleCreateRequest} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-white">Demande de Matériel</h3>
             
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Titre de l'intervention / Chantier</label>
-              <input type="text" placeholder="ex: Pose colonnes Bâtiment A" value={newPlanData.title} onChange={e => setNewPlanData({...newPlanData, title: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+              <label className="block text-xs text-slate-400 mb-1">Matériel / Fournitures souhaitées</label>
+              <input type="text" placeholder="ex: 3 couronnes multicouche Ø16, coudes..." value={newRequestData.items} onChange={e => setNewRequestData({...newRequestData, items: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
             </div>
 
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Attribuer à</label>
-              <select value={newPlanData.targetUserId} onChange={e => setNewPlanData({...newPlanData, targetUserId: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
-                <option value="all">Toute l'équipe (Général)</option>
-                {approvedUsers.map(u => (
-                  <option key={u.id} value={u.id}>{u.name} ({u.team})</option>
-                ))}
+              <label className="block text-xs text-slate-400 mb-1">Niveau d'urgence</label>
+              <select value={newRequestData.urgency} onChange={e => setNewRequestData({...newRequestData, urgency: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
+                <option value="Normal">🟢 Normal</option>
+                <option value="Urgent">⚡ Urgent</option>
+                <option value="Critique">🔥 Critique (Chantier bloqué)</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Date d'intervention</label>
-              <input 
-                type="date" 
-                value={newPlanData.date} 
-                onChange={e => setNewPlanData({...newPlanData, date: e.target.value})} 
-                onClick={(e) => e.target.showPicker?.()} 
-                required 
-                style={{ colorScheme: 'dark' }}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white cursor-pointer" 
-              />
+              <label className="block text-xs text-slate-400 mb-1">Précisions (Chantier, référence...)</label>
+              <textarea placeholder="Ex: Pour le bâtiment B, R+2..." value={newRequestData.description} onChange={e => setNewRequestData({...newRequestData, description: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white h-20" />
             </div>
 
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setShowAddRequestModal(false)} className="px-4 py-2 bg-slate-800 text-xs text-slate-300 rounded-xl">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-amber-600 text-xs text-white font-semibold rounded-xl">Envoyer la demande</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* --- MODALE CREATION TÂCHE PLANNING (GARDÉE) --- */}
+      {showAddPlanModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleUploadPlan} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold text-white">Assigner Tâche & Plusieurs PDFs</h3>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Titre de l'intervention / Chantier</label>
+              <input type="text" placeholder="ex: Pose colonnes Bâtiment A" value={newPlanData.title} onChange={e => setNewPlanData({...newPlanData, title: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Attribuer à</label>
+              <select value={newPlanData.targetUserId} onChange={e => setNewPlanData({...newPlanData, targetUserId: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
+                <option value="all">Toute l'équipe (Général)</option>
+                {approvedUsers.map(u => (<option key={u.id} value={u.id}>{u.name} ({u.team})</option>))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Date d'intervention</label>
+              <input type="date" value={newPlanData.date} onChange={e => setNewPlanData({...newPlanData, date: e.target.value})} onClick={(e) => e.target.showPicker?.()} required style={{ colorScheme: 'dark' }} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white cursor-pointer" />
+            </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Sélectionner un ou plusieurs fichiers PDF</label>
-              <input 
-                type="file" 
-                accept=".pdf" 
-                multiple 
-                onChange={handleMultipleFilesChange} 
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer" 
-              />
-              
-              {/* Liste des fichiers sélectionnés en attente d'envoi */}
+              <input type="file" accept=".pdf" multiple onChange={handleMultipleFilesChange} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer" />
               {newPlanData.files.length > 0 && (
                 <div className="mt-2 space-y-1.5 bg-slate-950 p-2 rounded-xl border border-slate-800">
-                  <span className="text-[10px] text-cyan-400 font-bold">Fichiers prêts à être joints ({newPlanData.files.length}) :</span>
+                  <span className="text-[10px] text-cyan-400 font-bold">Fichiers prêts ({newPlanData.files.length}) :</span>
                   {newPlanData.files.map((file, idx) => (
                     <div key={idx} className="flex items-center justify-between text-xs text-slate-200 bg-slate-900 px-2 py-1 rounded-lg">
                       <span className="truncate max-w-[200px]">📄 {file.name}</span>
-                      <button 
-                        type="button" 
-                        onClick={() => handleRemoveFileIndex(idx)} 
-                        className="text-red-400 hover:text-red-300 font-bold px-1"
-                      >
-                        ✕
-                      </button>
+                      <button type="button" onClick={() => handleRemoveFileIndex(idx)} className="text-red-400 hover:text-red-300 font-bold px-1">✕</button>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-
             <div>
               <label className="block text-xs text-slate-400 mb-1">Consignes complémentaires</label>
               <textarea placeholder="Instruction pour l'ouvrier..." value={newPlanData.description} onChange={e => setNewPlanData({...newPlanData, description: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white h-20" />
             </div>
-
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setShowAddPlanModal(false)} className="px-4 py-2 bg-slate-800 text-xs text-slate-300 rounded-xl">Annuler</button>
               <button type="submit" className="px-4 py-2 bg-cyan-600 text-xs text-white font-semibold rounded-xl">Enregistrer & Publier</button>
