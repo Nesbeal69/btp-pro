@@ -37,10 +37,9 @@ import {
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
-  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'pending'
+  const [authMode, setAuthMode] = useState('login'); 
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  // Champs Formulaires d'authentification
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   
@@ -48,21 +47,19 @@ export default function App() {
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regPassword, setRegPassword] = useState('');
-  const [regIsAdmin, setRegIsAdmin] = useState(false); // True = Créateur de chantier, False = Ouvrier/Intérimaire
-  const [regProjectCode, setRegProjectCode] = useState(''); // Code chantier rentré par l'ouvrier
+  const [regIsAdmin, setRegIsAdmin] = useState(false);
+  const [regProjectCode, setRegProjectCode] = useState('');
   const [authError, setAuthError] = useState('');
 
   const [showUserModal, setShowUserModal] = useState(false);
   const [userModalData, setUserModalData] = useState({ firestoreId: '', name: '', phone: '', role: 'Employé', password: '' });
 
-  // Données Firestore globales
   const [users, setUsers] = useState([]);
   const [equipment, setEquipment] = useState([]);
   const [requests, setRequests] = useState([]);
   const [plans, setPlans] = useState([]);
   const [videos, setVideos] = useState([]);
 
-  // États des modules internes
   const [toolSearch, setToolSearch] = useState('');
   const [toolStatusFilter, setToolStatusFilter] = useState('all');
   const [editingTool, setEditingTool] = useState(null);
@@ -111,7 +108,6 @@ export default function App() {
     return dateString;
   };
 
-  // Chargement des données Firestore
   useEffect(() => {
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
@@ -151,7 +147,6 @@ export default function App() {
     };
   }, []);
 
-  // Mettre à jour l'utilisateur connecté en temps réel si sa fiche change
   useEffect(() => {
     if (currentUser) {
       const updated = users.find(u => u.firestoreId === currentUser.firestoreId);
@@ -159,10 +154,9 @@ export default function App() {
     }
   }, [users]);
 
-  // ID du projet/chantier de l'utilisateur connecté (Si admin = son projectCode, si employé = son projectCode rattaché)
-  const myProjectCode = currentUser?.projectCode || currentUser?.adminProjectCode;
+  // Sécurité : si currentUser est null, on ne calcule rien pour éviter les erreurs de type
+  const myProjectCode = currentUser ? (currentUser.projectCode || currentUser.adminProjectCode) : null;
 
-  // --- FILTRAGE DES DONNÉES SELON LE CHANTIER ACTIF ---
   const projectEquipment = useMemo(() => {
     if (!myProjectCode) return [];
     return equipment.filter(t => t.projectCode === myProjectCode);
@@ -186,7 +180,6 @@ export default function App() {
   const approvedUsers = useMemo(() => projectUsers.filter(u => u.status === 'approved'), [projectUsers]);
   const pendingUsers = useMemo(() => projectUsers.filter(u => u.status === 'pending' && u.role !== 'admin'), [projectUsers]);
 
-  // --- GESTION OUTILLAGE ---
   const filteredEquipment = useMemo(() => {
     return projectEquipment.filter(tool => {
       const query = toolSearch.toLowerCase().trim();
@@ -203,7 +196,7 @@ export default function App() {
 
   const handleCreateTool = async (e) => {
     e.preventDefault();
-    if (!newToolData.name || !newToolData.id || !myProjectCode) return;
+    if (!newToolData.name || !newToolData.id || !myProjectCode || !currentUser) return;
     try {
       const initialNote = {
         id: Date.now(),
@@ -234,7 +227,7 @@ export default function App() {
 
   const handleSaveToolEdit = async (e) => {
     e.preventDefault();
-    if (!editingTool || !editingTool.firestoreId) return;
+    if (!editingTool || !editingTool.firestoreId || !currentUser) return;
     try {
       const toolRef = doc(db, "equipment", editingTool.firestoreId);
       const newHistoryNote = {
@@ -253,7 +246,7 @@ export default function App() {
   };
 
   const handleAddNote = async (tool) => {
-    if (!newNoteText.trim() || !tool.firestoreId) return;
+    if (!newNoteText.trim() || !tool.firestoreId || !currentUser) return;
     const noteObj = { id: Date.now(), author: currentUser.name, date: new Date().toISOString().split('T')[0], text: newNoteText };
     try {
       const toolRef = doc(db, "equipment", tool.firestoreId);
@@ -264,7 +257,6 @@ export default function App() {
     } catch (e) { console.error(e); }
   };
 
-  // --- GESTION VIDÉOS ---
   const handleCreateVideo = async (e) => {
     e.preventDefault();
     if (!newVideoData.title || !newVideoData.url) return;
@@ -279,7 +271,6 @@ export default function App() {
     try { if (firestoreId) await deleteDoc(doc(db, "videos", firestoreId)); } catch (e) { console.error(e); }
   };
 
-  // --- GESTION DEMANDES DE MATÉRIEL ---
   const handleRequestAttachmentChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -293,7 +284,7 @@ export default function App() {
 
   const handleCreateRequest = async (e) => {
     e.preventDefault();
-    if (!newRequestData.items || !myProjectCode) return;
+    if (!newRequestData.items || !myProjectCode || !currentUser) return;
     try {
       await addDoc(collection(db, "requests"), {
         ...newRequestData,
@@ -323,13 +314,13 @@ export default function App() {
   };
 
   const visibleRequests = useMemo(() => {
+    if (!currentUser) return [];
     const myId = currentUser.userIdNum || currentUser.id;
     let list = currentUser.role === 'admin' ? projectRequests : projectRequests.filter(r => r.requesterId === myId);
     if (requestStatusFilter !== 'all') list = list.filter(r => r.status === requestStatusFilter);
     return list;
   }, [projectRequests, currentUser, requestStatusFilter]);
 
-  // --- GESTION EFFECTIFS & COMPTES ---
   const filteredWorkers = useMemo(() => {
     return approvedUsers.filter(user => {
       const matchesSearch = user.name.toLowerCase().includes(workerSearch.toLowerCase().trim());
@@ -345,7 +336,7 @@ export default function App() {
 
   const handleSaveUserModal = async (e) => {
     e.preventDefault();
-    if (!userModalData.firestoreId) return;
+    if (!userModalData.firestoreId || !currentUser) return;
     try {
       await updateDoc(doc(db, "users", userModalData.firestoreId), {
         name: userModalData.name,
@@ -371,7 +362,6 @@ export default function App() {
     try { await deleteDoc(doc(db, "users", firestoreId)); } catch (e) { console.error(e); }
   };
 
-  // --- GESTION PLANNING & PDFs ---
   const handleMultipleFilesChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
     if (selectedFiles.length === 0) return;
@@ -388,10 +378,6 @@ export default function App() {
       };
       reader.readAsDataURL(file);
     });
-  };
-
-  const handleRemoveFileIndex = (idx) => {
-    setNewPlanData(prev => ({ ...prev, files: prev.files.filter((_, i) => i !== idx) }));
   };
 
   const handleUploadPlan = async (e) => {
@@ -430,6 +416,7 @@ export default function App() {
   };
 
   const visiblePlans = useMemo(() => {
+    if (!currentUser) return [];
     const myId = currentUser.userIdNum || currentUser.id;
     if (currentUser.role !== 'admin') {
       return projectPlans.filter(p => p.targetUserId === 'all' || p.targetUserId === myId);
@@ -438,7 +425,6 @@ export default function App() {
     return projectPlans.filter(p => p.targetUserId === Number(selectedWorkerFilter));
   }, [projectPlans, currentUser, selectedWorkerFilter]);
 
-  // --- AUTHENTIFICATION ---
   const handleLogin = (e) => {
     e.preventDefault();
     setAuthError('');
@@ -463,10 +449,8 @@ export default function App() {
     let assignedProjectCode = '';
 
     if (regIsAdmin) {
-      // Création d'un nouveau chantier / Code unique
       assignedProjectCode = 'CHANTIER-' + Math.floor(1000 + Math.random() * 9000);
     } else {
-      // Inscription d'un ouvrier avec le code de son chef
       const trimmedCode = regProjectCode.toUpperCase().trim();
       const chefExists = users.some(u => u.role === 'admin' && u.projectCode === trimmedCode);
       if (!chefExists) {
@@ -484,7 +468,7 @@ export default function App() {
       password: regPassword,
       role: regIsAdmin ? 'admin' : 'Employé',
       team: regIsAdmin ? 'Direction Chantier' : 'Ouvriers',
-      status: regIsAdmin ? 'approved' : 'pending', // L'admin a accès direct, l'ouvrier est en attente
+      status: regIsAdmin ? 'approved' : 'pending',
       projectCode: assignedProjectCode,
       joinedAt: new Date().toISOString().split('T')[0]
     };
@@ -512,7 +496,6 @@ export default function App() {
 
   const isAdmin = currentUser?.role === 'admin';
 
-  // --- ÉCRAN DE CONNEXION / INSCRIPTION ---
   if (!currentUser) {
     return (
       <div className="min-h-screen text-slate-100 flex items-center justify-center p-4 relative overflow-hidden">
@@ -566,7 +549,7 @@ export default function App() {
                     <input type="text" required value={regName} onChange={e => setRegName(e.target.value)} placeholder="Jean Martin" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">Email</label>
                     <input type="email" required value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="jean@btppro.fr" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
                   </div>
                   <div>
@@ -578,7 +561,6 @@ export default function App() {
                     <input type="password" required value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
                   </div>
 
-                  {/* Choix : Créer un chantier (Admin) ou Rejoindre avec un code */}
                   <div className="pt-2 border-t border-white/10 space-y-2">
                     <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-200">
                       <input type="checkbox" checked={regIsAdmin} onChange={e => setRegIsAdmin(e.target.checked)} className="rounded border-slate-700 bg-black/40 text-blue-600 focus:ring-blue-500" />
@@ -603,7 +585,6 @@ export default function App() {
     );
   }
 
-  // --- INTERFACE PRINCIPALE DE L'APPLICATION ---
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans">
       <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm sticky top-0 z-20">
@@ -963,7 +944,7 @@ export default function App() {
         )}
       </main>
 
-      {/* --- MODALES (Vidéo, Note, Edit Outil, Profil, Demande, Planning, Machine) --- */}
+      {/* --- MODALES --- */}
       {showAddVideoModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreateVideo} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
