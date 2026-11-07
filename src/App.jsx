@@ -72,13 +72,12 @@ export default function App() {
   const [newPlanData, setNewPlanData] = useState({
     title: '',
     targetUserId: 'all',
-    date: new Date().toISOString().split('T')[0], // Format ISO pour l'input date natif
+    date: new Date().toISOString().split('T')[0],
     description: '',
     fileName: '',
     fileData: ''
   });
 
-  // Fonction robuste pour transformer 2026-11-09 en LUNDI 9 NOVEMBRE 2026
   const formatDateFr = (dateString) => {
     if (!dateString) return '';
     try {
@@ -266,7 +265,7 @@ export default function App() {
         targetUserId: newPlanData.targetUserId === 'all' ? 'all' : Number(newPlanData.targetUserId),
         targetName: targetName,
         date: newPlanData.date,
-        formattedDate: formatDateFr(newPlanData.date) // Enregistre la date en toutes lettres
+        formattedDate: formatDateFr(newPlanData.date)
       });
       setShowAddPlanModal(false);
       setNewPlanData({ title: '', targetUserId: 'all', date: new Date().toISOString().split('T')[0], description: '', fileName: '', fileData: '' });
@@ -793,7 +792,7 @@ export default function App() {
         )}
       </main>
 
-      {/* --- MODALE CREATION TÂCHE AVEC CALENDRIER NATIF --- */}
+      {/* --- MODALE CREATION TÂCHE AVEC CALENDRIER CLIQUABLE PARTOUT & ICONE BLANCHE --- */}
       {showAddPlanModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
           <form onSubmit={handleUploadPlan} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
@@ -815,12 +814,14 @@ export default function App() {
             </div>
 
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Date d'intervention (Clique pour ouvrir le calendrier)</label>
+              <label className="block text-xs text-slate-400 mb-1">Date d'intervention (Clique n'importe où pour ouvrir)</label>
               <input 
                 type="date" 
                 value={newPlanData.date} 
                 onChange={e => setNewPlanData({...newPlanData, date: e.target.value})} 
+                onClick={(e) => e.target.showPicker?.()} 
                 required 
+                style={{ colorScheme: 'dark' }}
                 className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white cursor-pointer" 
               />
             </div>
