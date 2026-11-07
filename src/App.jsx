@@ -1,4 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { db } from './firebase';
+import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { 
   Building2, 
   Users, 
@@ -88,69 +90,6 @@ export default function App() {
   const [equipment, setEquipment] = useState(INITIAL_EQUIPMENT);
   const [requests, setRequests] = useState(INITIAL_REQUESTS);
   const [plans, setPlans] = useState(INITIAL_PLANS);
-  const filteredEquipment = useMemo(() => {
-  return equipment.filter(tool => {
-    const query = toolSearch.toLowerCase().trim();
-    return (
-      tool.name.toLowerCase().includes(query) ||
-      tool.id.toLowerCase().includes(query) ||
-      tool.brand.toLowerCase().includes(query) ||
-      (tool.assignedTo && tool.assignedTo.toLowerCase().includes(query))
-    );
-  });
-}, [equipment, toolSearch]);
-
-  function handleOpenEditModal(tool) {
-    setEditingTool(tool);
-    setEditToolForm({
-      assignedTo: tool.assignedTo || '',
-      status: tool.status || 'Disponible'
-    });
-  }
-
-  const handleDeleteTool = (toolId) => {
-    setEquipment(equipment.filter(t => t.id !== toolId));
-  };
-
-  const handleSaveToolEdit = (e) => {
-    e.preventDefault();
-    if (!editingTool) return;
-
-    const changes = [];
-    if (editToolForm.assignedTo !== editingTool.assignedTo) {
-      changes.push(`Affecté à : "${editingTool.assignedTo}" → "${editToolForm.assignedTo}"`);
-    }
-    if (editToolForm.status !== editingTool.status) {
-      changes.push(`Statut : "${editingTool.status}" → "${editToolForm.status}"`);
-    }
-
-    if (changes.length === 0) {
-      setEditingTool(null);
-      return;
-    }
-
-    const autoHistoryNote = {
-      id: Date.now(),
-      author: currentUser ? currentUser.name : 'Système',
-      date: new Date().toISOString().split('T')[0],
-      text: `✏️ Modification : ${changes.join(' | ')}`
-    };
-
-    const updatedEquipment = equipment.map(t => {
-      if (t.id === editingTool.id) {
-        return {
-          ...t,
-          assignedTo: editToolForm.assignedTo,
-          status: editToolForm.status,
-          notes: [autoHistoryNote, ...(t.notes || [])]
-        };
-      }
-      return t;
-    });
-
-    setEquipment(updatedEquipment);
-    setEditingTool(null);
-  };
 
   const [selectedTool, setSelectedTool] = useState(null);
   const [newNoteText, setNewNoteText] = useState('');
@@ -164,6 +103,73 @@ export default function App() {
   const [newPlanTitle, setNewPlanTitle] = useState('');
   const [newPlanTarget, setNewPlanTarget] = useState('all');
   const [newPlanFile, setNewPlanFile] = useState(null);
+
+  // Synchronisation en temps réel Firebase
+  useEffect(() => {
+    const unsubEquipment = onSnapshot(collection(db, "equipment"), (snapshot) => {
+      const items = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
+      if (items.length > 0) setEquipment(items);
+    });
+
+    const unsubSites = onSnapshot(collection(db, "sites"), (snapshot) => {
+      const items = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
+      if (items.length > 0) setSites(items);
+    });
+
+    return () => {
+      unsubEquipment();
+      unsubSites();
+    };
+  }, []);
+
+  const filteredEquipment = useMemo(() => {
+    return equipment.filter(tool => {
+      const query = toolSearch.toLowerCase().trim();
+      return (
+        tool.name.toLowerCase().includes(query) ||
+        tool.id.toLowerCase().includes(query) ||
+        tool.brand.toLowerCase().includes(query) ||
+        (tool.assignedTo && tool.assignedTo.toLowerCase().includes(query))
+      );
+    });
+  }, [equipment, toolSearch]);
+
+  function handleOpenEditModal(tool) {
+    setEditingTool(tool);
+    setEditToolForm({
+      assignedTo: tool.assignedTo || '',
+      status: tool.status || 'Disponible'
+    });
+  }
+
+  const handleSaveToolEdit = async (e) => {
+    e.preventDefault();
+    if (!editingTool) return;
+
+    try {
+      if (editingTool.firestoreId) {
+        const toolRef = doc(db, "equipment", editingTool.firestoreId);
+        await updateDoc(toolRef, {
+          assignedTo: editToolForm.assignedTo,
+          status: editToolForm.status
+        });
+      }
+      setEditingTool(null);
+    } catch (error) {
+      console.error("Erreur modification outil :", error);
+    }
+  };
+
+  const handleDeleteTool = async (toolId, firestoreId) => {
+    try {
+      if (firestoreId) {
+        await deleteDoc(doc(db, "equipment", firestoreId));
+      }
+      setEquipment(equipment.filter(t => t.id !== toolId));
+    } catch (error) {
+      console.error("Erreur suppression outil :", error);
+    }
+  };
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -215,39 +221,52 @@ export default function App() {
     setUsers(users.filter(u => u.id !== userId));
   };
 
-  const handleCreateSite = (e) => {
+  const handleCreateSite = async (e) => {
     e.preventDefault();
     if (!newSiteData.name) return;
-    const created = {
-      id: Date.now(),
-      name: newSiteData.name,
-      client: newSiteData.client || 'Client Privé',
-      address: newSiteData.address || 'Adresse à préciser',
-      status: 'En cours',
-      manager: newSiteData.manager,
-      workersCount: 0
-    };
-    setSites([...sites, created]);
-    setShowAddSiteModal(false);
-    setNewSiteData({ name: '', client: '', address: '', manager: 'Marc Vasseur' });
+    try {
+      await addDoc(collection(db, "sites"), {
+        name: newSiteData.name,
+        client: newSiteData.client || 'Client Privé',
+        address: newSiteData.address || 'Adresse à préciser',
+        status: 'En cours',
+        manager: newSiteData.manager,
+        workersCount: 0
+      });
+      setShowAddSiteModal(false);
+      setNewSiteData({ name: '', client: '', address: '', manager: 'Marc Vasseur' });
+    } catch (error) {
+      console.error("Erreur ajout chantier :", error);
+    }
   };
 
-  const handleDeleteSite = (siteId) => {
-    setSites(sites.filter(s => s.id !== siteId));
+  const handleDeleteSite = async (siteId, firestoreId) => {
+    try {
+      if (firestoreId) {
+        await deleteDoc(doc(db, "sites", firestoreId));
+      }
+      setSites(sites.filter(s => s.id !== siteId));
+    } catch (error) {
+      console.error("Erreur suppression chantier :", error);
+    }
   };
 
-  const handleCreateTool = (e) => {
+  const handleCreateTool = async (e) => {
     e.preventDefault();
     if (!newToolData.name || !newToolData.id) return;
-    const createdTool = {
-      ...newToolData,
-      assignedTo: 'Dépôt Central',
-      notes: []
-    };
-    setEquipment([...equipment, createdTool]);
-    setShowAddToolModal(false);
-    setNewToolData({ id: '', name: '', brand: 'REMS', category: 'Sertissage', status: 'Disponible' });
+    try {
+      await addDoc(collection(db, "equipment"), {
+        ...newToolData,
+        assignedTo: 'Dépôt Central',
+        notes: []
+      });
+      setShowAddToolModal(false);
+      setNewToolData({ id: '', name: '', brand: 'REMS', category: 'Sertissage', status: 'Disponible' });
+    } catch (error) {
+      console.error("Erreur ajout outil :", error);
+    }
   };
+
   const handleAddNote = (toolId) => {
     if (!newNoteText.trim() || !currentUser) return;
     const noteObj = {
@@ -300,7 +319,7 @@ export default function App() {
 
   const pendingUsers = useMemo(() => users.filter(u => u.status === 'pending'), [users]);
   const approvedUsers = useMemo(() => users.filter(u => u.status === 'approved'), [users]);
-  
+
   const visiblePlans = useMemo(() => {
     if (!currentUser) return [];
     if (currentUser.role === 'admin') return plans;
@@ -434,14 +453,10 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              
-              <div 
-                onClick={() => setActiveTab('planning')}
-                className="group bg-slate-900 border border-slate-800 hover:border-cyan-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-cyan-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
-              >
+              <div onClick={() => setActiveTab('planning')} className="group bg-slate-900 border border-slate-800 hover:border-cyan-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-3">
-                    <span className="text-3xl p-2.5 bg-cyan-500/10 rounded-xl group-hover:scale-110 transition-transform">📅</span>
+                    <span className="text-3xl p-2.5 bg-cyan-500/10 rounded-xl">📅</span>
                     <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-300 text-[11px] font-bold rounded-full">{visiblePlans.length} dispo</span>
                   </div>
                   <h3 className="text-base font-bold text-white group-hover:text-cyan-400 transition-colors">Planning</h3>
@@ -449,210 +464,86 @@ export default function App() {
                 </div>
                 <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-cyan-400">
                   <span>Accéder au module</span>
-                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <ChevronRight className="w-4 h-4" />
                 </div>
               </div>
 
-              <div 
-                onClick={() => setActiveTab('requests')}
-                className="group bg-slate-900 border border-slate-800 hover:border-amber-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-amber-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
-              >
+              <div onClick={() => setActiveTab('requests')} className="group bg-slate-900 border border-slate-800 hover:border-amber-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-3">
-                    <span className="text-3xl p-2.5 bg-amber-500/10 rounded-xl group-hover:scale-110 transition-transform">📋</span>
+                    <span className="text-3xl p-2.5 bg-amber-500/10 rounded-xl">📋</span>
                     <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[11px] font-bold rounded-full">{requests.length} en attente</span>
                   </div>
                   <h3 className="text-base font-bold text-white group-hover:text-amber-400 transition-colors">Demandes de Matériel</h3>
-                  <p className="text-xs text-slate-400 mt-1">Validez les besoins en raccords, tubes et quincaillerie des équipes.</p>
+                  <p className="text-xs text-slate-400 mt-1">Validez les besoins en raccords et tubes.</p>
                 </div>
                 <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-amber-400">
                   <span>Accéder au module</span>
-                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <ChevronRight className="w-4 h-4" />
                 </div>
               </div>
 
-              <div 
-                onClick={() => setActiveTab('workers')}
-                className="group bg-slate-900 border border-slate-800 hover:border-emerald-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-emerald-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
-              >
+              <div onClick={() => setActiveTab('workers')} className="group bg-slate-900 border border-slate-800 hover:border-emerald-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-3">
-                    <span className="text-3xl p-2.5 bg-emerald-500/10 rounded-xl group-hover:scale-110 transition-transform">👷‍♂️</span>
+                    <span className="text-3xl p-2.5 bg-emerald-500/10 rounded-xl">👷‍♂️</span>
                     <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-[11px] font-bold rounded-full">{approvedUsers.length} actifs</span>
                   </div>
                   <h3 className="text-base font-bold text-white group-hover:text-emerald-400 transition-colors">Gestion des Effectifs</h3>
-                  <p className="text-xs text-slate-400 mt-1">Suivi des équipes de plombiers, chauffagistes et chefs d'équipe.</p>
+                  <p className="text-xs text-slate-400 mt-1">Suivi des équipes de plombiers et chauffagistes.</p>
                 </div>
                 <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-emerald-400">
                   <span>Accéder au module</span>
-                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <ChevronRight className="w-4 h-4" />
                 </div>
               </div>
 
-              <div 
-                onClick={() => setActiveTab('sites')}
-                className="group bg-slate-900 border border-slate-800 hover:border-blue-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-blue-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
-              >
+              <div onClick={() => setActiveTab('sites')} className="group bg-slate-900 border border-slate-800 hover:border-blue-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-3">
-                    <span className="text-3xl p-2.5 bg-blue-500/10 rounded-xl group-hover:scale-110 transition-transform">🏗️</span>
+                    <span className="text-3xl p-2.5 bg-blue-500/10 rounded-xl">🏗️</span>
                     <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-[11px] font-bold rounded-full">{sites.length} chantiers</span>
                   </div>
                   <h3 className="text-base font-bold text-white group-hover:text-blue-400 transition-colors">Chantiers & Résidences</h3>
-                  <p className="text-xs text-slate-400 mt-1">Suivi des travaux de réhabilitation, adresses et chefs de chantier.</p>
+                  <p className="text-xs text-slate-400 mt-1">Suivi des travaux de réhabilitation.</p>
                 </div>
                 <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-blue-400">
                   <span>Accéder au module</span>
-                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <ChevronRight className="w-4 h-4" />
                 </div>
               </div>
 
-              <div 
-                onClick={() => setActiveTab('tools')}
-                className="group bg-slate-900 border border-slate-800 hover:border-indigo-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-indigo-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
-              >
+              <div onClick={() => setActiveTab('tools')} className="group bg-slate-900 border border-slate-800 hover:border-indigo-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-3">
-                    <span className="text-3xl p-2.5 bg-indigo-500/10 rounded-xl group-hover:scale-110 transition-transform">🔧</span>
+                    <span className="text-3xl p-2.5 bg-indigo-500/10 rounded-xl">🔧</span>
                     <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 text-[11px] font-bold rounded-full">{equipment.length} machines</span>
                   </div>
                   <h3 className="text-base font-bold text-white group-hover:text-indigo-400 transition-colors">Parc Outillage</h3>
-                  <p className="text-xs text-slate-400 mt-1">Suivi des sertisseuses, carotteuses et carnets d'entretien matériel.</p>
+                  <p className="text-xs text-slate-400 mt-1">Suivi des sertisseuses, carotteuses et carnets d'entretien.</p>
                 </div>
                 <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-indigo-400">
                   <span>Accéder au module</span>
-                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <ChevronRight className="w-4 h-4" />
                 </div>
               </div>
 
               {isAdmin && (
-                <div 
-                  onClick={() => setActiveTab('accounts')}
-                  className="group bg-slate-900 border border-slate-800 hover:border-purple-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl hover:shadow-purple-500/10 transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
-                >
+                <div onClick={() => setActiveTab('accounts')} className="group bg-slate-900 border border-slate-800 hover:border-purple-500/50 p-5 rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-start mb-3">
-                      <span className="text-3xl p-2.5 bg-purple-500/10 rounded-xl group-hover:scale-110 transition-transform">🛡️</span>
+                      <span className="text-3xl p-2.5 bg-purple-500/10 rounded-xl">🛡️</span>
                       <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-[11px] font-bold rounded-full">{pendingUsers.length} à valider</span>
                     </div>
                     <h3 className="text-base font-bold text-white group-hover:text-purple-400 transition-colors">Validation des Comptes</h3>
-                    <p className="text-xs text-slate-400 mt-1">Approuvez ou refusez les accès des nouveaux collaborateurs.</p>
+                    <p className="text-xs text-slate-400 mt-1">Approuvez ou refusez les accès collaborateurs.</p>
                   </div>
                   <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-purple-400">
                     <span>Accéder au module</span>
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    <ChevronRight className="w-4 h-4" />
                   </div>
                 </div>
               )}
-
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'planning' && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>📅</span> Plannings & Documents PDF</h2>
-              {isAdmin && (
-                <button onClick={() => setShowAddPlanModal(true)} className="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 transition-colors text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow">
-                  <Upload className="w-4 h-4" /> Partager un planning PDF
-                </button>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {visiblePlans.map(plan => (
-                <div key={plan.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3 shadow-md flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-cyan-400 font-bold px-2 py-0.5 bg-cyan-500/10 rounded">{plan.date}</span>
-                      <span className="text-[11px] text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">🎯 Pour : {plan.targetName}</span>
-                    </div>
-                    <div className="text-sm font-bold text-white">{plan.title}</div>
-                    <div className="flex items-center gap-2 p-2.5 bg-slate-950 rounded-lg text-xs text-slate-300 border border-slate-800">
-                      <FileText className="w-4 h-4 text-red-400 shrink-0" />
-                      <span className="truncate font-mono">{plan.fileName}</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                    <button 
-                      onClick={() => {
-                        const link = document.createElement('a');
-                        link.href = plan.fileUrl;
-                        link.download = plan.fileName;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                      }}
-                      className="flex-1 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold rounded-lg transition-colors text-center"
-                    >
-                      📄 Télécharger PDF
-                    </button>
-                    {isAdmin && (
-                      <button 
-                        onClick={() => handleDeletePlan(plan.id)} 
-                        className="ml-2 px-2.5 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs rounded-lg transition-colors"
-                        title="Supprimer ce planning"
-                      >
-                        🗑️
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {visiblePlans.length === 0 && (
-                <p className="text-xs text-slate-400 italic">Aucun planning disponible pour le moment.</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'requests' && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>📋</span> Demandes de Matériel</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {requests.map(req => (
-                <div key={req.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3 shadow-md">
-                  <div className="flex justify-between text-xs text-slate-400">
-                    <span>{req.timeAgo}</span>
-                    <span className="text-amber-400 font-bold px-2 py-0.5 bg-amber-500/10 rounded">{req.status}</span>
-                  </div>
-                  <div className="text-sm font-bold text-white">{req.requester}</div>
-                  <div className="p-2.5 bg-slate-950 rounded-lg text-xs font-mono text-slate-200 border border-slate-800">
-                    {req.items}
-                  </div>
-                  {isAdmin && (
-                    <button 
-                      onClick={() => handleValidateRequest(req.id)}
-                      className="w-full py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold rounded-lg transition-colors"
-                    >
-                      ✓ Valider et archiver
-                    </button>
-                  )}
-                </div>
-              ))}
-              {requests.length === 0 && (
-                <p className="text-xs text-slate-400 italic">Aucune demande en attente.</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'workers' && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>👷‍♂️</span> Effectifs Actifs</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {approvedUsers.map(u => (
-                <div key={u.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 shadow-md">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-emerald-400 font-bold px-2 py-0.5 bg-emerald-500/10 rounded">{u.role.toUpperCase()}</span>
-                    <span className="text-slate-400">Depuis {u.joinedAt}</span>
-                  </div>
-                  <div className="text-sm font-bold text-white">{u.name}</div>
-                  <div className="text-xs text-slate-400">{u.team} • <span className="font-mono text-slate-300">{u.email}</span></div>
-                </div>
-              ))}
             </div>
           </div>
         )}
@@ -660,43 +551,35 @@ export default function App() {
         {activeTab === 'sites' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>🏗️</span> Chantiers en Cours</h2>
+              <h2 className="text-lg font-bold text-white">Chantiers en cours (Temps réel)</h2>
               {isAdmin && (
-                <button onClick={() => setShowAddSiteModal(true)} className="px-3 py-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow">
+                <button onClick={() => setShowAddSiteModal(true)} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow">
                   <Plus className="w-4 h-4" /> Nouveau Chantier
                 </button>
               )}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sites.map(s => (
-                <div key={s.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3 shadow-md flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-blue-400 font-bold px-2 py-0.5 bg-blue-500/10 rounded">{s.client}</span>
-                      <span className="text-emerald-400 text-[11px] font-semibold">{s.status}</span>
-                    </div>
-                    <div className="text-sm font-bold text-white">{s.name}</div>
-                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                      <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                      <span>{s.address}</span>
-                    </div>
-                  </div>
-                  <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
-                    <span className="text-slate-400">Chef : <strong className="text-slate-200">{s.manager}</strong></span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {sites.map(site => (
+                <div key={site.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2">
+                  <div className="flex justify-between items-start">
+                    <h3 className="text-sm font-bold text-white">{site.name}</h3>
                     {isAdmin && (
-                      <button onClick={() => handleDeleteSite(s.id)} className="text-red-400 hover:text-red-300 text-xs">Supprimer</button>
+                      <button onClick={() => handleDeleteSite(site.id, site.firestoreId)} className="text-red-400 hover:text-red-300 text-xs">🗑️</button>
                     )}
                   </div>
+                  <p className="text-xs text-slate-400">Client : {site.client}</p>
+                  <p className="text-xs text-slate-400">Adresse : {site.address}</p>
+                  <p className="text-xs text-slate-400">Statut : <span className="text-emerald-400 font-semibold">{site.status}</span></p>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-{activeTab === 'tools' && (
+        {activeTab === 'tools' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>🔧</span> Parc Outillage & Matériel</h2>
+              <h2 className="text-lg font-bold text-white">Parc Outillage & Matériel (Temps réel)</h2>
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <input 
                   type="text"
@@ -706,7 +589,7 @@ export default function App() {
                   className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white w-full sm:w-64 focus:outline-none focus:border-indigo-500"
                 />
                 {isAdmin && (
-                  <button onClick={() => setShowAddToolModal(true)} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 transition-colors text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow shrink-0">
+                  <button onClick={() => setShowAddToolModal(true)} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow shrink-0">
                     <Plus className="w-4 h-4" /> Ajouter une machine
                   </button>
                 )}
@@ -715,47 +598,33 @@ export default function App() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredEquipment.map(tool => (
-                <div key={tool.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 shadow-md flex flex-col justify-between">
-                  <div className="space-y-1">
+                <div key={tool.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 flex flex-col justify-between">
+                  <div>
                     <div className="flex justify-between text-xs">
                       <span className="text-indigo-400 font-mono font-bold">{tool.id}</span>
                       <span className="text-slate-400">{tool.brand}</span>
                     </div>
-                    <div className="text-sm font-bold text-white">{tool.name}</div>
-                    <div className="text-xs text-slate-400">
+                    <div className="text-sm font-bold text-white mt-1">{tool.name}</div>
+                    <div className="text-xs text-slate-400 mt-1">
                       Statut : <span className="text-emerald-400 font-medium">{tool.status}</span>
                     </div>
-                  </div>
-
-                  <div className="text-xs text-slate-400 space-y-1 my-1">
                     {tool.assignedTo && (
-                      <div className="text-slate-500">
+                      <div className="text-xs text-slate-500 mt-1">
                         Assigné à : <strong className="text-slate-300">{tool.assignedTo}</strong>
                       </div>
                     )}
                   </div>
 
                   <div className="pt-2 border-t border-slate-800 flex items-center gap-2">
-                    <button 
-                      onClick={() => setSelectedTool(tool)} 
-                      className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 transition-colors text-xs text-slate-200 rounded-lg"
-                    >
+                    <button onClick={() => setSelectedTool(tool)} className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 rounded-lg">
                       Carnet ({tool.notes?.length || 0})
                     </button>
-
                     {isAdmin && (
                       <>
-                        <button
-                          onClick={() => handleOpenEditModal(tool)}
-                          className="px-2.5 py-1.5 bg-amber-600/25 hover:bg-amber-600/40 text-amber-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
-                        >
+                        <button onClick={() => handleOpenEditModal(tool)} className="px-2.5 py-1.5 bg-amber-600/25 hover:bg-amber-600/40 text-amber-300 text-xs font-semibold rounded-lg">
                           Modifier
                         </button>
-                        <button
-                          onClick={() => handleDeleteTool(tool.id)}
-                          className="px-2.5 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs font-semibold rounded-lg transition-colors"
-                          title="Supprimer cette machine"
-                        >
+                        <button onClick={() => handleDeleteTool(tool.id, tool.firestoreId)} className="px-2.5 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs font-semibold rounded-lg">
                           🗑️
                         </button>
                       </>
@@ -763,30 +632,62 @@ export default function App() {
                   </div>
                 </div>
               ))}
-              {filteredEquipment.length === 0 && (
-                <p className="text-xs text-slate-400 italic col-span-full">Aucun outil ne correspond à votre recherche.</p>
-              )}
             </div>
           </div>
         )}
 
-        {isAdmin && activeTab === 'accounts' && (
+        {activeTab === 'requests' && (
           <div className="space-y-4">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2"><span>🛡️</span> Validation des Comptes en Attente</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {pendingUsers.map(u => (
-                <div key={u.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3 shadow-md">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-amber-400 font-bold px-2 py-0.5 bg-amber-500/10 rounded">EN ATTENTE</span>
-                    <span className="text-slate-400">{u.joinedAt}</span>
-                  </div>
+            <h2 className="text-lg font-bold text-white">Bons de commande & Besoins chantier</h2>
+            <div className="space-y-2">
+              {requests.map(req => (
+                <div key={req.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center">
                   <div>
-                    <div className="text-sm font-bold text-white">{u.name}</div>
-                    <div className="text-xs text-slate-400">{u.email} • <span className="font-mono text-slate-300">{u.role}</span></div>
+                    <p className="text-sm font-bold text-white">{req.items}</p>
+                    <p className="text-xs text-slate-400">Demandeur : {req.requester} - {req.timeAgo}</p>
                   </div>
-                  <div className="flex gap-2 pt-2 border-t border-slate-800">
-                    <button onClick={() => handleApproveAccount(u.id)} className="flex-1 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold rounded-lg">Approuver</button>
-                    <button onClick={() => handleRejectAccount(u.id)} className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs font-semibold rounded-lg">Refuser</button>
+                  {isAdmin && (
+                    <button onClick={() => handleValidateRequest(req.id)} className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold rounded-lg">
+                      Valider
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'workers' && (
+          <div className="space-y-4">
+            <h2 className="text-lg font-bold text-white">Équipes & Effectifs actifs</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {approvedUsers.map(user => (
+                <div key={user.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2">
+                  <div className="flex justify-between items-start">
+                    <h3 className="text-sm font-bold text-white">{user.name}</h3>
+                    <span className="text-[10px] px-2 py-0.5 bg-blue-500/20 text-blue-300 font-semibold rounded">{user.role}</span>
+                  </div>
+                  <p className="text-xs text-slate-400">{user.email}</p>
+                  <p className="text-xs text-slate-500">Équipe : {user.team}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'accounts' && isAdmin && (
+          <div className="space-y-4">
+            <h2 className="text-lg font-bold text-white">Validation des comptes en attente</h2>
+            <div className="space-y-3">
+              {pendingUsers.map(user => (
+                <div key={user.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center">
+                  <div>
+                    <p className="text-sm font-bold text-white">{user.name} ({user.email})</p>
+                    <p className="text-xs text-slate-400">Rôle demandé : {user.role} - Inscrit le {user.joinedAt}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => handleApproveAccount(user.id)} className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg">Approuver</button>
+                    <button onClick={() => handleRejectAccount(user.id)} className="px-3 py-1.5 bg-red-600/20 text-red-300 text-xs font-semibold rounded-lg">Refuser</button>
                   </div>
                 </div>
               ))}
@@ -797,199 +698,142 @@ export default function App() {
           </div>
         )}
 
-      </main>
-
-      {/* MODALE : CARNET D'ENTRETIEN OUTIL */}
-      {selectedTool && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-5 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <div>
-                <span className="text-xs text-indigo-400 font-mono font-bold">{selectedTool.id}</span>
-                <h3 className="text-base font-bold text-white">{selectedTool.name}</h3>
-              </div>
-              <button onClick={() => setSelectedTool(null)} className="p-1 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
-
-            <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Historique & Notes</h4>
-              {selectedTool.notes && selectedTool.notes.length > 0 ? (
-                selectedTool.notes.map(note => (
-                  <div key={note.id} className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
-                    <div className="flex justify-between text-[11px] text-slate-400">
-                      <span className="font-semibold text-indigo-300">{note.author}</span>
-                      <span>{note.date}</span>
-                    </div>
-                    <p className="text-xs text-slate-200">{note.text}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-slate-500 italic">Aucune note enregistrée sur ce carnet.</p>
+        {activeTab === 'planning' && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-bold text-white">Plannings & Documents PDF</h2>
+              {isAdmin && (
+                <button onClick={() => setShowAddPlanModal(true)} className="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow">
+                  <Upload className="w-4 h-4" /> Partager un planning PDF
+                </button>
               )}
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {visiblePlans.map(plan => (
+                <div key={plan.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-cyan-400 font-bold">{plan.date}</span>
+                    <span className="text-slate-400">Pour : {plan.targetName}</span>
+                  </div>
+                  <div className="text-sm font-bold text-white">{plan.title}</div>
+                  <div className="flex items-center gap-2 p-2 bg-slate-950 rounded-lg text-xs text-slate-300 border border-slate-800">
+                    <FileText className="w-4 h-4 text-red-400 shrink-0" />
+                    <span className="truncate">{plan.fileName}</span>
+                  </div>
+                  {isAdmin && (
+                    <button onClick={() => handleDeletePlan(plan.id)} className="w-full py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs rounded-lg">
+                      Supprimer ce planning
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </main>
 
+      {/* Modale Ajout Chantier */}
+      {showAddSiteModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleCreateSite} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4">
+            <h3 className="text-lg font-bold text-white">Nouveau Chantier</h3>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Nom du chantier</label>
+              <input type="text" value={newSiteData.name} onChange={e => setNewSiteData({...newSiteData, name: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Client</label>
+              <input type="text" value={newSiteData.client} onChange={e => setNewSiteData({...newSiteData, client: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Adresse</label>
+              <input type="text" value={newSiteData.address} onChange={e => setNewSiteData({...newSiteData, address: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setShowAddSiteModal(false)} className="px-4 py-2 bg-slate-800 text-xs text-slate-300 rounded-xl">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-indigo-600 text-xs text-white font-semibold rounded-xl">Créer</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Modale Ajout Outil */}
+      {showAddToolModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleCreateTool} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4">
+            <h3 className="text-lg font-bold text-white">Ajouter une machine</h3>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">ID Machine (ex: REMS-03)</label>
+              <input type="text" value={newToolData.id} onChange={e => setNewToolData({...newToolData, id: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Nom de l'outil</label>
+              <input type="text" value={newToolData.name} onChange={e => setNewToolData({...newToolData, name: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Marque</label>
+              <input type="text" value={newToolData.brand} onChange={e => setNewToolData({...newToolData, brand: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setShowAddToolModal(false)} className="px-4 py-2 bg-slate-800 text-xs text-slate-300 rounded-xl">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-indigo-600 text-xs text-white font-semibold rounded-xl">Ajouter</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Modale Modification Outil */}
+      {editingTool && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleSaveToolEdit} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4">
+            <h3 className="text-lg font-bold text-white">Modifier : {editingTool.name}</h3>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Assigné à</label>
+              <input type="text" value={editToolForm.assignedTo} onChange={e => setEditToolForm({...editToolForm, assignedTo: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Statut</label>
+              <select value={editToolForm.status} onChange={e => setEditToolForm({...editToolForm, status: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
+                <option value="Disponible">Disponible</option>
+                <option value="Sur chantier">Sur chantier</option>
+                <option value="En révision">En révision</option>
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setEditingTool(null)} className="px-4 py-2 bg-slate-800 text-xs text-slate-300 rounded-xl">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-amber-600 text-xs text-white font-semibold rounded-xl">Enregistrer</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Modale Carnet d'entretien Outil */}
+      {selectedTool && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-lg space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-bold text-white">Carnet : {selectedTool.name}</h3>
+              <button onClick={() => setSelectedTool(null)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {selectedTool.notes?.length === 0 && <p className="text-xs text-slate-400 italic">Aucune note dans le carnet.</p>}
+              {selectedTool.notes?.map(note => (
+                <div key={note.id} className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs space-y-1">
+                  <div className="flex justify-between text-slate-400 text-[10px]">
+                    <span className="font-bold text-indigo-300">{note.author}</span>
+                    <span>{note.date}</span>
+                  </div>
+                  <p className="text-slate-200">{note.text}</p>
+                </div>
+              ))}
+            </div>
             <div className="space-y-2 pt-2 border-t border-slate-800">
-              <label className="block text-xs text-slate-400">Ajouter une note de suivi</label>
-              <div className="flex gap-2">
-                <input 
-                  type="text" 
-                  value={newNoteText} 
-                  onChange={e => setNewNoteText(e.target.value)} 
-                  placeholder="Ex: Révision flexible, changement de mors..." 
-                  className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
-                />
-                <button onClick={() => handleAddNote(selectedTool.id)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl">Ajouter</button>
-              </div>
+              <input type="text" value={newNoteText} onChange={e => setNewNoteText(e.target.value)} placeholder="Ajouter une note d'entretien..." className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+              <button onClick={() => handleAddNote(selectedTool.id)} className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-xs text-white font-semibold rounded-xl">Ajouter au carnet</button>
             </div>
           </div>
         </div>
       )}
-
-      {/* MODALE : MODIFICATION RAPIDE OUTIL */}
-      {editingTool && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleSaveToolEdit} className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white">Modifier l'outillage : {editingTool.id}</h3>
-              <button type="button" onClick={() => setEditingTool(null)} className="p-1 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
-            
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Assigné à (Chantier ou Personne)</label>
-                <input 
-                  type="text" 
-                  value={editToolForm.assignedTo} 
-                  onChange={e => setEditToolForm({ ...editToolForm, assignedTo: e.target.value })} 
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Statut</label>
-                <select 
-                  value={editToolForm.status} 
-                  onChange={e => setEditToolForm({ ...editToolForm, status: e.target.value })} 
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
-                >
-                  <option value="Disponible">Disponible</option>
-                  <option value="Sur chantier">Sur chantier</option>
-                  <option value="En révision">En révision</option>
-                  <option value="Hors service">Hors service</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-              <button type="button" onClick={() => setEditingTool(null)} className="px-3 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs rounded-xl">Enregistrer</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* MODALE : AJOUTER UN CHANTIER */}
-      {showAddSiteModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleCreateSite} className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white">Nouveau Chantier</h3>
-              <button type="button" onClick={() => setShowAddSiteModal(false)} className="p-1 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Nom du chantier</label>
-                <input type="text" required value={newSiteData.name} onChange={e => setNewSiteData({ ...newSiteData, name: e.target.value })} placeholder="Ex: Résidence Les Jardins" className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Client / Maître d'ouvrage</label>
-                <input type="text" value={newSiteData.client} onChange={e => setNewSiteData({ ...newSiteData, client: e.target.value })} placeholder="Ex: Nexity, GCC..." className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Adresse</label>
-                <input type="text" value={newSiteData.address} onChange={e => setNewSiteData({ ...newSiteData, address: e.target.value })} placeholder="Adresse complète" className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Chef de chantier / Responsable</label>
-                <input type="text" value={newSiteData.manager} onChange={e => setNewSiteData({ ...newSiteData, manager: e.target.value })} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-              <button type="button" onClick={() => setShowAddSiteModal(false)} className="px-3 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl">Créer</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* MODALE : AJOUTER UN OUTIL */}
-      {showAddToolModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleCreateTool} className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white">Ajouter une machine</h3>
-              <button type="button" onClick={() => setShowAddToolModal(false)} className="p-1 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">ID / Référence (ex: OUT-103)</label>
-                <input type="text" required value={newToolData.id} onChange={e => setNewToolData({ ...newToolData, id: e.target.value })} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Nom de la machine</label>
-                <input type="text" required value={newToolData.name} onChange={e => setNewToolData({ ...newToolData, name: e.target.value })} placeholder="Ex: Coupe-tube sans fil" className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Marque</label>
-                <input type="text" value={newToolData.brand} onChange={e => setNewToolData({ ...newToolData, brand: e.target.value })} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Catégorie</label>
-                <input type="text" value={newToolData.category} onChange={e => setNewToolData({ ...newToolData, category: e.target.value })} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-              <button type="button" onClick={() => setShowAddToolModal(false)} className="px-3 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl">Ajouter</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* MODALE : PARTAGER UN PLANNING */}
-      {showAddPlanModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleUploadPlan} className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white">Partager un planning PDF</h3>
-              <button type="button" onClick={() => setShowAddPlanModal(false)} className="p-1 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Titre du planning</label>
-                <input type="text" required value={newPlanTitle} onChange={e => setNewPlanTitle(e.target.value)} placeholder="Ex: Planning S47 - Réseau Chauffage" className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Destinataire</label>
-                <select value={newPlanTarget} onChange={e => setNewPlanTarget(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
-                  <option value="all">Toute l'équipe</option>
-                  {approvedUsers.map(u => (
-                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Fichier PDF</label>
-                <input type="file" accept=".pdf" onChange={e => setNewPlanFile(e.target.files[0])} className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500" />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-              <button type="button" onClick={() => setShowAddPlanModal(false)} className="px-3 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs rounded-xl">Partager</button>
-            </div>
-          </form>
-        </div>
-      )}
-
     </div>
   );
 }
