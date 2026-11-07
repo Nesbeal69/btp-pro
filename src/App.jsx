@@ -172,8 +172,8 @@ export default function App() {
       const vList = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
       if (vList.length === 0) {
         const defaultVideos = [
-          { title: 'Postures de levage & Prévention TMS', category: 'Sécurité & Posture', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', description: 'Rappel sur les bonnes positions pour porter les charges lourdes et les sertisseuses sans forcer sur les lombaires.' },
-          { title: 'Technique de sertissage Multicouche REMS', category: 'Technique Plomberie', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', description: 'Procédure standard de préparation du tube, ébavurage et sertissage sécurisé.' }
+          { title: 'Prévention des TMS - Motion Design', category: 'Sécurité & Posture', url: 'http://www.youtube.com/watch?v=a4niEbOorAk', description: 'Vidéo de sensibilisation en motion design sur la prévention des Troubles Musculosquelettiques (TMS) sur les chantiers.' },
+          { title: 'Technique de sertissage Multicouche REMS', category: 'Technique Plomberie', url: 'https://www.youtube.com/watch?v=zlmTvpTUdNM', description: 'Procédure standard de préparation du tube, ébavurage et sertissage sécurisé.' }
         ];
         defaultVideos.forEach(v => addDoc(collection(db, "videos"), v));
       } else {
@@ -628,72 +628,81 @@ export default function App() {
 
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-slate-100 text-slate-800 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-800 p-6 text-center">
-            <div className="inline-flex p-3 bg-white/10 rounded-2xl mb-3 backdrop-blur-sm">
-              <Building2 className="w-8 h-8 text-white" />
+      <div className="min-h-screen text-slate-100 flex items-center justify-center p-4 relative overflow-hidden">
+        {/* Image de fond chantier / plomberie avec un filtre sombre et léger flou pour la profondeur */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center z-0 filter brightness-[0.35] scale-105"
+          style={{ backgroundImage: `url('https://images.unsplash.com/photo-1581094288338-2314dddb7ece?q=80&w=2000&auto=format&fit=crop')` }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/40 to-slate-950/60 z-0" />
+
+        {/* Bloc central avec effet verre givré (Glassmorphism) et logo intégré */}
+        <div className="relative z-10 w-full max-w-md bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl shadow-2xl p-8 overflow-hidden">
+          
+          {/* En-tête avec Logo et Nom */}
+          <div className="text-center mb-8">
+            <div className="inline-flex p-3.5 bg-blue-600/20 border border-blue-400/30 rounded-2xl mb-3 shadow-inner">
+              <Building2 className="w-9 h-9 text-blue-400" />
             </div>
-            <h1 className="text-xl font-bold text-white tracking-wide">BÂTIR+</h1>
-            <p className="text-xs text-blue-100 mt-1">Plateforme Chantiers, Matériel & Équipes</p>
+            <h1 className="text-2xl font-black text-white tracking-wider">BÂTIR+</h1>
+            <p className="text-xs text-slate-300 mt-1 font-medium tracking-wide">Plateforme Chantiers, Matériel & Équipes</p>
           </div>
 
-          <div className="p-6">
-            {authMode === 'pending' ? (
-              <div className="text-center py-6 space-y-4">
-                <Clock className="w-12 h-12 text-amber-500 mx-auto animate-pulse" />
-                <h2 className="text-lg font-semibold text-slate-800">Compte en Attente de Validation</h2>
-                <p className="text-xs text-slate-600">Votre inscription a bien été enregistrée. L'administrateur doit valider votre compte et vous attribuer un rôle avant de vous donner l'accès.</p>
-                <button onClick={() => { setAuthMode('login'); setAuthError(''); }} className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded-xl font-medium transition-colors">Retour à la connexion</button>
+          {authMode === 'pending' ? (
+            <div className="text-center py-6 space-y-4">
+              <Clock className="w-12 h-12 text-amber-400 mx-auto animate-pulse" />
+              <h2 className="text-lg font-semibold text-white">Compte en Attente de Validation</h2>
+              <p className="text-xs text-slate-300">Votre inscription a bien été enregistrée. L'administrateur doit valider votre compte et vous attribuer un rôle avant de vous donner l'accès.</p>
+              <button onClick={() => { setAuthMode('login'); setAuthError(''); }} className="w-full py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs rounded-xl font-medium transition-colors border border-white/10">Retour à la connexion</button>
+            </div>
+          ) : (
+            <>
+              {/* Sélecteur Connexion / Inscription minimaliste */}
+              <div className="flex rounded-xl bg-black/30 p-1 mb-6 border border-white/10">
+                <button onClick={() => { setAuthMode('login'); setAuthError(''); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'login' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Connexion</button>
+                <button onClick={() => { setAuthMode('register'); setAuthError(''); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'register' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Inscription</button>
               </div>
-            ) : (
-              <>
-                <div className="flex rounded-xl bg-slate-100 p-1 mb-6 border border-slate-200">
-                  <button onClick={() => { setAuthMode('login'); setAuthError(''); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'login' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600'}`}>Connexion</button>
-                  <button onClick={() => { setAuthMode('register'); setAuthError(''); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'register' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600'}`}>Inscription</button>
-                </div>
 
-                {authError && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-medium">{authError}</div>}
+              {authError && <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-xs text-red-200 font-medium">{authError}</div>}
 
-                {authMode === 'login' ? (
-                  <form onSubmit={handleLogin} className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
-                      <input type="email" required value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="admin@btppro.fr" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Mot de passe</label>
-                      <input type="password" required value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
-                    </div>
-                    <button type="submit" className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 transition-colors font-semibold rounded-xl text-xs text-white shadow-md shadow-blue-500/20">Se Connecter</button>
-                    <div className="pt-3 border-t border-slate-100 flex justify-center gap-2">
-                      <button type="button" onClick={() => { setLoginEmail('admin@btppro.fr'); setLoginPassword('admin'); }} className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-blue-600 text-[11px] font-medium rounded-lg transition-colors">Démo Admin</button>
-                    </div>
-                  </form>
-                ) : (
-                  <form onSubmit={handleRegister} className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Nom complet</label>
-                      <input type="text" required value={regName} onChange={e => setRegName(e.target.value)} placeholder="Jean Martin" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
-                      <input type="email" required value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="jean@btppro.fr" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Numéro de téléphone <span className="text-red-500">*</span></label>
-                      <input type="tel" required value={regPhone} onChange={e => setRegPhone(e.target.value)} placeholder="06 12 34 56 78" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Mot de passe</label>
-                      <input type="password" required value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
-                    </div>
-                    <button type="submit" className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 transition-colors font-semibold rounded-xl text-xs text-white shadow-md shadow-emerald-500/20">S'inscrire</button>
-                  </form>
-                )}
-              </>
-            )}
-          </div>
+              {authMode === 'login' ? (
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">Email</label>
+                    <input type="email" required value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="admin@btppro.fr" className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">Mot de passe</label>
+                    <input type="password" required value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500" />
+                  </div>
+                  <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-500 transition-colors font-bold rounded-xl text-xs text-white shadow-lg shadow-blue-600/30">Se Connecter</button>
+                  <div className="pt-3 border-t border-white/10 flex justify-center">
+                    <button type="button" onClick={() => { setLoginEmail('admin@btppro.fr'); setLoginPassword('admin'); }} className="px-3 py-1 bg-white/5 hover:bg-white/10 text-blue-400 text-[11px] font-medium rounded-lg transition-colors border border-white/5">🚀 Connexion Rapide (Admin)</button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleRegister} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">Nom complet</label>
+                    <input type="text" required value={regName} onChange={e => setRegName(e.target.value)} placeholder="Jean Martin" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">Email</label>
+                    <input type="email" required value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="jean@btppro.fr" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">Numéro de téléphone <span className="text-red-400">*</span></label>
+                    <input type="tel" required value={regPhone} onChange={e => setRegPhone(e.target.value)} placeholder="06 12 34 56 78" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">Mot de passe</label>
+                    <input type="password" required value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                  </div>
+                  <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 transition-colors font-bold rounded-xl text-xs text-white shadow-lg shadow-emerald-600/30 mt-2">S'inscrire</button>
+                </form>
+              )}
+            </>
+          )}
         </div>
       </div>
     );
@@ -1138,7 +1147,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- NOUVEAU MODULE : TUTOS & SÉCURITÉ --- */}
+        {/* --- MODULE TUTOS & SÉCURITÉ --- */}
         {activeTab === 'videos' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
