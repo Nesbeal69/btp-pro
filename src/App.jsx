@@ -66,7 +66,7 @@ const INITIAL_PLANS = [
   { id: 2, title: 'Feuille de route - Thomas Bernard', fileName: 'Route_Thomas_Olives.pdf', targetUserId: 3, targetName: 'Thomas Bernard', date: '2026-11-06' }
 ];
 
-export default function App() {
+export default function App() 
   const [currentUser, setCurrentUser] = useState(null);
   const [authMode, setAuthMode] = useState('login');
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -202,11 +202,21 @@ export default function App() {
     setNewNoteText('');
   };
 
-  const handleValidateRequest = (reqId) => {
+const handleValidateRequest = (reqId) => {
     setRequests(requests.filter(r => r.id !== reqId));
   };
 
-  const newPlanObj = {
+  const handleUploadPlan = (e) => {
+    e.preventDefault();
+    if (!newPlanTitle) return;
+
+    let targetName = 'Toute l’équipe';
+    if (newPlanTarget !== 'all') {
+      const foundUser = users.find(u => u.id === Number(newPlanTarget));
+      if (foundUser) targetName = foundUser.name;
+    }
+
+    const newPlanObj = {
       id: Date.now(),
       title: newPlanTitle,
       fileName: newPlanFile ? newPlanFile.name : 'Planning_General.pdf',
@@ -810,5 +820,4 @@ export default function App() {
           </div>
         </div>
       )}
-    </div>
-  );
+    </div>  );
