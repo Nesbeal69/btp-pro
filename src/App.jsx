@@ -71,6 +71,9 @@ export default function App() {
   const [authMode, setAuthMode] = useState('login');
   const [activeTab, setActiveTab] = useState('dashboard');
 
+  const [editingTool, setEditingTool] = useState(null);
+  const [editToolForm, setEditToolForm] = useState({ assignedTo: '', status: '' });
+
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [regName, setRegName] = useState('');
@@ -84,6 +87,54 @@ export default function App() {
   const [equipment, setEquipment] = useState(INITIAL_EQUIPMENT);
   const [requests, setRequests] = useState(INITIAL_REQUESTS);
   const [plans, setPlans] = useState(INITIAL_PLANS);
+
+  const handleOpenEditModal = (tool) => {
+    setEditingTool(tool);
+    setEditToolForm({
+      assignedTo: tool.assignedTo || '',
+      status: tool.status || 'Disponible'
+    });
+  };
+
+  const handleSaveToolEdit = (e) => {
+    e.preventDefault();
+    if (!editingTool) return;
+
+    const changes = [];
+    if (editToolForm.assignedTo !== editingTool.assignedTo) {
+      changes.push(`Affecté à : "${editingTool.assignedTo}" → "${editToolForm.assignedTo}"`);
+    }
+    if (editToolForm.status !== editingTool.status) {
+      changes.push(`Statut : "${editingTool.status}" → "${editToolForm.status}"`);
+    }
+
+    if (changes.length === 0) {
+      setEditingTool(null);
+      return;
+    }
+
+    const autoHistoryNote = {
+      id: Date.now(),
+      author: currentUser ? currentUser.name : 'Système',
+      date: new Date().toISOString().split('T')[0],
+      text: `✏️ Modification : ${changes.join(' | ')}`
+    };
+
+    const updatedEquipment = equipment.map(t => {
+      if (t.id === editingTool.id) {
+        return {
+          ...t,
+          assignedTo: editToolForm.assignedTo,
+          status: editToolForm.status,
+          notes: [autoHistoryNote, ...(t.notes || [])]
+        };
+      }
+      return t;
+    });
+
+    setEquipment(updatedEquipment);
+    setEditingTool(null);
+  };
 
   const [selectedTool, setSelectedTool] = useState(null);
   const [newNoteText, setNewNoteText] = useState('');
@@ -661,6 +712,12 @@ const handleValidateRequest = (reqId) => {
                     <button onClick={() => setSelectedTool(tool)} className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 transition-colors text-xs text-slate-200 font-medium rounded-lg">
                       Carnet ({tool.notes?.length || 0})
                     </button>
+                    <button
+  onClick={() => setEditingTool(tool)}
+  className="px-2.5 py-1.5 bg-amber-600/25 hover:bg-amber-600/40 text-amber-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+>
+  ✏️ Modifier
+</button>
                     {isAdmin && (
                       <button onClick={() => handleDeleteTool(tool.id)} className="px-2.5 py-1.5 bg-red-600/25 hover:bg-red-600/40 text-red-200 text-xs rounded-lg transition-colors" title="Supprimer l'outil">
                         🗑️
