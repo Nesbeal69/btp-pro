@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { 
   Building2, 
   Users, 
@@ -28,12 +28,6 @@ import {
   Search
 } from 'lucide-react';
 
-const INITIAL_USERS = [
-  { id: 1, name: 'Jean Dupont', email: 'admin@btppro.fr', phone: '06 12 34 56 78', password: 'admin', role: 'admin', team: 'Direction', status: 'approved', joinedAt: '2024-01-10' },
-  { id: 2, name: 'Marc Vasseur', email: 'marc@btppro.fr', phone: '06 98 76 54 32', password: 'password123', role: 'Employé', team: 'Équipe Chauffage', status: 'approved', joinedAt: '2024-02-15' },
-  { id: 3, name: 'Thomas Bernard', email: 'thomas@btppro.fr', phone: '06 11 22 33 44', password: 'password123', role: 'Intérimaire', team: 'Équipe Plomberie 1', status: 'approved', joinedAt: '2024-03-01' }
-];
-
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authMode, setAuthMode] = useState('login');
@@ -55,7 +49,7 @@ export default function App() {
   const [editUserRole, setEditUserRole] = useState('Employé');
 
   // Données Firestore
-  const [users, setUsers] = useState(INITIAL_USERS);
+  const [users, setUsers] = useState([]);
   const [sites, setSites] = useState([]);
   const [equipment, setEquipment] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -114,7 +108,30 @@ export default function App() {
     return dateString;
   };
 
+  // Synchronisation Firestore (Utilisateurs, Équipements, Chantiers, Demandes, Plannings)
   useEffect(() => {
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+      const usersList = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
+      
+      // Si la base est vide (premier lancement), on crée un compte Admin par défaut dans Firestore
+      if (usersList.length === 0) {
+        const defaultAdmin = {
+          userIdNum: 1,
+          name: 'Jean Dupont',
+          email: 'admin@btppro.fr',
+          phone: '06 12 34 56 78',
+          password: 'admin',
+          role: 'admin',
+          team: 'Direction',
+          status: 'approved',
+          joinedAt: '2024-01-10'
+        };
+        addDoc(collection(db, "users"), defaultAdmin);
+      } else {
+        setUsers(usersList);
+      }
+    });
+
     const unsubEquipment = onSnapshot(collection(db, "equipment"), (snapshot) => {
       setEquipment(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
@@ -132,6 +149,7 @@ export default function App() {
     });
 
     return () => {
+      unsubUsers();
       unsubEquipment();
       unsubSites();
       unsubRequests();
@@ -266,7 +284,7 @@ export default function App() {
         urgency: newRequestData.urgency,
         description: newRequestData.description || '',
         requester: currentUser.name,
-        requesterId: currentUser.id,
+        requesterId: currentUser.userIdNum || currentUser.id,
         status: 'En attente',
         createdAt: new Date().toISOString().split('T')[0],
         receivedDate: null,
@@ -303,7 +321,8 @@ export default function App() {
 
   const visibleRequests = useMemo(() => {
     if (!currentUser) return [];
-    let list = currentUser.role === 'admin' ? requests : requests.filter(r => r.requesterId === currentUser.id);
+    const myId = currentUser.userIdNum || currentUser.id;
+    let list = currentUser.role === 'admin' ? requests : requests.filter(r => r.requesterId === myId);
     
     if (requestStatusFilter !== 'all') {
       list = list.filter(r => r.status === requestStatusFilter);
@@ -321,14 +340,22 @@ export default function App() {
     });
   }, [approvedUsers, workerSearch, workerRoleFilter]);
 
-  const handleUpdateUserRole = (userId, newRole) => {
-    setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
-    setEditingUser(null);
+  const handleUpdateUserRole = async (firestoreId, newRole) => {
+    try {
+      await updateDoc(doc(db, "users", firestoreId), { role: newRole });
+      setEditingUser(null);
+    } catch (error) {
+      console.error("Erreur mise à jour rôle :", error);
+    }
   };
 
-  const handleDeleteUser = (userId) => {
+  const handleDeleteUser = async (firestoreId) => {
     if (window.confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ? Il n'aura plus accès à l'application.")) {
-      setUsers(users.filter(u => u.id !== userId));
+      try {
+        await deleteDoc(doc(db, "users", firestoreId));
+      } catch (error) {
+        console.error("Erreur suppression utilisateur :", error);
+      }
     }
   };
 
@@ -371,7 +398,7 @@ export default function App() {
 
     let targetName = 'Toute l’équipe';
     if (newPlanData.targetUserId !== 'all') {
-      const foundUser = users.find(u => u.id === Number(newPlanData.targetUserId));
+      const foundUser = users.find(u => (u.userIdNum || u.id) === Number(newPlanData.targetUserId));
       if (foundUser) targetName = foundUser.name;
     }
 
@@ -413,7 +440,7 @@ export default function App() {
     document.body.removeChild(link);
   };
 
-  // --- CONNEXION SÉCURISÉE STRICTE ---
+  // --- CONNEXION SÉCURISÉE ---
   const handleLogin = (e) => {
     e.preventDefault();
     setAuthError('');
@@ -424,7 +451,6 @@ export default function App() {
       return;
     }
 
-    // Vérification stricte du mot de passe
     if (loginPassword !== found.password) {
       setAuthError("Mot de passe incorrect.");
       return;
@@ -439,8 +465,8 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
-  // --- INSCRIPTION ---
-  const handleRegister = (e) => {
+  // --- INSCRIPTION (SAUVEGARDE DANS FIRESTORE) ---
+  const handleRegister = async (e) => {
     e.preventDefault();
     setAuthError('');
     if (!regName || !regEmail || !regPhone || !regPassword) {
@@ -455,7 +481,7 @@ export default function App() {
     }
 
     const newUser = {
-      id: Date.now(),
+      userIdNum: Date.now(),
       name: regName,
       email: regEmail,
       phone: regPhone,
@@ -465,9 +491,14 @@ export default function App() {
       status: 'pending', 
       joinedAt: new Date().toISOString().split('T')[0]
     };
-    
-    setUsers([...users, newUser]);
-    setAuthMode('pending');
+
+    try {
+      await addDoc(collection(db, "users"), newUser);
+      setAuthMode('pending');
+    } catch (error) {
+      console.error("Erreur lors de l'inscription :", error);
+      setAuthError("Erreur lors de l'enregistrement en ligne.");
+    }
   };
 
   const handleLogout = () => {
@@ -477,20 +508,29 @@ export default function App() {
     setLoginPassword('');
   };
 
-  const handleApproveAccount = (userId) => {
-    setUsers(users.map(u => u.id === userId ? { ...u, status: 'approved' } : u));
+  const handleApproveAccount = async (firestoreId) => {
+    try {
+      await updateDoc(doc(db, "users", firestoreId), { status: 'approved' });
+    } catch (error) {
+      console.error("Erreur approbation :", error);
+    }
   };
 
-  const handleRejectAccount = (userId) => {
-    setUsers(users.filter(u => u.id !== userId));
+  const handleRejectAccount = async (firestoreId) => {
+    try {
+      await deleteDoc(doc(db, "users", firestoreId));
+    } catch (error) {
+      console.error("Erreur refus :", error);
+    }
   };
 
   const pendingUsers = useMemo(() => users.filter(u => u.status === 'pending'), [users]);
   
   const visiblePlans = useMemo(() => {
     if (!currentUser) return [];
+    const myId = currentUser.userIdNum || currentUser.id;
     if (currentUser.role !== 'admin') {
-      return plans.filter(p => p.targetUserId === 'all' || p.targetUserId === currentUser.id);
+      return plans.filter(p => p.targetUserId === 'all' || p.targetUserId === myId);
     }
     if (selectedWorkerFilter === 'all') return plans;
     return plans.filter(p => p.targetUserId === Number(selectedWorkerFilter));
@@ -515,7 +555,7 @@ export default function App() {
               <div className="text-center py-6 space-y-4">
                 <Clock className="w-12 h-12 text-amber-400 mx-auto" />
                 <h2 className="text-lg font-semibold text-amber-300">Compte en Attente de Validation</h2>
-                <p className="text-xs text-slate-300">Votre inscription a bien été enregistrée[cite: 5]. L'administrateur doit valider votre compte et vous attribuer un rôle[cite: 5].</p>
+                <p className="text-xs text-slate-300">Votre inscription a bien été enregistrée[cite: 5]. L'administrateur doit valider votre compte et vous attribuer un rôle avant de vous donner l'accès[cite: 5].</p>
                 <button onClick={() => { setAuthMode('login'); setAuthError(''); }} className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl transition-colors">Retour à la connexion</button>
               </div>
             ) : (
@@ -540,7 +580,6 @@ export default function App() {
                     <button type="submit" className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 transition-colors font-semibold rounded-xl text-xs shadow-lg">Se Connecter</button>
                     <div className="pt-3 border-t border-slate-800 flex justify-center gap-2">
                       <button type="button" onClick={() => { setLoginEmail('admin@btppro.fr'); setLoginPassword('admin'); }} className="px-2 py-1 bg-slate-800 text-blue-400 text-[11px] rounded">Démo Admin</button>
-                      <button type="button" onClick={() => { setLoginEmail('thomas@btppro.fr'); setLoginPassword('password123'); }} className="px-2 py-1 bg-slate-800 text-emerald-400 text-[11px] rounded">Démo Ouvrier</button>
                     </div>
                   </form>
                 ) : (
@@ -733,7 +772,7 @@ export default function App() {
                 {isAdmin && (
                   <select value={selectedWorkerFilter} onChange={e => setSelectedWorkerFilter(e.target.value)} className="px-3 py-1.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl focus:outline-none">
                     <option value="all">Tous les ouvriers</option>
-                    {approvedUsers.map(u => (<option key={u.id} value={u.id}>{u.name}</option>))}
+                    {approvedUsers.map(u => (<option key={u.firestoreId} value={u.userIdNum || u.id}>{u.name}</option>))}
                   </select>
                 )}
 
@@ -956,7 +995,7 @@ export default function App() {
                 if (user.role === 'admin') roleBadge = <span className="px-2.5 py-1 bg-purple-500/20 text-purple-300 text-xs font-bold rounded-lg">🛡️ Admin</span>;
 
                 return (
-                  <div key={user.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3 shadow-md flex flex-col justify-between">
+                  <div key={user.firestoreId} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3 shadow-md flex flex-col justify-between">
                     <div>
                       <div className="flex justify-between items-start">
                         <h3 className="text-sm font-bold text-white">{user.name}</h3>
@@ -973,7 +1012,7 @@ export default function App() {
 
                     {isAdmin && (
                       <div className="pt-3 border-t border-slate-800 space-y-2">
-                        {editingUser === user.id ? (
+                        {editingUser === user.firestoreId ? (
                           <div className="flex gap-2 items-center">
                             <select 
                               value={editUserRole} 
@@ -984,20 +1023,20 @@ export default function App() {
                               <option value="Intérimaire">Intérimaire</option>
                               <option value="admin">Admin</option>
                             </select>
-                            <button onClick={() => handleUpdateUserRole(user.id, editUserRole)} className="px-2 py-1 bg-emerald-600 text-white text-xs rounded-lg font-semibold">OK</button>
+                            <button onClick={() => handleUpdateUserRole(user.firestoreId, editUserRole)} className="px-2 py-1 bg-emerald-600 text-white text-xs rounded-lg font-semibold">OK</button>
                             <button onClick={() => setEditingUser(null)} className="px-2 py-1 bg-slate-800 text-slate-300 text-xs rounded-lg">✕</button>
                           </div>
                         ) : (
                           <div className="flex justify-between items-center gap-2">
                             <button 
-                              onClick={() => { setEditingUser(user.id); setEditUserRole(user.role); }} 
+                              onClick={() => { setEditingUser(user.firestoreId); setEditUserRole(user.role); }} 
                               className="flex-1 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg font-medium transition-colors"
                             >
                               Modifier rôle
                             </button>
-                            {user.id !== currentUser.id && (
+                            {user.email !== currentUser.email && (
                               <button 
-                                onClick={() => handleDeleteUser(user.id)} 
+                                onClick={() => handleDeleteUser(user.firestoreId)} 
                                 className="px-3 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs rounded-lg transition-colors"
                               >
                                 🗑️ Supprimer
@@ -1081,14 +1120,14 @@ export default function App() {
             <h2 className="text-lg font-bold text-white">Validation des comptes en attente</h2>
             <div className="space-y-3">
               {pendingUsers.map(user => (
-                <div key={user.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center">
+                <div key={user.firestoreId} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center">
                   <div>
                     <p className="text-sm font-bold text-white">{user.name} ({user.email})</p>
                     <p className="text-xs text-slate-400">Téléphone : {user.phone || 'Non renseigné'}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => handleApproveAccount(user.id)} className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg font-semibold">Approuver</button>
-                    <button onClick={() => handleRejectAccount(user.id)} className="px-3 py-1.5 bg-red-600/20 text-red-300 text-xs rounded-lg">Refuser</button>
+                    <button onClick={() => handleApproveAccount(user.firestoreId)} className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg font-semibold">Approuver</button>
+                    <button onClick={() => handleRejectAccount(user.firestoreId)} className="px-3 py-1.5 bg-red-600/20 text-red-300 text-xs rounded-lg">Refuser</button>
                   </div>
                 </div>
               ))}
@@ -1182,7 +1221,7 @@ export default function App() {
               <label className="block text-xs text-slate-400 mb-1">Attribuer à</label>
               <select value={newPlanData.targetUserId} onChange={e => setNewPlanData({...newPlanData, targetUserId: e.target.value})} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
                 <option value="all">Toute l'équipe (Général)</option>
-                {approvedUsers.map(u => (<option key={u.id} value={u.id}>{u.name} ({u.team})</option>))}
+                {approvedUsers.map(u => (<option key={u.firestoreId} value={u.userIdNum || u.id}>{u.name} ({u.team})</option>))}
               </select>
             </div>
             <div>
