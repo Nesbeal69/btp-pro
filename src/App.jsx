@@ -64,7 +64,7 @@ export default function App() {
   const [showAddToolModal, setShowAddToolModal] = useState(false);
   const [newToolData, setNewToolData] = useState({ id: '', name: '', brand: 'REMS', category: 'Sertissage', status: 'Disponible' });
 
-  // États Planning & PDF Réel
+  // États Planning
   const [showAddPlanModal, setShowAddPlanModal] = useState(false);
   const [planningViewMode, setPlanningViewMode] = useState('week');
   const [selectedWorkerFilter, setSelectedWorkerFilter] = useState('all');
@@ -72,11 +72,27 @@ export default function App() {
   const [newPlanData, setNewPlanData] = useState({
     title: '',
     targetUserId: 'all',
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toISOString().split('T')[0], // Valeur par défaut pour le calendrier
     description: '',
     fileName: '',
-    fileData: '' // Stockera le fichier en base64
+    fileData: ''
   });
+
+  // Fonction pour formater joliment la date (ex: LUNDI 9 NOVEMBRE 2026)
+  const formatDateFr = (dateString) => {
+    if (!dateString) return '';
+    try {
+      const parts = dateString.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        return d.toLocaleDateString('fr-FR', options).toUpperCase();
+      }
+    } catch (e) {
+      // Si format invalide, retourne l'original
+    }
+    return dateString;
+  };
 
   // Synchronisation Firestore
   useEffect(() => {
@@ -213,7 +229,6 @@ export default function App() {
     }
   };
 
-  // --- GESTION UPLOAD FICHIER PDF RÉEL ---
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -222,7 +237,7 @@ export default function App() {
         setNewPlanData(prev => ({
           ...prev,
           fileName: file.name,
-          fileData: reader.result // Base64 du PDF
+          fileData: reader.result
         }));
       };
       reader.readAsDataURL(file);
@@ -247,7 +262,8 @@ export default function App() {
         fileData: newPlanData.fileData || '',
         targetUserId: newPlanData.targetUserId === 'all' ? 'all' : Number(newPlanData.targetUserId),
         targetName: targetName,
-        date: newPlanData.date
+        date: newPlanData.date, // Stocke la date brute ex: 2026-11-09
+        formattedDate: formatDateFr(newPlanData.date) // Stocke la date lisible ex: LUNDI 9 NOVEMBRE 2026
       });
       setShowAddPlanModal(false);
       setNewPlanData({ title: '', targetUserId: 'all', date: new Date().toISOString().split('T')[0], description: '', fileName: '', fileData: '' });
@@ -264,7 +280,6 @@ export default function App() {
     }
   };
 
-  // Fonction de téléchargement réel du PDF
   const handleDownloadPdf = (plan) => {
     if (!plan.fileData) {
       alert("Aucun fichier PDF rattaché à cette tâche.");
@@ -558,7 +573,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE PLANNING & PDF RÉEL --- */}
+        {/* --- MODULE PLANNING AVEC DATE LISIBLE & CALENDRIER --- */}
         {activeTab === 'planning' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-md">
@@ -613,14 +628,15 @@ export default function App() {
                 <div key={plan.firestoreId || plan.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3 shadow-md flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-center text-xs">
-                      <span className="px-2 py-0.5 rounded font-mono font-bold bg-cyan-500/20 text-cyan-300">📅 {plan.date}</span>
+                      <span className="px-2 py-0.5 rounded font-mono font-bold bg-cyan-500/20 text-cyan-300">
+                        📅 {plan.formattedDate || plan.date}
+                      </span>
                       <span className="text-slate-400 font-medium">Pour : <strong className="text-slate-200">{plan.targetName}</strong></span>
                     </div>
 
                     <h3 className="text-sm font-bold text-white mt-2">{plan.title}</h3>
                     {plan.description && <p className="text-xs text-slate-300 mt-1">{plan.description}</p>}
 
-                    {/* Vrai Bloc PDF Téléchargeable */}
                     <div className="mt-3 p-2.5 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4 text-red-400 shrink-0" />
@@ -774,7 +790,7 @@ export default function App() {
         )}
       </main>
 
-      {/* --- MODALE CREATION TÂCHE & UPLOAD PDF RÉEL --- */}
+      {/* --- MODALE CREATION TÂCHE AVEC CALENDRIER NATIF --- */}
       {showAddPlanModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
           <form onSubmit={handleUploadPlan} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
@@ -796,8 +812,15 @@ export default function App() {
             </div>
 
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Date d'intervention</label>
-              <input type="date" value={newPlanData.date} onChange={e => setNewPlanData({...newPlanData, date: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+              <label className="block text-xs text-slate-400 mb-1">Date d'intervention (Ouvre le calendrier)</label>
+              {/* Le champ type="date" ouvre automatiquement le calendrier natif du téléphone ou du PC */}
+              <input 
+                type="date" 
+                value={newPlanData.date} 
+                onChange={e => setNewPlanData({...newPlanData, date: e.target.value})} 
+                required 
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white cursor-pointer" 
+              />
             </div>
 
             <div>
@@ -807,7 +830,7 @@ export default function App() {
                 accept=".pdf" 
                 onChange={handleFileChange} 
                 required 
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500" 
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer" 
               />
             </div>
 
