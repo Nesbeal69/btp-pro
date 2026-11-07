@@ -31,37 +31,42 @@ import {
   Play,
   ShieldAlert,
   Sparkles,
-  ArrowUpRight
+  ArrowUpRight,
+  Key
 } from 'lucide-react';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
-  const [authMode, setAuthMode] = useState('login');
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'pending'
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [toolSearch, setToolSearch] = useState('');
-  const [toolStatusFilter, setToolStatusFilter] = useState('all');
-
-  const [editingTool, setEditingTool] = useState(null);
-  const [editToolForm, setEditToolForm] = useState({ assignedTo: '', status: '' });
-
+  
+  // Champs Formulaires d'authentification
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regPassword, setRegPassword] = useState('');
+  const [regIsAdmin, setRegIsAdmin] = useState(false); // True = Créateur de chantier, False = Ouvrier/Intérimaire
+  const [regProjectCode, setRegProjectCode] = useState(''); // Code chantier rentré par l'ouvrier
   const [authError, setAuthError] = useState('');
 
   const [showUserModal, setShowUserModal] = useState(false);
   const [userModalData, setUserModalData] = useState({ firestoreId: '', name: '', phone: '', role: 'Employé', password: '' });
 
-  // Données Firestore
+  // Données Firestore globales
   const [users, setUsers] = useState([]);
   const [equipment, setEquipment] = useState([]);
   const [requests, setRequests] = useState([]);
   const [plans, setPlans] = useState([]);
   const [videos, setVideos] = useState([]);
 
+  // États des modules internes
+  const [toolSearch, setToolSearch] = useState('');
+  const [toolStatusFilter, setToolStatusFilter] = useState('all');
+  const [editingTool, setEditingTool] = useState(null);
+  const [editToolForm, setEditToolForm] = useState({ assignedTo: '', status: '' });
   const [selectedTool, setSelectedTool] = useState(null);
   const [newNoteText, setNewNoteText] = useState('');
   
@@ -76,35 +81,15 @@ export default function App() {
   });
 
   const [showAddVideoModal, setShowAddVideoModal] = useState(false);
-  const [newVideoData, setNewVideoData] = useState({
-    title: '',
-    category: 'Sécurité & Posture',
-    url: '',
-    description: ''
-  });
+  const [newVideoData, setNewVideoData] = useState({ title: '', category: 'Sécurité & Posture', url: '', description: '' });
 
   const [showAddPlanModal, setShowAddPlanModal] = useState(false);
-  const [planningViewMode, setPlanningViewMode] = useState('week');
   const [selectedWorkerFilter, setSelectedWorkerFilter] = useState('all');
-  
-  const [newPlanData, setNewPlanData] = useState({
-    title: '',
-    targetUserId: 'all',
-    date: new Date().toISOString().split('T')[0],
-    description: '',
-    files: []
-  });
+  const [newPlanData, setNewPlanData] = useState({ title: '', targetUserId: 'all', date: new Date().toISOString().split('T')[0], description: '', files: [] });
 
   const [showAddRequestModal, setShowAddRequestModal] = useState(false);
   const [requestStatusFilter, setRequestStatusFilter] = useState('all');
-  const [newRequestData, setNewRequestData] = useState({
-    items: '',
-    quantity: 1,
-    urgency: 'Normal',
-    description: '',
-    attachmentName: '',
-    attachmentData: ''
-  });
+  const [newRequestData, setNewRequestData] = useState({ items: '', quantity: 1, urgency: 'Normal', description: '', attachmentName: '', attachmentData: '' });
 
   const [workerSearch, setWorkerSearch] = useState('');
   const [workerRoleFilter, setWorkerRoleFilter] = useState('all');
@@ -118,8 +103,7 @@ export default function App() {
         const month = parseInt(parts[1], 10) - 1;
         const day = parseInt(parts[2], 10);
         const d = new Date(year, month, day);
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        return d.toLocaleDateString('fr-FR', options).toUpperCase();
+        return d.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase();
       }
     } catch (e) {
       console.error(e);
@@ -127,40 +111,14 @@ export default function App() {
     return dateString;
   };
 
+  // Chargement des données Firestore
   useEffect(() => {
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
-      const usersList = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
-      
-      if (usersList.length === 0) {
-        const defaultAdmin = {
-          userIdNum: 1,
-          name: 'Jean Dupont',
-          email: 'admin@btppro.fr',
-          phone: '06 12 34 56 78',
-          password: 'admin',
-          role: 'admin',
-          team: 'Direction',
-          status: 'approved',
-          joinedAt: '2024-01-10'
-        };
-        addDoc(collection(db, "users"), defaultAdmin);
-      } else {
-        setUsers(usersList);
-      }
+      setUsers(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
 
     const unsubEquipment = onSnapshot(collection(db, "equipment"), (snapshot) => {
-      const eqList = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
-      if (eqList.length === 0) {
-        const defaultTools = [
-          { id: 'REM-01', name: 'Sertisseuse radiale REMS Power-Press', brand: 'REMS', category: 'Sertissage', status: 'Disponible', assignedTo: 'Dépôt Central', notes: [] },
-          { id: 'REM-02', name: 'Carotteuse diamant REMS Picus S1', brand: 'REMS', category: 'Carottage', status: 'En service', assignedTo: 'Chantier Air Bel', notes: [] },
-          { id: 'VIR-03', name: 'Cintreuse hydraulique Virax', brand: 'Virax', category: 'Cintrage', status: 'Disponible', assignedTo: 'Dépôt Central', notes: [] }
-        ];
-        defaultTools.forEach(t => addDoc(collection(db, "equipment"), t));
-      } else {
-        setEquipment(eqList);
-      }
+      setEquipment(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
 
     const unsubRequests = onSnapshot(collection(db, "requests"), (snapshot) => {
@@ -175,7 +133,7 @@ export default function App() {
       const vList = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
       if (vList.length === 0) {
         const defaultVideos = [
-          { title: 'Prévention des TMS - Motion Design', category: 'Sécurité & Posture', url: 'http://www.youtube.com/watch?v=a4niEbOorAk', description: 'Vidéo de sensibilisation en motion design sur la prévention des Troubles Musculosquelettiques (TMS) sur les chantiers.' },
+          { title: 'Prévention des TMS - Motion Design', category: 'Sécurité & Posture', url: 'http://www.youtube.com/watch?v=a4niEbOorAk', description: 'Vidéo de sensibilisation en motion design sur la prévention des Troubles Musculosquelettiques (TMS).' },
           { title: 'Technique de sertissage Multicouche REMS', category: 'Technique Plomberie', url: 'https://www.youtube.com/watch?v=zlmTvpTUdNM', description: 'Procédure standard de préparation du tube, ébavurage et sertissage sécurisé.' }
         ];
         defaultVideos.forEach(v => addDoc(collection(db, "videos"), v));
@@ -193,17 +151,44 @@ export default function App() {
     };
   }, []);
 
+  // Mettre à jour l'utilisateur connecté en temps réel si sa fiche change
   useEffect(() => {
     if (currentUser) {
       const updated = users.find(u => u.firestoreId === currentUser.firestoreId);
-      if (updated) {
-        setCurrentUser(updated);
-      }
+      if (updated) setCurrentUser(updated);
     }
   }, [users]);
 
+  // ID du projet/chantier de l'utilisateur connecté (Si admin = son projectCode, si employé = son projectCode rattaché)
+  const myProjectCode = currentUser?.projectCode || currentUser?.adminProjectCode;
+
+  // --- FILTRAGE DES DONNÉES SELON LE CHANTIER ACTIF ---
+  const projectEquipment = useMemo(() => {
+    if (!myProjectCode) return [];
+    return equipment.filter(t => t.projectCode === myProjectCode);
+  }, [equipment, myProjectCode]);
+
+  const projectRequests = useMemo(() => {
+    if (!myProjectCode) return [];
+    return requests.filter(r => r.projectCode === myProjectCode);
+  }, [requests, myProjectCode]);
+
+  const projectPlans = useMemo(() => {
+    if (!myProjectCode) return [];
+    return plans.filter(p => p.projectCode === myProjectCode);
+  }, [plans, myProjectCode]);
+
+  const projectUsers = useMemo(() => {
+    if (!myProjectCode) return [];
+    return users.filter(u => u.projectCode === myProjectCode || u.adminProjectCode === myProjectCode);
+  }, [users, myProjectCode]);
+
+  const approvedUsers = useMemo(() => projectUsers.filter(u => u.status === 'approved'), [projectUsers]);
+  const pendingUsers = useMemo(() => projectUsers.filter(u => u.status === 'pending' && u.role !== 'admin'), [projectUsers]);
+
+  // --- GESTION OUTILLAGE ---
   const filteredEquipment = useMemo(() => {
-    return equipment.filter(tool => {
+    return projectEquipment.filter(tool => {
       const query = toolSearch.toLowerCase().trim();
       const matchesSearch = (
         tool.name?.toLowerCase().includes(query) ||
@@ -214,21 +199,21 @@ export default function App() {
       const matchesStatus = toolStatusFilter === 'all' || tool.status === toolStatusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [equipment, toolSearch, toolStatusFilter]);
+  }, [projectEquipment, toolSearch, toolStatusFilter]);
 
   const handleCreateTool = async (e) => {
     e.preventDefault();
-    if (!newToolData.name || !newToolData.id) return;
+    if (!newToolData.name || !newToolData.id || !myProjectCode) return;
     try {
       const initialNote = {
         id: Date.now(),
-        author: currentUser ? currentUser.name : 'Admin',
+        author: currentUser.name,
         date: new Date().toISOString().split('T')[0],
-        text: `Création de la machine et affectation initiale à : ${newToolData.assignedTo} (Statut: ${newToolData.status})`
+        text: `Création de la machine et affectation initiale à : ${newToolData.assignedTo}`
       };
-
       await addDoc(collection(db, "equipment"), {
         ...newToolData,
+        projectCode: myProjectCode,
         notes: [initialNote]
       });
       setShowAddToolModal(false);
@@ -239,11 +224,7 @@ export default function App() {
   };
 
   const handleDeleteTool = async (firestoreId) => {
-    try {
-      if (firestoreId) await deleteDoc(doc(db, "equipment", firestoreId));
-    } catch (error) {
-      console.error(error);
-    }
+    try { if (firestoreId) await deleteDoc(doc(db, "equipment", firestoreId)); } catch (e) { console.error(e); }
   };
 
   const handleOpenEditModal = (tool) => {
@@ -254,58 +235,36 @@ export default function App() {
   const handleSaveToolEdit = async (e) => {
     e.preventDefault();
     if (!editingTool || !editingTool.firestoreId) return;
-
     try {
       const toolRef = doc(db, "equipment", editingTool.firestoreId);
-      
-      let changesText = [];
-      if (editingTool.assignedTo !== editToolForm.assignedTo) {
-        changesText.push(`Réassigné de [${editingTool.assignedTo || 'Dépôt'}] vers [${editToolForm.assignedTo}]`);
-      }
-      if (editingTool.status !== editToolForm.status) {
-        changesText.push(`Statut modifié de [${editingTool.status || 'Disponible'}] vers [${editToolForm.status}]`);
-      }
-
       const newHistoryNote = {
         id: Date.now(),
-        author: currentUser ? currentUser.name : 'Admin',
+        author: currentUser.name,
         date: new Date().toISOString().split('T')[0],
-        text: changesText.length > 0 ? changesText.join(' | ') : 'Mise à jour des informations de la machine.'
+        text: `Mise à jour statut/affectation`
       };
-
-      const updatedNotes = [newHistoryNote, ...(editingTool.notes || [])];
-
       await updateDoc(toolRef, {
         assignedTo: editToolForm.assignedTo,
         status: editToolForm.status,
-        notes: updatedNotes
+        notes: [newHistoryNote, ...(editingTool.notes || [])]
       });
-
       setEditingTool(null);
-    } catch (error) {
-      console.error(error);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const handleAddNote = async (tool) => {
-    if (!newNoteText.trim() || !currentUser || !tool.firestoreId) return;
-    const noteObj = {
-      id: Date.now(),
-      author: currentUser.name,
-      date: new Date().toISOString().split('T')[0],
-      text: newNoteText
-    };
+    if (!newNoteText.trim() || !tool.firestoreId) return;
+    const noteObj = { id: Date.now(), author: currentUser.name, date: new Date().toISOString().split('T')[0], text: newNoteText };
     try {
       const toolRef = doc(db, "equipment", tool.firestoreId);
       const updatedNotes = [noteObj, ...(tool.notes || [])];
       await updateDoc(toolRef, { notes: updatedNotes });
       setNewNoteText('');
       setSelectedTool(prev => ({ ...prev, notes: updatedNotes }));
-    } catch (error) {
-      console.error(error);
-    }
+    } catch (e) { console.error(e); }
   };
 
+  // --- GESTION VIDÉOS ---
   const handleCreateVideo = async (e) => {
     e.preventDefault();
     if (!newVideoData.title || !newVideoData.url) return;
@@ -313,29 +272,20 @@ export default function App() {
       await addDoc(collection(db, "videos"), newVideoData);
       setShowAddVideoModal(false);
       setNewVideoData({ title: '', category: 'Sécurité & Posture', url: '', description: '' });
-    } catch (error) {
-      console.error(error);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const handleDeleteVideo = async (firestoreId) => {
-    try {
-      if (firestoreId) await deleteDoc(doc(db, "videos", firestoreId));
-    } catch (error) {
-      console.error(error);
-    }
+    try { if (firestoreId) await deleteDoc(doc(db, "videos", firestoreId)); } catch (e) { console.error(e); }
   };
 
+  // --- GESTION DEMANDES DE MATÉRIEL ---
   const handleRequestAttachmentChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setNewRequestData(prev => ({
-          ...prev,
-          attachmentName: file.name,
-          attachmentData: reader.result
-        }));
+        setNewRequestData(prev => ({ ...prev, attachmentName: file.name, attachmentData: reader.result }));
       };
       reader.readAsDataURL(file);
     }
@@ -343,63 +293,43 @@ export default function App() {
 
   const handleCreateRequest = async (e) => {
     e.preventDefault();
-    if (!newRequestData.items || !currentUser) return;
-
+    if (!newRequestData.items || !myProjectCode) return;
     try {
       await addDoc(collection(db, "requests"), {
-        items: newRequestData.items,
-        quantity: newRequestData.quantity || 1,
-        urgency: newRequestData.urgency,
-        description: newRequestData.description || '',
+        ...newRequestData,
+        projectCode: myProjectCode,
         requester: currentUser.name,
         requesterId: currentUser.userIdNum || currentUser.id,
         status: 'En attente',
         createdAt: new Date().toISOString().split('T')[0],
-        receivedDate: null,
-        attachmentName: newRequestData.attachmentName || '',
-        attachmentData: newRequestData.attachmentData || ''
+        receivedDate: null
       });
       setShowAddRequestModal(false);
       setNewRequestData({ items: '', quantity: 1, urgency: 'Normal', description: '', attachmentName: '', attachmentData: '' });
-    } catch (error) {
-      console.error("Erreur création demande :", error);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const handleUpdateRequestStatus = async (firestoreId, newStatus) => {
     try {
       const reqRef = doc(db, "requests", firestoreId);
       const updateData = { status: newStatus };
-      if (newStatus === 'Reçu au dépôt') {
-        updateData.receivedDate = new Date().toISOString().split('T')[0];
-      }
+      if (newStatus === 'Reçu au dépôt') updateData.receivedDate = new Date().toISOString().split('T')[0];
       await updateDoc(reqRef, updateData);
-    } catch (error) {
-      console.error("Erreur mise à jour statut :", error);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const handleDeleteRequest = async (firestoreId) => {
-    try {
-      if (firestoreId) await deleteDoc(doc(db, "requests", firestoreId));
-    } catch (error) {
-      console.error(error);
-    }
+    try { if (firestoreId) await deleteDoc(doc(db, "requests", firestoreId)); } catch (e) { console.error(e); }
   };
 
   const visibleRequests = useMemo(() => {
-    if (!currentUser) return [];
     const myId = currentUser.userIdNum || currentUser.id;
-    let list = currentUser.role === 'admin' ? requests : requests.filter(r => r.requesterId === myId);
-    
-    if (requestStatusFilter !== 'all') {
-      list = list.filter(r => r.status === requestStatusFilter);
-    }
+    let list = currentUser.role === 'admin' ? projectRequests : projectRequests.filter(r => r.requesterId === myId);
+    if (requestStatusFilter !== 'all') list = list.filter(r => r.status === requestStatusFilter);
     return list;
-  }, [requests, currentUser, requestStatusFilter]);
+  }, [projectRequests, currentUser, requestStatusFilter]);
 
-  const approvedUsers = useMemo(() => users.filter(u => u.status === 'approved'), [users]);
-
+  // --- GESTION EFFECTIFS & COMPTES ---
   const filteredWorkers = useMemo(() => {
     return approvedUsers.filter(user => {
       const matchesSearch = user.name.toLowerCase().includes(workerSearch.toLowerCase().trim());
@@ -409,122 +339,88 @@ export default function App() {
   }, [approvedUsers, workerSearch, workerRoleFilter]);
 
   const handleOpenUserModal = (userToEdit) => {
-    setUserModalData({
-      firestoreId: userToEdit.firestoreId,
-      name: userToEdit.name,
-      phone: userToEdit.phone || '',
-      role: userToEdit.role,
-      password: userToEdit.password || ''
-    });
+    setUserModalData({ firestoreId: userToEdit.firestoreId, name: userToEdit.name, phone: userToEdit.phone || '', role: userToEdit.role, password: userToEdit.password || '' });
     setShowUserModal(true);
   };
 
   const handleSaveUserModal = async (e) => {
     e.preventDefault();
     if (!userModalData.firestoreId) return;
-
     try {
-      const userRef = doc(db, "users", userModalData.firestoreId);
-      const updatePayload = {
+      await updateDoc(doc(db, "users", userModalData.firestoreId), {
         name: userModalData.name,
         phone: userModalData.phone,
-        password: userModalData.password
-      };
-      if (currentUser.role === 'admin') {
-        updatePayload.role = userModalData.role;
-      }
-
-      await updateDoc(userRef, updatePayload);
+        password: userModalData.password,
+        ...(currentUser.role === 'admin' ? { role: userModalData.role } : {})
+      });
       setShowUserModal(false);
-    } catch (error) {
-      console.error("Erreur mise à jour profil :", error);
-      alert("Erreur lors de la mise à jour.");
-    }
+    } catch (e) { console.error(e); }
   };
 
   const handleDeleteUser = async (firestoreId) => {
-    if (window.confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ? Il n'aura plus accès à l'application.")) {
-      try {
-        await deleteDoc(doc(db, "users", firestoreId));
-      } catch (error) {
-        console.error("Erreur suppression utilisateur :", error);
-      }
+    if (window.confirm("Supprimer cet utilisateur de votre chantier ?")) {
+      try { await deleteDoc(doc(db, "users", firestoreId)); } catch (e) { console.error(e); }
     }
   };
 
+  const handleApproveAccount = async (firestoreId) => {
+    try { await updateDoc(doc(db, "users", firestoreId), { status: 'approved' }); } catch (e) { console.error(e); }
+  };
+
+  const handleRejectAccount = async (firestoreId) => {
+    try { await deleteDoc(doc(db, "users", firestoreId)); } catch (e) { console.error(e); }
+  };
+
+  // --- GESTION PLANNING & PDFs ---
   const handleMultipleFilesChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
     if (selectedFiles.length === 0) return;
-
     let processedFiles = [];
     let loadedCount = 0;
-
     selectedFiles.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        processedFiles.push({
-          name: file.name,
-          data: reader.result
-        });
+        processedFiles.push({ name: file.name, data: reader.result });
         loadedCount++;
         if (loadedCount === selectedFiles.length) {
-          setNewPlanData(prev => ({
-            ...prev,
-            files: [...prev.files, ...processedFiles]
-          }));
+          setNewPlanData(prev => ({ ...prev, files: [...prev.files, ...processedFiles] }));
         }
       };
       reader.readAsDataURL(file);
     });
   };
 
-  const handleRemoveFileIndex = (indexToRemove) => {
-    setNewPlanData(prev => ({
-      ...prev,
-      files: prev.files.filter((_, idx) => idx !== indexToRemove)
-    }));
+  const handleRemoveFileIndex = (idx) => {
+    setNewPlanData(prev => ({ ...prev, files: prev.files.filter((_, i) => i !== idx) }));
   };
 
   const handleUploadPlan = async (e) => {
     e.preventDefault();
-    if (!newPlanData.title) return;
-
+    if (!newPlanData.title || !myProjectCode) return;
     let targetName = 'Toute l’équipe';
     if (newPlanData.targetUserId !== 'all') {
       const foundUser = users.find(u => (u.userIdNum || u.id) === Number(newPlanData.targetUserId));
       if (foundUser) targetName = foundUser.name;
     }
-
     try {
       await addDoc(collection(db, "plans"), {
-        title: newPlanData.title,
-        description: newPlanData.description || '',
-        files: newPlanData.files || [],
+        ...newPlanData,
+        projectCode: myProjectCode,
         targetUserId: newPlanData.targetUserId === 'all' ? 'all' : Number(newPlanData.targetUserId),
-        targetName: targetName,
-        date: newPlanData.date,
+        targetName,
         formattedDate: formatDateFr(newPlanData.date)
       });
       setShowAddPlanModal(false);
       setNewPlanData({ title: '', targetUserId: 'all', date: new Date().toISOString().split('T')[0], description: '', files: [] });
-    } catch (error) {
-      console.error("Erreur ajout planning :", error);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const handleDeletePlan = async (firestoreId) => {
-    try {
-      if (firestoreId) await deleteDoc(doc(db, "plans", firestoreId));
-    } catch (error) {
-      console.error(error);
-    }
+    try { if (firestoreId) await deleteDoc(doc(db, "plans", firestoreId)); } catch (e) { console.error(e); }
   };
 
   const handleDownloadSinglePdf = (fileObj) => {
-    if (!fileObj.data) {
-      alert("Fichier introuvable.");
-      return;
-    }
+    if (!fileObj.data) return;
     const link = document.createElement('a');
     link.href = fileObj.data;
     link.download = fileObj.name || 'document.pdf';
@@ -533,26 +429,23 @@ export default function App() {
     document.body.removeChild(link);
   };
 
+  const visiblePlans = useMemo(() => {
+    const myId = currentUser.userIdNum || currentUser.id;
+    if (currentUser.role !== 'admin') {
+      return projectPlans.filter(p => p.targetUserId === 'all' || p.targetUserId === myId);
+    }
+    if (selectedWorkerFilter === 'all') return projectPlans;
+    return projectPlans.filter(p => p.targetUserId === Number(selectedWorkerFilter));
+  }, [projectPlans, currentUser, selectedWorkerFilter]);
+
+  // --- AUTHENTIFICATION ---
   const handleLogin = (e) => {
     e.preventDefault();
     setAuthError('');
-    
     const found = users.find(u => u.email.toLowerCase() === loginEmail.toLowerCase().trim());
-    if (!found) {
-      setAuthError("Adresse email introuvable. Veuillez vous inscrire d'abord.");
-      return;
-    }
-
-    if (loginPassword !== found.password) {
-      setAuthError("Mot de passe incorrect.");
-      return;
-    }
-
-    if (found.status === 'pending') {
-      setAuthMode('pending');
-      return;
-    }
-
+    if (!found) { setAuthError("Email introuvable. Veuillez vous inscrire."); return; }
+    if (loginPassword !== found.password) { setAuthError("Mot de passe incorrect."); return; }
+    if (found.status === 'pending') { setAuthMode('pending'); return; }
     setCurrentUser(found);
     setActiveTab('dashboard');
   };
@@ -561,14 +454,26 @@ export default function App() {
     e.preventDefault();
     setAuthError('');
     if (!regName || !regEmail || !regPhone || !regPassword) {
-      setAuthError('Veuillez remplir tous les champs, y compris le numéro de téléphone.');
+      setAuthError('Veuillez remplir tous les champs.');
       return;
     }
-
     const existing = users.find(u => u.email.toLowerCase() === regEmail.toLowerCase().trim());
-    if (existing) {
-      setAuthError('Cette adresse email est déjà utilisée.');
-      return;
+    if (existing) { setAuthError('Cet email est déjà utilisé.'); return; }
+
+    let assignedProjectCode = '';
+
+    if (regIsAdmin) {
+      // Création d'un nouveau chantier / Code unique
+      assignedProjectCode = 'CHANTIER-' + Math.floor(1000 + Math.random() * 9000);
+    } else {
+      // Inscription d'un ouvrier avec le code de son chef
+      const trimmedCode = regProjectCode.toUpperCase().trim();
+      const chefExists = users.some(u => u.role === 'admin' && u.projectCode === trimmedCode);
+      if (!chefExists) {
+        setAuthError("Code de chantier introuvable. Vérifiez le code avec votre chef d'équipe.");
+        return;
+      }
+      assignedProjectCode = trimmedCode;
     }
 
     const newUser = {
@@ -576,19 +481,25 @@ export default function App() {
       name: regName,
       email: regEmail,
       phone: regPhone,
-      password: regPassword, 
-      role: 'Employé', 
-      team: 'Ouvriers',
-      status: 'pending', 
+      password: regPassword,
+      role: regIsAdmin ? 'admin' : 'Employé',
+      team: regIsAdmin ? 'Direction Chantier' : 'Ouvriers',
+      status: regIsAdmin ? 'approved' : 'pending', // L'admin a accès direct, l'ouvrier est en attente
+      projectCode: assignedProjectCode,
       joinedAt: new Date().toISOString().split('T')[0]
     };
 
     try {
       await addDoc(collection(db, "users"), newUser);
-      setAuthMode('pending');
-    } catch (error) {
-      console.error("Erreur lors de l'inscription :", error);
-      setAuthError("Erreur lors de l'enregistrement en ligne.");
+      if (regIsAdmin) {
+        setCurrentUser(newUser);
+        setActiveTab('dashboard');
+      } else {
+        setAuthMode('pending');
+      }
+    } catch (e) {
+      console.error(e);
+      setAuthError("Erreur lors de l'inscription.");
     }
   };
 
@@ -599,55 +510,24 @@ export default function App() {
     setLoginPassword('');
   };
 
-  const handleApproveAccount = async (firestoreId) => {
-    try {
-      await updateDoc(doc(db, "users", firestoreId), { status: 'approved' });
-    } catch (error) {
-      console.error("Erreur approbation :", error);
-    }
-  };
-
-  const handleRejectAccount = async (firestoreId) => {
-    try {
-      await deleteDoc(doc(db, "users", firestoreId));
-    } catch (error) {
-      console.error("Erreur refus :", error);
-    }
-  };
-
-  const pendingUsers = useMemo(() => users.filter(u => u.status === 'pending'), [users]);
-  
-  const visiblePlans = useMemo(() => {
-    if (!currentUser) return [];
-    const myId = currentUser.userIdNum || currentUser.id;
-    if (currentUser.role !== 'admin') {
-      return plans.filter(p => p.targetUserId === 'all' || p.targetUserId === myId);
-    }
-    if (selectedWorkerFilter === 'all') return plans;
-    return plans.filter(p => p.targetUserId === Number(selectedWorkerFilter));
-  }, [plans, currentUser, selectedWorkerFilter]);
-
   const isAdmin = currentUser?.role === 'admin';
 
+  // --- ÉCRAN DE CONNEXION / INSCRIPTION ---
   if (!currentUser) {
     return (
       <div className="min-h-screen text-slate-100 flex items-center justify-center p-4 relative overflow-hidden">
-        {/* Image de fond chantier / plomberie avec un filtre sombre et léger flou pour la profondeur */}
         <div 
           className="absolute inset-0 bg-cover bg-center z-0 filter brightness-[0.35] scale-105"
           style={{ backgroundImage: `url('https://images.unsplash.com/photo-1581094288338-2314dddb7ece?q=80&w=2000&auto=format&fit=crop')` }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/40 to-slate-950/60 z-0" />
 
-        {/* Bloc central avec effet verre givré (Glassmorphism) et logo intégré */}
         <div className="relative z-10 w-full max-w-md bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl shadow-2xl p-8 overflow-hidden">
-          
-          {/* En-tête avec Logo et Nom */}
-          <div className="text-center mb-8">
+          <div className="text-center mb-6">
             <div className="inline-flex p-3.5 bg-blue-600/20 border border-blue-400/30 rounded-2xl mb-3 shadow-inner">
               <Building2 className="w-9 h-9 text-blue-400" />
             </div>
-            <h1 className="text-2xl font-black text-white tracking-wider">BÂTIR+</h1>
+            <h1 className="text-2xl font-black text-white tracking-wider">BÂTIR+ <span className="text-blue-400 font-light">PRO</span></h1>
             <p className="text-xs text-slate-300 mt-1 font-medium tracking-wide">Plateforme Chantiers, Matériel & Équipes</p>
           </div>
 
@@ -655,12 +535,11 @@ export default function App() {
             <div className="text-center py-6 space-y-4">
               <Clock className="w-12 h-12 text-amber-400 mx-auto animate-pulse" />
               <h2 className="text-lg font-semibold text-white">Compte en Attente de Validation</h2>
-              <p className="text-xs text-slate-300">Votre inscription a bien été enregistrée. L'administrateur doit valider votre compte et vous attribuer un rôle avant de vous donner l'accès.</p>
+              <p className="text-xs text-slate-300">Votre inscription a bien été enregistrée. Votre chef d'équipe doit valider votre accès avec votre code de chantier.</p>
               <button onClick={() => { setAuthMode('login'); setAuthError(''); }} className="w-full py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs rounded-xl font-medium transition-colors border border-white/10">Retour à la connexion</button>
             </div>
           ) : (
             <>
-              {/* Sélecteur Connexion / Inscription minimaliste */}
               <div className="flex rounded-xl bg-black/30 p-1 mb-6 border border-white/10">
                 <button onClick={() => { setAuthMode('login'); setAuthError(''); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'login' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Connexion</button>
                 <button onClick={() => { setAuthMode('register'); setAuthError(''); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'register' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Inscription</button>
@@ -672,35 +551,48 @@ export default function App() {
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div>
                     <label className="block text-xs font-medium text-slate-300 mb-1">Email</label>
-                    <input type="email" required value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="admin@btppro.fr" className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500" />
+                    <input type="email" required value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="votre@email.fr" className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-300 mb-1">Mot de passe</label>
-                    <input type="password" required value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500" />
+                    <input type="password" required value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
                   </div>
                   <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-500 transition-colors font-bold rounded-xl text-xs text-white shadow-lg shadow-blue-600/30">Se Connecter</button>
-                  <div className="pt-3 border-t border-white/10 flex justify-center">
-                    <button type="button" onClick={() => { setLoginEmail('admin@btppro.fr'); setLoginPassword('admin'); }} className="px-3 py-1 bg-white/5 hover:bg-white/10 text-blue-400 text-[11px] font-medium rounded-lg transition-colors border border-white/5">🚀 Connexion Rapide (Admin)</button>
-                  </div>
                 </form>
               ) : (
                 <form onSubmit={handleRegister} className="space-y-3">
                   <div>
                     <label className="block text-xs font-medium text-slate-300 mb-1">Nom complet</label>
-                    <input type="text" required value={regName} onChange={e => setRegName(e.target.value)} placeholder="Jean Martin" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                    <input type="text" required value={regName} onChange={e => setRegName(e.target.value)} placeholder="Jean Martin" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Email</label>
-                    <input type="email" required value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="jean@btppro.fr" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
+                    <input type="email" required value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="jean@btppro.fr" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Numéro de téléphone <span className="text-red-400">*</span></label>
-                    <input type="tel" required value={regPhone} onChange={e => setRegPhone(e.target.value)} placeholder="06 12 34 56 78" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                    <label className="block text-xs font-medium text-slate-300 mb-1">Numéro de téléphone</label>
+                    <input type="tel" required value={regPhone} onChange={e => setRegPhone(e.target.value)} placeholder="06 12 34 56 78" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-300 mb-1">Mot de passe</label>
-                    <input type="password" required value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                    <input type="password" required value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
                   </div>
+
+                  {/* Choix : Créer un chantier (Admin) ou Rejoindre avec un code */}
+                  <div className="pt-2 border-t border-white/10 space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-200">
+                      <input type="checkbox" checked={regIsAdmin} onChange={e => setRegIsAdmin(e.target.checked)} className="rounded border-slate-700 bg-black/40 text-blue-600 focus:ring-blue-500" />
+                      <span>Je suis Chef d'équipe / Je crée un nouveau chantier</span>
+                    </label>
+
+                    {!regIsAdmin && (
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Code de chantier de votre chef</label>
+                        <input type="text" required={!regIsAdmin} value={regProjectCode} onChange={e => setRegProjectCode(e.target.value)} placeholder="ex: CHANTIER-4821" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 uppercase font-mono tracking-wider focus:outline-none" />
+                      </div>
+                    )}
+                  </div>
+
                   <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 transition-colors font-bold rounded-xl text-xs text-white shadow-lg shadow-emerald-600/30 mt-2">S'inscrire</button>
                 </form>
               )}
@@ -711,6 +603,7 @@ export default function App() {
     );
   }
 
+  // --- INTERFACE PRINCIPALE DE L'APPLICATION ---
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans">
       <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm sticky top-0 z-20">
@@ -718,202 +611,144 @@ export default function App() {
           <div className="p-1.5 bg-blue-600 text-white rounded-lg shadow-sm">
             <Building2 className="w-4 h-4" />
           </div>
-          <span className="font-bold text-sm text-slate-900 tracking-wide">BÂTIR+</span>
+          <span className="font-bold text-sm text-slate-900 tracking-wide">BÂTIR+ <span className="text-blue-600 font-light">PRO</span></span>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right text-xs">
             <span className="font-bold text-slate-900">{currentUser.name}</span>
-            <span className="text-[10px] ml-2 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200">{isAdmin ? 'ADMIN' : currentUser.role.toUpperCase()}</span>
+            <span className="text-[10px] ml-2 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200">{isAdmin ? 'CHEF / ADMIN' : currentUser.role.toUpperCase()}</span>
+            {isAdmin && <span className="ml-2 font-mono text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold border border-indigo-200">Code : {myProjectCode}</span>}
           </div>
           
-          <button 
-            onClick={() => handleOpenUserModal(currentUser)} 
-            title="Modifier mon profil"
-            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors flex items-center gap-1 text-xs px-2.5 font-medium border border-slate-200"
-          >
+          <button onClick={() => handleOpenUserModal(currentUser)} className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs px-2.5 font-medium border border-slate-200 flex items-center gap-1">
             <Settings className="w-3.5 h-3.5 text-slate-500" /> <span className="hidden sm:inline">Mon Profil</span>
           </button>
-
-          <button onClick={handleLogout} title="Se déconnecter" className="p-1.5 text-slate-400 hover:text-red-600 transition-colors">
-            <LogOut className="w-4 h-4" />
-          </button>
+          <button onClick={handleLogout} title="Se déconnecter" className="p-1.5 text-slate-400 hover:text-red-600"><LogOut className="w-4 h-4" /></button>
         </div>
       </header>
 
-      <div className="bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-2 flex items-center justify-between">
+      <div className="bg-white/85 backdrop-blur-md border-b border-slate-200 px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {activeTab !== 'dashboard' && (
-            <button onClick={() => setActiveTab('dashboard')} className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded-lg transition-all shadow-sm font-medium border border-slate-200">
-              <ArrowLeft className="w-3.5 h-3.5" /> Retour au Tableau de bord
+            <button onClick={() => setActiveTab('dashboard')} className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded-lg font-medium border border-slate-200">
+              <ArrowLeft className="w-3.5 h-3.5" /> Retour
             </button>
           )}
-          <span className="text-xs text-slate-500 font-medium">
-            {activeTab === 'dashboard' ? '📊 Vue d\'ensemble de l\'activité' : `📂 Module : ${activeTab.toUpperCase()}`}
-          </span>
+          <span className="text-xs text-slate-500 font-medium">{activeTab === 'dashboard' ? '📊 Tableau de bord du chantier' : `📂 Module : ${activeTab.toUpperCase()}`}</span>
         </div>
       </div>
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-8">
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
-            
-            {/* --- NOUVEAU HERO BANNER ULTRA PRO (Logo centré + Bienvenue) --- */}
             <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white rounded-3xl p-8 md:p-10 shadow-xl border border-blue-900/50">
-              {/* Effet décoratif en arrière-plan */}
-              <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute -left-10 -top-10 w-64 h-64 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
-
               <div className="relative z-10 flex flex-col items-center text-center">
-                {/* Logo central brillant */}
                 <div className="p-4 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-2xl shadow-lg shadow-blue-500/30 mb-4 border border-blue-400/30">
                   <Building2 className="w-10 h-10 text-white" />
                 </div>
-                
                 <h1 className="text-2xl md:text-3xl font-black tracking-wide">BÂTIR+ <span className="text-blue-400 font-light">PRO</span></h1>
-                <p className="text-xs md:text-sm text-slate-300 mt-1 max-w-md">
-                  Espace de gestion centralisé, plannings chantiers, outillage et sécurité pour les équipes.
-                </p>
+                <p className="text-xs md:text-sm text-slate-300 mt-1 max-w-md">Espace de gestion de votre équipe et de votre chantier.</p>
 
-                {/* Badge utilisateur connecté */}
+                {isAdmin && (
+                  <div className="mt-4 px-4 py-2 bg-indigo-500/20 border border-indigo-400/30 rounded-2xl text-xs flex items-center gap-2">
+                    <Key className="w-4 h-4 text-indigo-300" />
+                    <span>Votre code de chantier à partager à vos gars : <strong className="font-mono font-bold text-white tracking-widest">{myProjectCode}</strong></span>
+                  </div>
+                )}
+
                 <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md rounded-full border border-white/10 text-xs font-medium">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  Connecté en tant que <strong className="text-white">{currentUser.name}</strong> 
-                  <span className="ml-1 px-2 py-0.5 bg-blue-600/60 rounded-full text-[10px] font-bold uppercase">{isAdmin ? 'Admin' : currentUser.role}</span>
+                  Connecté : <strong className="text-white">{currentUser.name}</strong> 
                 </div>
               </div>
             </div>
 
-            {/* --- GRILLE DES MODULES AVEC DESIGN MODERNE --- */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              
-              {/* MODULE PLANNING */}
-              <div onClick={() => setActiveTab('planning')} className="group bg-white border border-slate-200/80 hover:border-cyan-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl group-hover:bg-cyan-500/10 transition-colors" />
+              <div onClick={() => setActiveTab('planning')} className="group bg-white border border-slate-200/80 hover:border-cyan-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
-                    <div className="p-3.5 bg-cyan-50 text-cyan-600 rounded-2xl border border-cyan-100 group-hover:scale-110 transition-transform">
-                      <CalendarIcon className="w-6 h-6" />
-                    </div>
-                    <span className="px-2.5 py-1 bg-cyan-50 text-cyan-700 text-xs font-bold rounded-full border border-cyan-200">{visiblePlans.length} dispo</span>
+                    <div className="p-3.5 bg-cyan-50 text-cyan-600 rounded-2xl"><CalendarIcon className="w-6 h-6" /></div>
+                    <span className="px-2.5 py-1 bg-cyan-50 text-cyan-700 text-xs font-bold rounded-full">{projectPlans.length} dispo</span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-cyan-600 transition-colors">Planning & PDF</h3>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">Feuilles de route, plannings nominatifs et documents d'exécution.</p>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-cyan-600">Planning & PDF</h3>
+                  <p className="text-xs text-slate-500 mt-1">Feuilles de route et plans d'exécution.</p>
                 </div>
                 <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-cyan-600">
-                  <span>Accéder au module</span>
-                  <div className="w-7 h-7 rounded-xl bg-cyan-50 flex items-center justify-center group-hover:bg-cyan-600 group-hover:text-white transition-colors">
-                    <ArrowUpRight className="w-4 h-4" />
-                  </div>
+                  <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
                 </div>
               </div>
 
-              {/* MODULE DEMANDES DE MATÉRIEL */}
-              <div onClick={() => setActiveTab('requests')} className="group bg-white border border-slate-200/80 hover:border-amber-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-colors" />
+              <div onClick={() => setActiveTab('requests')} className="group bg-white border border-slate-200/80 hover:border-amber-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
-                    <div className="p-3.5 bg-amber-50 text-amber-600 rounded-2xl border border-amber-100 group-hover:scale-110 transition-transform">
-                      <ClipboardList className="w-6 h-6" />
-                    </div>
-                    <span className="px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-200">{visibleRequests.length} demandes</span>
+                    <div className="p-3.5 bg-amber-50 text-amber-600 rounded-2xl"><ClipboardList className="w-6 h-6" /></div>
+                    <span className="px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full">{visibleRequests.length} demandes</span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-600 transition-colors">Demandes de Matériel</h3>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">Besoins en raccords, tubes, colliers et fournitures chantier.</p>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-600">Demandes de Matériel</h3>
+                  <p className="text-xs text-slate-500 mt-1">Besoins en raccords, tubes et fournitures.</p>
                 </div>
                 <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-amber-600">
-                  <span>Accéder au module</span>
-                  <div className="w-7 h-7 rounded-xl bg-amber-50 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-colors">
-                    <ArrowUpRight className="w-4 h-4" />
-                  </div>
+                  <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
                 </div>
               </div>
 
-              {/* MODULE EFFECTIFS */}
-              <div onClick={() => setActiveTab('workers')} className="group bg-white border border-slate-200/80 hover:border-emerald-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-colors" />
+              <div onClick={() => setActiveTab('workers')} className="group bg-white border border-slate-200/80 hover:border-emerald-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
-                    <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 group-hover:scale-110 transition-transform">
-                      <Users className="w-6 h-6" />
-                    </div>
-                    <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">{approvedUsers.length} actifs</span>
+                    <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl"><Users className="w-6 h-6" /></div>
+                    <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full">{approvedUsers.length} actifs</span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">Gestion des Effectifs</h3>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">Annuaire des 14 collaborateurs, rôles et numéros de téléphone.</p>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-emerald-600">Gestion des Effectifs</h3>
+                  <p className="text-xs text-slate-500 mt-1">Annuaire de votre équipe et numéros.</p>
                 </div>
                 <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-emerald-600">
-                  <span>Accéder au module</span>
-                  <div className="w-7 h-7 rounded-xl bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                    <ArrowUpRight className="w-4 h-4" />
-                  </div>
+                  <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
                 </div>
               </div>
 
-              {/* MODULE PARC OUTILLAGE */}
-              <div onClick={() => setActiveTab('tools')} className="group bg-white border border-slate-200/80 hover:border-indigo-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-colors" />
+              <div onClick={() => setActiveTab('tools')} className="group bg-white border border-slate-200/80 hover:border-indigo-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
-                    <div className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100 group-hover:scale-110 transition-transform">
-                      <Wrench className="w-6 h-6" />
-                    </div>
-                    <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full border border-indigo-200">{equipment.length} machines</span>
+                    <div className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl"><Wrench className="w-6 h-6" /></div>
+                    <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full">{projectEquipment.length} machines</span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">Parc Outillage</h3>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">Suivi des sertisseuses, carotteuses, affectations et historique notes.</p>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600">Parc Outillage</h3>
+                  <p className="text-xs text-slate-500 mt-1">Suivi des sertisseuses, carotteuses et entretien.</p>
                 </div>
                 <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-indigo-600">
-                  <span>Accéder au module</span>
-                  <div className="w-7 h-7 rounded-xl bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                    <ArrowUpRight className="w-4 h-4" />
-                  </div>
+                  <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
                 </div>
               </div>
 
-              {/* MODULE TUTOS & SÉCURITÉ */}
-              <div onClick={() => setActiveTab('videos')} className="group bg-white border border-slate-200/80 hover:border-rose-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full blur-2xl group-hover:bg-rose-500/10 transition-colors" />
+              <div onClick={() => setActiveTab('videos')} className="group bg-white border border-slate-200/80 hover:border-rose-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
-                    <div className="p-3.5 bg-rose-50 text-rose-600 rounded-2xl border border-rose-100 group-hover:scale-110 transition-transform">
-                      <Video className="w-6 h-6" />
-                    </div>
-                    <span className="px-2.5 py-1 bg-rose-50 text-rose-700 text-xs font-bold rounded-full border border-rose-200">{videos.length} vidéos</span>
+                    <div className="p-3.5 bg-rose-50 text-rose-600 rounded-2xl"><Video className="w-6 h-6" /></div>
+                    <span className="px-2.5 py-1 bg-rose-50 text-rose-700 text-xs font-bold rounded-full">{videos.length} vidéos</span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-rose-600 transition-colors">Tutos & Sécurité</h3>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">Vidéos de prévention, bonnes pratiques et formations métiers.</p>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-rose-600">Tutos & Sécurité</h3>
+                  <p className="text-xs text-slate-500 mt-1">Vidéos de prévention et bonnes pratiques.</p>
                 </div>
                 <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-rose-600">
-                  <span>Accéder au module</span>
-                  <div className="w-7 h-7 rounded-xl bg-rose-50 flex items-center justify-center group-hover:bg-rose-600 group-hover:text-white transition-colors">
-                    <ArrowUpRight className="w-4 h-4" />
-                  </div>
+                  <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
                 </div>
               </div>
 
-              {/* VALIDATION DES COMPTES (ADMIN) */}
               {isAdmin && (
-                <div onClick={() => setActiveTab('accounts')} className="group bg-white border border-slate-200/80 hover:border-purple-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10 transition-colors" />
+                <div onClick={() => setActiveTab('accounts')} className="group bg-white border border-slate-200/80 hover:border-purple-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-start mb-4">
-                      <div className="p-3.5 bg-purple-50 text-purple-600 rounded-2xl border border-purple-100 group-hover:scale-110 transition-transform">
-                        <UserCheck className="w-6 h-6" />
-                      </div>
-                      <span className="px-2.5 py-1 bg-purple-50 text-purple-700 text-xs font-bold rounded-full border border-purple-200">{pendingUsers.length} en attente</span>
+                      <div className="p-3.5 bg-purple-50 text-purple-600 rounded-2xl"><UserCheck className="w-6 h-6" /></div>
+                      <span className="px-2.5 py-1 bg-purple-50 text-purple-700 text-xs font-bold rounded-full">{pendingUsers.length} en attente</span>
                     </div>
-                    <h3 className="text-base font-bold text-slate-900 group-hover:text-purple-600 transition-colors">Validation des Comptes</h3>
-                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">Gérez les demandes d'accès des nouveaux collaborateurs.</p>
+                    <h3 className="text-base font-bold text-slate-900 group-hover:text-purple-600">Validation des Comptes</h3>
+                    <p className="text-xs text-slate-500 mt-1">Validez les gars qui ont utilisé votre code.</p>
                   </div>
                   <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-purple-600">
-                    <span>Accéder au module</span>
-                    <div className="w-7 h-7 rounded-xl bg-purple-50 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                      <ArrowUpRight className="w-4 h-4" />
-                    </div>
+                    <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
                   </div>
                 </div>
               )}
-
             </div>
           </div>
         )}
@@ -922,84 +757,37 @@ export default function App() {
         {activeTab === 'planning' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <CalendarIcon className="w-5 h-5 text-cyan-600" /> Planning des interventions
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {isAdmin ? "Gestion globale des affectations et plans d'exécution" : "Tes tâches et feuilles de route attribuées"}
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200">
-                  <button onClick={() => setPlanningViewMode('week')} className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${planningViewMode === 'week' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-600'}`}>Vue Semaine</button>
-                  <button onClick={() => setPlanningViewMode('month')} className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${planningViewMode === 'month' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-600'}`}>Vue Mois</button>
-                </div>
-
-                {isAdmin && (
-                  <select value={selectedWorkerFilter} onChange={e => setSelectedWorkerFilter(e.target.value)} className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-xs text-slate-800 rounded-xl focus:outline-none">
-                    <option value="all">Tous les ouvriers</option>
-                    {approvedUsers.map(u => (<option key={u.firestoreId} value={u.userIdNum || u.id}>{u.name}</option>))}
-                  </select>
-                )}
-
-                {isAdmin && (
-                  <button onClick={() => setShowAddPlanModal(true)} className="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow-sm">
-                    <Plus className="w-4 h-4" /> Assigner Tâche & PDFs
-                  </button>
-                )}
-              </div>
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><CalendarIcon className="w-5 h-5 text-cyan-600" /> Planning des interventions</h2>
+              {isAdmin && (
+                <button onClick={() => setShowAddPlanModal(true)} className="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1">
+                  <Plus className="w-4 h-4" /> Assigner Tâche & PDFs
+                </button>
+              )}
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {visiblePlans.map(plan => (
-                <div key={plan.firestoreId || plan.id} className="bg-white border border-slate-200 p-4 rounded-xl space-y-3 shadow-sm flex flex-col justify-between">
+                <div key={plan.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl space-y-3 shadow-sm flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-center text-xs">
                       <span className="px-2 py-0.5 rounded font-mono font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">📅 {plan.formattedDate || formatDateFr(plan.date)}</span>
                       <span className="text-slate-500 font-medium">Pour : <strong className="text-slate-800">{plan.targetName}</strong></span>
                     </div>
-
                     <h3 className="text-sm font-bold text-slate-900 mt-2">{plan.title}</h3>
                     {plan.description && <p className="text-xs text-slate-600 mt-1">{plan.description}</p>}
-
                     <div className="mt-3 space-y-2">
-                      <span className="text-[11px] text-slate-500 font-semibold">Documents associés ({plan.files ? plan.files.length : (plan.fileName ? 1 : 0)}) :</span>
-                      {(!plan.files || plan.files.length === 0) && plan.fileData && (
-                        <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-red-500 shrink-0" />
-                            <span className="text-xs text-slate-800 font-medium truncate max-w-[140px]">{plan.fileName}</span>
-                          </div>
-                          <button onClick={() => handleDownloadSinglePdf({ name: plan.fileName, data: plan.fileData })} className="px-2 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-[11px] rounded-lg font-semibold">Ouvrir</button>
-                        </div>
-                      )}
+                      <span className="text-[11px] text-slate-500 font-semibold">Documents ({plan.files ? plan.files.length : 0}) :</span>
                       {plan.files && plan.files.map((fileObj, fIdx) => (
                         <div key={fIdx} className="p-2 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-red-500 shrink-0" />
-                            <span className="text-xs text-slate-800 font-medium truncate max-w-[140px]">{fileObj.name}</span>
-                          </div>
-                          <button onClick={() => handleDownloadSinglePdf(fileObj)} className="px-2 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-[11px] rounded-lg font-semibold flex items-center gap-1">
-                            <Download className="w-3 h-3" /> Ouvrir
-                          </button>
+                          <span className="text-xs text-slate-800 font-medium truncate max-w-[140px]">📄 {fileObj.name}</span>
+                          <button onClick={() => handleDownloadSinglePdf(fileObj)} className="px-2 py-1 bg-cyan-600 text-white text-[11px] rounded-lg font-semibold flex items-center gap-1"><Download className="w-3 h-3" /> Ouvrir</button>
                         </div>
                       ))}
                     </div>
                   </div>
-
-                  {isAdmin && (
-                    <div className="pt-2 border-t border-slate-100 flex justify-end">
-                      <button onClick={() => handleDeletePlan(plan.firestoreId)} className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded-lg transition-colors font-medium">Supprimer</button>
-                    </div>
-                  )}
+                  {isAdmin && <div className="pt-2 border-t border-slate-100 flex justify-end"><button onClick={() => handleDeletePlan(plan.firestoreId)} className="text-xs text-red-600 font-medium">Supprimer</button></div>}
                 </div>
               ))}
-
-              {visiblePlans.length === 0 && (
-                <div className="col-span-full py-8 text-center bg-white border border-slate-200 rounded-2xl text-slate-500 text-xs italic shadow-sm">Aucune tâche ou planning attribué pour cette période.</div>
-              )}
+              {visiblePlans.length === 0 && <div className="col-span-full py-8 text-center bg-white border border-slate-200 rounded-2xl text-slate-500 text-xs italic">Aucune tâche assignée.</div>}
             </div>
           </div>
         )}
@@ -1008,112 +796,53 @@ export default function App() {
         {activeTab === 'requests' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <ClipboardList className="w-5 h-5 text-amber-600" /> Demandes de matériel & fournitures
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {isAdmin ? "Gérez les besoins chantier, validez ou refusez les commandes" : "Retrouvez vos demandes de matériel et suivez leur statut"}
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                <select 
-                  value={requestStatusFilter} 
-                  onChange={e => setRequestStatusFilter(e.target.value)}
-                  className="px-3 py-2 bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-xl focus:outline-none"
-                >
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><ClipboardList className="w-5 h-5 text-amber-600" /> Demandes de matériel</h2>
+              <div className="flex gap-2">
+                <select value={requestStatusFilter} onChange={e => setRequestStatusFilter(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-xl">
                   <option value="all">🔍 Tous les statuts</option>
                   <option value="En attente">⏳ En attente</option>
                   <option value="Validé / Commandé">✅ Validé / Commandé</option>
                   <option value="Reçu au dépôt">📦 Reçu au dépôt</option>
-                  <option value="Refusé">❌ Refusé</option>
                 </select>
-
-                <button onClick={() => setShowAddRequestModal(true)} className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow-sm">
+                <button onClick={() => setShowAddRequestModal(true)} className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1">
                   <Plus className="w-4 h-4" /> Nouvelle Demande
                 </button>
               </div>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {visibleRequests.map(req => {
-                let urgencyBadge = <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-full border border-emerald-200">Normal</span>;
-                if (req.urgency === 'Urgent') urgencyBadge = <span className="px-2.5 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-bold rounded-full border border-amber-200">⚡ Urgent</span>;
-                if (req.urgency === 'Critique') urgencyBadge = <span className="px-2.5 py-0.5 bg-red-50 text-red-700 text-[10px] font-bold rounded-full border border-red-200">🔥 Critique</span>;
-
-                return (
-                  <div key={req.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl space-y-3 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-center text-xs mb-2">
-                        <span className="text-slate-500">Demandeur : <strong className="text-slate-800">{req.requester}</strong></span>
-                        {urgencyBadge}
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-bold text-slate-900">{req.items}</h3>
-                        <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-xs font-mono font-bold rounded-lg border border-slate-200">Qté : {req.quantity || 1}</span>
-                      </div>
-
-                      {req.description && <p className="text-xs text-slate-600 mt-1">{req.description}</p>}
-
-                      {req.attachmentData && (
-                        <div className="mt-2 p-2 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-cyan-600 shrink-0" />
-                            <span className="text-xs text-slate-800 font-medium truncate max-w-[140px]">{req.attachmentName || 'Pièce jointe'}</span>
-                          </div>
-                          <button onClick={() => handleDownloadSinglePdf({ name: req.attachmentName, data: req.attachmentData })} className="px-2 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-[11px] rounded-lg font-semibold flex items-center gap-1">
-                            <Download className="w-3 h-3" /> Ouvrir
-                          </button>
-                        </div>
-                      )}
-
-                      <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
-                        <span className="text-[11px] text-slate-500">Statut :</span>
-                        {isAdmin ? (
-                          <select 
-                            value={req.status} 
-                            onChange={(e) => handleUpdateRequestStatus(req.firestoreId, e.target.value)}
-                            className={`px-2.5 py-1 text-xs font-semibold rounded-xl border focus:outline-none ${
-                              req.status === 'Validé / Commandé' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                              req.status === 'Reçu au dépôt' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                              req.status === 'Refusé' ? 'bg-red-50 text-red-700 border-red-200' :
-                              'bg-amber-50 text-amber-700 border-amber-200'
-                            }`}
-                          >
-                            <option value="En attente" className="bg-white text-slate-800">⏳ En attente</option>
-                            <option value="Validé / Commandé" className="bg-white text-slate-800">✅ Validé / Commandé</option>
-                            <option value="Reçu au dépôt" className="bg-white text-slate-800">📦 Reçu au dépôt</option>
-                            <option value="Refusé" className="bg-white text-slate-800">❌ Refusé</option>
-                          </select>
-                        ) : (
-                          <span className={`px-2.5 py-1 text-xs font-bold rounded-lg border ${
-                            req.status === 'Validé / Commandé' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                            req.status === 'Reçu au dépôt' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                            req.status === 'Refusé' ? 'bg-red-50 text-red-700 border-red-200' :
-                            'bg-amber-50 text-amber-700 border-amber-200'
-                          }`}>
-                            {req.status === 'Reçu au dépôt' ? `📦 Reçu (${req.receivedDate})` : req.status}
-                          </span>
-                        )}
-                      </div>
+              {visibleRequests.map(req => (
+                <div key={req.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl space-y-3 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-center text-xs mb-2">
+                      <span className="text-slate-500">Par : <strong>{req.requester}</strong></span>
+                      <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-bold rounded-full">{req.urgency}</span>
                     </div>
-
-                    {isAdmin && (
-                      <div className="pt-3 border-t border-slate-100 flex justify-end">
-                        <button onClick={() => handleDeleteRequest(req.firestoreId)} className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded-lg transition-colors flex items-center gap-1 font-medium">
-                          🗑️ Supprimer
-                        </button>
+                    <h3 className="text-sm font-bold text-slate-900">{req.items} (Qté : {req.quantity})</h3>
+                    {req.description && <p className="text-xs text-slate-600 mt-1">{req.description}</p>}
+                    {req.attachmentData && (
+                      <div className="mt-2 p-2 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                        <span className="text-xs text-slate-800 truncate max-w-[140px]">{req.attachmentName}</span>
+                        <button onClick={() => handleDownloadSinglePdf({ name: req.attachmentName, data: req.attachmentData })} className="px-2 py-1 bg-cyan-600 text-white text-[11px] rounded-lg">Ouvrir</button>
                       </div>
                     )}
+                    <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[11px] text-slate-500">Statut :</span>
+                      {isAdmin ? (
+                        <select value={req.status} onChange={(e) => handleUpdateRequestStatus(req.firestoreId, e.target.value)} className="px-2.5 py-1 text-xs font-semibold rounded-xl border bg-slate-50">
+                          <option value="En attente">⏳ En attente</option>
+                          <option value="Validé / Commandé">✅ Validé / Commandé</option>
+                          <option value="Reçu au dépôt">📦 Reçu au dépôt</option>
+                          <option value="Refusé">❌ Refusé</option>
+                        </select>
+                      ) : (
+                        <span className="px-2 py-1 text-xs font-bold rounded-lg bg-slate-100">{req.status}</span>
+                      )}
+                    </div>
                   </div>
-                );
-              })}
-
-              {visibleRequests.length === 0 && (
-                <div className="col-span-full py-8 text-center bg-white border border-slate-200 rounded-2xl text-slate-500 text-xs italic shadow-sm">Aucune demande de matériel ne correspond à ce filtre.</div>
-              )}
+                  {isAdmin && <div className="pt-2 border-t border-slate-100 flex justify-end"><button onClick={() => handleDeleteRequest(req.firestoreId)} className="text-xs text-red-600">Supprimer</button></div>}
+                </div>
+              ))}
+              {visibleRequests.length === 0 && <div className="col-span-full py-8 text-center bg-white border border-slate-200 rounded-2xl text-slate-500 text-xs italic">Aucune demande.</div>}
             </div>
           </div>
         )}
@@ -1122,87 +851,29 @@ export default function App() {
         {activeTab === 'workers' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-emerald-600" /> Annuaire des Effectifs Inscrits
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Liste de tous les collaborateurs validés. {isAdmin ? "Vous pouvez modifier leurs rôles/fiches ou supprimer des accès." : ""}
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                <div className="relative">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input 
-                    type="text" 
-                    value={workerSearch} 
-                    onChange={e => setWorkerSearch(e.target.value)} 
-                    placeholder="Rechercher par nom..." 
-                    className="pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 w-full sm:w-48 focus:outline-none" 
-                  />
-                </div>
-
-                <select 
-                  value={workerRoleFilter} 
-                  onChange={e => setWorkerRoleFilter(e.target.value)}
-                  className="px-3 py-2 bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-xl focus:outline-none"
-                >
-                  <option value="all">🔍 Tous les rôles</option>
-                  <option value="Employé">Employé</option>
-                  <option value="Intérimaire">Intérimaire</option>
-                  <option value="admin">Admin</option>
-                </select>
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Users className="w-5 h-5 text-emerald-600" /> Annuaire de l'équipe</h2>
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input type="text" value={workerSearch} onChange={e => setWorkerSearch(e.target.value)} placeholder="Rechercher..." className="pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs" />
               </div>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredWorkers.map(user => {
-                let roleBadge = <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-lg border border-emerald-200">Employé</span>;
-                if (user.role === 'Intérimaire') roleBadge = <span className="px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-lg border border-amber-200">⚡ Intérimaire</span>;
-                if (user.role === 'admin') roleBadge = <span className="px-2.5 py-1 bg-purple-50 text-purple-700 text-xs font-bold rounded-lg border border-purple-200">🛡️ Admin</span>;
-
-                return (
-                  <div key={user.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl space-y-3 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-start">
-                        <h3 className="text-sm font-bold text-slate-900">{user.name}</h3>
-                        {roleBadge}
-                      </div>
-
-                      <div className="mt-3 flex items-center gap-2 text-xs text-slate-700 bg-slate-50 p-2 rounded-xl border border-slate-200">
-                        <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        <span className="font-mono font-medium">{user.phone || 'Non renseigné'}</span>
-                      </div>
-
-                      <div className="mt-2 text-[11px] text-slate-400">Inscrit le : {user.joinedAt}</div>
+              {filteredWorkers.map(user => (
+                <div key={user.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl space-y-3 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">{user.name}</h3>
+                    <div className="mt-2 flex items-center gap-2 text-xs text-slate-700 bg-slate-50 p-2 rounded-xl">
+                      <Phone className="w-3.5 h-3.5 text-emerald-600" /> <span className="font-mono">{user.phone || 'Non renseigné'}</span>
                     </div>
-
-                    {(isAdmin || user.email === currentUser.email) && (
-                      <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
-                        <button 
-                          onClick={() => handleOpenUserModal(user)} 
-                          className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded-lg font-medium transition-colors border border-slate-200"
-                        >
-                          ✏️ Modifier la fiche
-                        </button>
-                        {isAdmin && user.email !== currentUser.email && (
-                          <button 
-                            onClick={() => handleDeleteUser(user.firestoreId)} 
-                            className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded-lg transition-colors font-medium border border-red-200"
-                          >
-                            🗑️ Supprimer
-                          </button>
-                        )}
-                      </div>
-                    )}
                   </div>
-                );
-              })}
-
-              {filteredWorkers.length === 0 && (
-                <div className="col-span-full py-8 text-center bg-white border border-slate-200 rounded-2xl text-slate-500 text-xs italic shadow-sm">Aucun collaborateur ne correspond à votre recherche.</div>
-              )}
+                  {(isAdmin || user.email === currentUser.email) && (
+                    <div className="pt-2 border-t border-slate-100 flex gap-2">
+                      <button onClick={() => handleOpenUserModal(user)} className="flex-1 py-1.5 bg-slate-100 text-slate-700 text-xs rounded-lg font-medium">Modifier</button>
+                      {isAdmin && user.email !== currentUser.email && <button onClick={() => handleDeleteUser(user.firestoreId)} className="px-3 py-1.5 bg-red-50 text-red-600 text-xs rounded-lg">🗑️</button>}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -1210,54 +881,24 @@ export default function App() {
         {/* --- MODULE TUTOS & SÉCURITÉ --- */}
         {activeTab === 'videos' && (
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <Video className="w-5 h-5 text-rose-600" /> Tutos, Postures & Sécurité Chantiers
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">Vidéos de formation, prévention des risques et bonnes pratiques métiers</p>
-              </div>
-
-              {isAdmin && (
-                <button onClick={() => setShowAddVideoModal(true)} className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow-sm">
-                  <Plus className="w-4 h-4" /> Ajouter une vidéo
-                </button>
-              )}
+            <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Video className="w-5 h-5 text-rose-600" /> Tutos & Sécurité</h2>
+              {isAdmin && <button onClick={() => setShowAddVideoModal(true)} className="px-3 py-2 bg-rose-600 text-white text-xs font-semibold rounded-xl"><Plus className="w-4 h-4" /> Ajouter</button>}
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {videos.map(vid => (
                 <div key={vid.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl space-y-3 shadow-sm flex flex-col justify-between">
                   <div>
-                    <div className="flex justify-between items-center text-xs mb-2">
-                      <span className="px-2.5 py-0.5 bg-rose-50 text-rose-700 font-bold rounded-full border border-rose-200">🎬 {vid.category || 'Formation'}</span>
-                      {isAdmin && (
-                        <button onClick={() => handleDeleteVideo(vid.firestoreId)} className="text-red-500 hover:text-red-700 text-xs">🗑️ Supprimer</button>
-                      )}
-                    </div>
-
-                    <h3 className="text-sm font-bold text-slate-900">{vid.title}</h3>
+                    <span className="px-2 py-0.5 bg-rose-50 text-rose-700 text-xs font-bold rounded-full">{vid.category}</span>
+                    <h3 className="text-sm font-bold text-slate-900 mt-2">{vid.title}</h3>
                     {vid.description && <p className="text-xs text-slate-600 mt-1">{vid.description}</p>}
                   </div>
-
-                  <div className="pt-3 border-t border-slate-100">
-                    <a 
-                      href={vid.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-colors"
-                    >
-                      <Play className="w-3.5 h-3.5 fill-current" /> Regarder la vidéo
-                    </a>
+                  <div className="pt-3 border-t border-slate-100 flex gap-2">
+                    <a href={vid.url} target="_blank" rel="noopener noreferrer" className="flex-1 py-2 bg-rose-600 text-white text-xs font-semibold rounded-xl text-center flex items-center justify-center gap-1"><Play className="w-3.5 h-3.5 fill-current" /> Regarder</a>
+                    {isAdmin && <button onClick={() => handleDeleteVideo(vid.firestoreId)} className="px-3 bg-red-50 text-red-600 text-xs rounded-xl">🗑️</button>}
                   </div>
                 </div>
               ))}
-
-              {videos.length === 0 && (
-                <div className="col-span-full py-12 text-center bg-white border border-slate-200 rounded-2xl text-slate-500 text-xs italic shadow-sm">
-                  Aucune vidéo partagée pour le moment.
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -1266,452 +907,175 @@ export default function App() {
         {activeTab === 'tools' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <Wrench className="w-5 h-5 text-indigo-600" /> Parc Outillage & Matériel
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">Suivi des sertisseuses, carotteuses et de leur affectation sur chantier</p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                <select 
-                  value={toolStatusFilter} 
-                  onChange={e => setToolStatusFilter(e.target.value)}
-                  className="px-3 py-2 bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-xl focus:outline-none"
-                >
-                  <option value="all">🔍 Tous les statuts</option>
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Wrench className="w-5 h-5 text-indigo-600" /> Parc Outillage</h2>
+              <div className="flex gap-2">
+                <select value={toolStatusFilter} onChange={e => setToolStatusFilter(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-xl">
+                  <option value="all">🔍 Tous</option>
                   <option value="Disponible">🟢 Disponible</option>
                   <option value="En service">⚡ En service</option>
                   <option value="En révision">🛠️ En révision</option>
                 </select>
-
-                <div className="relative">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input 
-                    type="text" 
-                    value={toolSearch} 
-                    onChange={e => setToolSearch(e.target.value)} 
-                    placeholder="Rechercher machine..." 
-                    className="pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 w-full sm:w-44 focus:outline-none" 
-                  />
-                </div>
-
-                {isAdmin && (
-                  <button onClick={() => setShowAddToolModal(true)} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow-sm">
-                    <Plus className="w-4 h-4" /> Machine
-                  </button>
-                )}
+                {isAdmin && <button onClick={() => setShowAddToolModal(true)} className="px-3 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl"><Plus className="w-4 h-4" /> Machine</button>}
               </div>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredEquipment.map(tool => (
                 <div key={tool.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl space-y-3 shadow-sm flex flex-col justify-between">
                   <div>
-                    <div className="flex justify-between items-center text-xs mb-1">
-                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 font-mono font-bold rounded border border-indigo-200">{tool.id}</span>
-                      <span className="text-slate-500 font-medium">{tool.brand || 'REMS'}</span>
-                    </div>
-
+                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 font-mono text-xs font-bold rounded">{tool.id}</span>
                     <h3 className="text-sm font-bold text-slate-900 mt-2">{tool.name}</h3>
-
-                    <div className="mt-3 space-y-1.5 text-xs">
-                      <div className="flex justify-between bg-slate-50 p-2 rounded-lg border border-slate-100">
-                        <span className="text-slate-500">Statut :</span>
-                        <span className="font-semibold text-emerald-600">{tool.status || 'Disponible'}</span>
-                      </div>
-                      <div className="flex justify-between bg-slate-50 p-2 rounded-lg border border-slate-100">
-                        <span className="text-slate-500">Affecté à :</span>
-                        <span className="font-semibold text-slate-800">{tool.assignedTo || 'Dépôt Central'}</span>
-                      </div>
+                    <div className="mt-3 space-y-1.5 text-xs bg-slate-50 p-2 rounded-lg">
+                      <div className="flex justify-between"><span className="text-slate-500">Statut :</span><span className="font-semibold text-emerald-600">{tool.status}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Affecté :</span><span className="font-semibold">{tool.assignedTo}</span></div>
                     </div>
                   </div>
-
-                  <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
-                    <button onClick={() => setSelectedTool(tool)} className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-lg font-medium border border-slate-200">
-                      💬 Notes ({tool.notes ? tool.notes.length : 0})
-                    </button>
-                    {isAdmin && (
-                      <>
-                        <button onClick={() => handleOpenEditModal(tool)} className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs rounded-lg border border-amber-200 font-medium">Modifier</button>
-                        <button onClick={() => handleDeleteTool(tool.firestoreId)} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded-lg border border-red-200 font-medium">🗑️</button>
-                      </>
-                    )}
+                  <div className="pt-3 border-t border-slate-100 flex gap-2">
+                    <button onClick={() => setSelectedTool(tool)} className="flex-1 py-1.5 bg-slate-100 text-xs rounded-lg">💬 Notes ({tool.notes?.length || 0})</button>
+                    {isAdmin && <button onClick={() => handleOpenEditModal(tool)} className="px-3 py-1.5 bg-amber-50 text-amber-700 text-xs rounded-lg">Modifier</button>}
+                    {isAdmin && <button onClick={() => handleDeleteTool(tool.firestoreId)} className="px-3 py-1.5 bg-red-50 text-red-600 text-xs rounded-lg">🗑️</button>}
                   </div>
                 </div>
               ))}
-
-              {filteredEquipment.length === 0 && (
-                <div className="col-span-full py-12 text-center bg-white border border-slate-200 rounded-2xl text-slate-500 text-xs italic shadow-sm">
-                  Aucune machine trouvée. Ajoute un nouvel outil ou modifie tes filtres de recherche.
-                </div>
-              )}
             </div>
           </div>
         )}
 
+        {/* --- VALIDATION COMPTES (ADMIN) --- */}
         {activeTab === 'accounts' && isAdmin && (
           <div className="space-y-4">
-            <h2 className="text-lg font-bold text-slate-900">Validation des comptes en attente</h2>
+            <h2 className="text-lg font-bold text-slate-900">Validation des collaborateurs (Code : {myProjectCode})</h2>
             <div className="space-y-3">
               {pendingUsers.map(user => (
                 <div key={user.firestoreId} className="bg-white border border-slate-200 p-4 rounded-xl flex justify-between items-center shadow-sm">
                   <div>
                     <p className="text-sm font-bold text-slate-900">{user.name} ({user.email})</p>
-                    <p className="text-xs text-slate-500">Téléphone : {user.phone || 'Non renseigné'}</p>
+                    <p className="text-xs text-slate-500">Tél : {user.phone}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => handleApproveAccount(user.firestoreId)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs rounded-lg font-semibold shadow-sm">Approuver</button>
-                    <button onClick={() => handleRejectAccount(user.firestoreId)} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded-lg font-medium border border-red-200">Refuser</button>
+                    <button onClick={() => handleApproveAccount(user.firestoreId)} className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg font-semibold">Approuver</button>
+                    <button onClick={() => handleRejectAccount(user.firestoreId)} className="px-3 py-1.5 bg-red-50 text-red-600 text-xs rounded-lg">Refuser</button>
                   </div>
                 </div>
               ))}
-              {pendingUsers.length === 0 && (
-                <div className="py-6 text-center text-slate-500 text-xs italic bg-white border border-slate-200 rounded-xl shadow-sm">Aucun compte en attente de validation.</div>
-              )}
+              {pendingUsers.length === 0 && <div className="py-6 text-center text-slate-500 text-xs italic bg-white border border-slate-200 rounded-xl">Aucune attente.</div>}
             </div>
           </div>
         )}
       </main>
 
-      {/* --- MODALE AJOUT VIDÉO TUTO --- */}
+      {/* --- MODALES (Vidéo, Note, Edit Outil, Profil, Demande, Planning, Machine) --- */}
       {showAddVideoModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleCreateVideo} className="bg-white border border-slate-200 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-900">Ajouter une vidéo tuto</h3>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Titre de la vidéo</label>
-              <input type="text" placeholder="ex: Postures de levage & sécurité" value={newVideoData.title} onChange={e => setNewVideoData({...newVideoData, title: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Catégorie</label>
-              <select value={newVideoData.category} onChange={e => setNewVideoData({...newVideoData, category: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none">
-                <option value="Sécurité & Posture">🛡️ Sécurité & Posture</option>
-                <option value="Technique Plomberie">🔧 Technique Plomberie</option>
-                <option value="Chauffage & Essais">🔥 Chauffage & Essais</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Lien YouTube / Vidéo (URL)</label>
-              <input type="url" placeholder="https://www.youtube.com/watch?v=..." value={newVideoData.url} onChange={e => setNewVideoData({...newVideoData, url: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Description / Consignes</label>
-              <textarea placeholder="Résumé de ce que les gars doivent retenir..." value={newVideoData.description} onChange={e => setNewVideoData({...newVideoData, description: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 h-20 focus:outline-none" />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setShowAddVideoModal(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-xl font-medium border border-slate-200">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-xs text-white font-semibold rounded-xl shadow-sm">Publier</button>
-            </div>
+          <form onSubmit={handleCreateVideo} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900">Ajouter une vidéo</h3>
+            <input type="text" placeholder="Titre" value={newVideoData.title} onChange={e => setNewVideoData({...newVideoData, title: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
+            <select value={newVideoData.category} onChange={e => setNewVideoData({...newVideoData, category: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
+              <option value="Sécurité & Posture">Sécurité & Posture</option>
+              <option value="Technique Plomberie">Technique Plomberie</option>
+            </select>
+            <input type="url" placeholder="Lien YouTube" value={newVideoData.url} onChange={e => setNewVideoData({...newVideoData, url: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
+            <textarea placeholder="Description" value={newVideoData.description} onChange={e => setNewVideoData({...newVideoData, description: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs h-20" />
+            <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowAddVideoModal(false)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl">Annuler</button><button type="submit" className="px-4 py-2 bg-rose-600 text-white text-xs rounded-xl font-semibold">Publier</button></div>
           </form>
         </div>
       )}
 
-      {/* --- MODALE NOTES / HISTORIQUE OUTIL --- */}
       {selectedTool && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-slate-200 p-6 rounded-2xl w-full max-w-lg space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white p-6 rounded-2xl w-full max-w-lg space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center">
-              <div>
-                <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{selectedTool.id}</span>
-                <h3 className="text-base font-bold text-slate-900 mt-1">{selectedTool.name}</h3>
-              </div>
-              <button onClick={() => setSelectedTool(null)} className="p-1 text-slate-400 hover:text-slate-600">✕</button>
+              <h3 className="text-base font-bold text-slate-900">{selectedTool.name}</h3>
+              <button onClick={() => setSelectedTool(null)}>✕</button>
             </div>
-
+            <div className="flex gap-2">
+              <input type="text" value={newNoteText} onChange={e => setNewNoteText(e.target.value)} placeholder="Ajouter une note..." className="flex-1 px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
+              <button onClick={() => handleAddNote(selectedTool)} className="px-3 py-2 bg-indigo-600 text-white text-xs rounded-xl">Ajouter</button>
+            </div>
             <div className="space-y-2">
-              <label className="block text-xs font-medium text-slate-600">Ajouter une note de suivi (panne, révision, entretien...)</label>
-              <div className="flex gap-2">
-                <input 
-                  type="text" 
-                  value={newNoteText} 
-                  onChange={e => setNewNoteText(e.target.value)} 
-                  placeholder="Ex: Changement de mâchoire Ø26..." 
-                  className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" 
-                />
-                <button onClick={() => handleAddNote(selectedTool)} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm">Ajouter</button>
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-2 border-t border-slate-100">
-              <span className="text-xs font-bold text-slate-700">Historique des notes et modifications :</span>
-              {selectedTool.notes && selectedTool.notes.map((note) => (
-                <div key={note.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
-                  <div className="flex justify-between text-[11px] text-slate-400 font-medium">
-                    <span>Par {note.author}</span>
-                    <span>{note.date}</span>
-                  </div>
-                  <p className="text-slate-700 font-medium">{note.text}</p>
-                </div>
+              {selectedTool.notes?.map(note => (
+                <div key={note.id} className="p-2 bg-slate-50 rounded-lg text-xs"><span className="text-slate-400 font-bold">{note.date} : </span>{note.text}</div>
               ))}
-              {(!selectedTool.notes || selectedTool.notes.length === 0) && (
-                <p className="text-xs text-slate-400 italic">Aucune note enregistrée pour cet outil.</p>
-              )}
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <button onClick={() => setSelectedTool(null)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-xl font-medium border border-slate-200">Fermer</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* --- MODALE EDITION OUTIL (ADMIN) --- */}
       {editingTool && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleSaveToolEdit} className="bg-white border border-slate-200 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-900">Modifier l'affectation / Statut</h3>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Affecté à (Ouvrier ou Dépôt)</label>
-              <select 
-                value={editToolForm.assignedTo} 
-                onChange={e => setEditToolForm({...editToolForm, assignedTo: e.target.value})} 
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none"
-              >
-                <option value="Dépôt Central">📦 Dépôt Central</option>
-                {approvedUsers.map(u => (
-                  <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name} ({u.role})</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Statut</label>
-              <select value={editToolForm.status} onChange={e => setEditToolForm({...editToolForm, status: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none">
-                <option value="Disponible">🟢 Disponible</option>
-                <option value="En service">⚡ En service</option>
-                <option value="En révision">🛠️ En révision</option>
-              </select>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setEditingTool(null)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-xl font-medium border border-slate-200">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-xs text-white font-semibold rounded-xl shadow-sm">Enregistrer</button>
-            </div>
+          <form onSubmit={handleSaveToolEdit} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900">Modifier l'outil</h3>
+            <select value={editToolForm.assignedTo} onChange={e => setEditToolForm({...editToolForm, assignedTo: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
+              <option value="Dépôt Central">📦 Dépôt Central</option>
+              {approvedUsers.map(u => <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name}</option>)}
+            </select>
+            <select value={editToolForm.status} onChange={e => setEditToolForm({...editToolForm, status: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
+              <option value="Disponible">🟢 Disponible</option>
+              <option value="En service">⚡ En service</option>
+              <option value="En révision">🛠️ En révision</option>
+            </select>
+            <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditingTool(null)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl">Annuler</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white text-xs rounded-xl">Enregistrer</button></div>
           </form>
         </div>
       )}
 
-      {/* --- MODALE MODIFICATION FICHE UTILISATEUR / PROFIL --- */}
       {showUserModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleSaveUserModal} className="bg-white border border-slate-200 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <span>✏️ Modifier la fiche</span>
-            </h3>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Nom complet</label>
-              <input 
-                type="text" 
-                required 
-                value={userModalData.name} 
-                onChange={e => setUserModalData({...userModalData, name: e.target.value})} 
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" 
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Numéro de téléphone</label>
-              <input 
-                type="tel" 
-                required 
-                value={userModalData.phone} 
-                onChange={e => setUserModalData({...userModalData, phone: e.target.value})} 
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" 
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Nouveau mot de passe (optionnel)</label>
-              <input 
-                type="password" 
-                value={userModalData.password} 
-                onChange={e => setUserModalData({...userModalData, password: e.target.value})} 
-                placeholder="Laisser vide ou entrer un nouveau mdp" 
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" 
-              />
-            </div>
-
-            {isAdmin && (
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Rôle (Réservé Admin)</label>
-                <select 
-                  value={userModalData.role} 
-                  onChange={e => setUserModalData({...userModalData, role: e.target.value})}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none"
-                >
-                  <option value="Employé">Employé</option>
-                  <option value="Intérimaire">Intérimaire</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setShowUserModal(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-xl font-medium border border-slate-200">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-xs text-white font-semibold rounded-xl shadow-sm">Enregistrer les modifications</button>
-            </div>
+          <form onSubmit={handleSaveUserModal} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900">Modifier mon profil</h3>
+            <input type="text" value={userModalData.name} onChange={e => setUserModalData({...userModalData, name: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" required />
+            <input type="tel" value={userModalData.phone} onChange={e => setUserModalData({...userModalData, phone: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" required />
+            <input type="password" placeholder="Nouveau mot de passe" value={userModalData.password} onChange={e => setUserModalData({...userModalData, password: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
+            <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowUserModal(false)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl">Annuler</button><button type="submit" className="px-4 py-2 bg-emerald-600 text-white text-xs rounded-xl">Enregistrer</button></div>
           </form>
         </div>
       )}
 
-      {/* --- MODALE NOUVELLE DEMANDE DE MATÉRIEL --- */}
       {showAddRequestModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleCreateRequest} className="bg-white border border-slate-200 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-slate-900">Nouvelle Demande de Matériel</h3>
-            
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Matériel / Fournitures souhaitées</label>
-              <input type="text" placeholder="ex: Couronnes multicouche Ø16, coudes..." value={newRequestData.items} onChange={e => setNewRequestData({...newRequestData, items: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Quantité</label>
-              <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200 w-fit">
-                <button 
-                  type="button" 
-                  onClick={() => setNewRequestData(prev => ({ ...prev, quantity: Math.max(1, prev.quantity - 1) }))}
-                  className="w-8 h-8 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded-lg flex items-center justify-center font-bold text-sm transition-colors shadow-sm"
-                >
-                  <Minus className="w-4 h-4" />
-                </button>
-                <span className="w-10 text-center font-mono font-bold text-sm text-blue-600">{newRequestData.quantity}</span>
-                <button 
-                  type="button" 
-                  onClick={() => setNewRequestData(prev => ({ ...prev, quantity: prev.quantity + 1 }))}
-                  className="w-8 h-8 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded-lg flex items-center justify-center font-bold text-sm transition-colors shadow-sm"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Niveau d'urgence</label>
-              <select value={newRequestData.urgency} onChange={e => setNewRequestData({...newRequestData, urgency: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none">
-                <option value="Normal">🟢 Normal</option>
-                <option value="Urgent">⚡ Urgent</option>
-                <option value="Critique">🔥 Critique (Chantier bloqué)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Pièce jointe (Optionnel : Photo ou PDF)</label>
-              <input 
-                type="file" 
-                accept="image/*,.pdf" 
-                onChange={handleRequestAttachmentChange} 
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-600 file:text-white hover:file:bg-amber-700 cursor-pointer" 
-              />
-              {newRequestData.attachmentName && (
-                <div className="mt-1.5 text-[11px] text-emerald-600 font-medium flex items-center gap-1">
-                  <span>📎 Fichier joint : {newRequestData.attachmentName}</span>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Précisions (Chantier, référence...)</label>
-              <textarea placeholder="Ex: Pour le bâtiment B, R+2..." value={newRequestData.description} onChange={e => setNewRequestData({...newRequestData, description: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 h-20 focus:outline-none" />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setShowAddRequestModal(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-xl font-medium border border-slate-200">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-xs text-white font-semibold rounded-xl shadow-sm">Envoyer la demande</button>
-            </div>
+          <form onSubmit={handleCreateRequest} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900">Demande de matériel</h3>
+            <input type="text" placeholder="Matériel (ex: Coudes Ø20)" value={newRequestData.items} onChange={e => setNewRequestData({...newRequestData, items: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
+            <input type="number" min="1" value={newRequestData.quantity} onChange={e => setNewRequestData({...newRequestData, quantity: Number(e.target.value)})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
+            <select value={newRequestData.urgency} onChange={e => setNewRequestData({...newRequestData, urgency: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
+              <option value="Normal">Normal</option>
+              <option value="Urgent">Urgent</option>
+              <option value="Critique">Critique</option>
+            </select>
+            <input type="file" accept="image/*,.pdf" onChange={handleRequestAttachmentChange} className="w-full text-xs" />
+            <textarea placeholder="Précisions..." value={newRequestData.description} onChange={e => setNewRequestData({...newRequestData, description: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs h-20" />
+            <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowAddRequestModal(false)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl">Annuler</button><button type="submit" className="px-4 py-2 bg-amber-600 text-white text-xs rounded-xl font-semibold">Envoyer</button></div>
           </form>
         </div>
       )}
 
-      {/* --- MODALE CREATION TÂCHE PLANNING --- */}
       {showAddPlanModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleUploadPlan} className="bg-white border border-slate-200 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-slate-900">Assigner Tâche & Plusieurs PDFs</h3>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Titre de l'intervention / Chantier</label>
-              <input type="text" placeholder="ex: Pose colonnes Bâtiment A" value={newPlanData.title} onChange={e => setNewPlanData({...newPlanData, title: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Attribuer à</label>
-              <select value={newPlanData.targetUserId} onChange={e => setNewPlanData({...newPlanData, targetUserId: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none">
-                <option value="all">Toute l'équipe (Général)</option>
-                {approvedUsers.map(u => (<option key={u.firestoreId} value={u.userIdNum || u.id}>{u.name} ({u.team})</option>))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Date d'intervention</label>
-              <input type="date" value={newPlanData.date} onChange={e => setNewPlanData({...newPlanData, date: e.target.value})} onClick={(e) => e.target.showPicker?.()} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 cursor-pointer focus:outline-none" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Sélectionner un ou plusieurs fichiers PDF</label>
-              <input type="file" accept=".pdf" multiple onChange={handleMultipleFilesChange} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer" />
-              {newPlanData.files.length > 0 && (
-                <div className="mt-2 space-y-1.5 bg-slate-50 p-2 rounded-xl border border-slate-200">
-                  <span className="text-[10px] text-cyan-600 font-bold">Fichiers prêts ({newPlanData.files.length}) :</span>
-                  {newPlanData.files.map((file, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-xs text-slate-700 bg-white px-2 py-1 rounded-lg border border-slate-200">
-                      <span className="truncate max-w-[200px]">📄 {file.name}</span>
-                      <button type="button" onClick={() => handleRemoveFileIndex(idx)} className="text-red-500 hover:text-red-700 font-bold px-1">✕</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Consignes complémentaires</label>
-              <textarea placeholder="Instruction pour l'ouvrier..." value={newPlanData.description} onChange={e => setNewPlanData({...newPlanData, description: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 h-20 focus:outline-none" />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setShowAddPlanModal(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-xl font-medium border border-slate-200">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-xs text-white font-semibold rounded-xl shadow-sm">Enregistrer & Publier</button>
-            </div>
+          <form onSubmit={handleUploadPlan} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900">Assigner Tâche & PDFs</h3>
+            <input type="text" placeholder="Titre intervention" value={newPlanData.title} onChange={e => setNewPlanData({...newPlanData, title: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
+            <select value={newPlanData.targetUserId} onChange={e => setNewPlanData({...newPlanData, targetUserId: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
+              <option value="all">Toute l'équipe</option>
+              {approvedUsers.map(u => <option key={u.firestoreId} value={u.userIdNum || u.id}>{u.name}</option>)}
+            </select>
+            <input type="date" value={newPlanData.date} onChange={e => setNewPlanData({...newPlanData, date: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
+            <input type="file" accept=".pdf" multiple onChange={handleMultipleFilesChange} className="w-full text-xs" />
+            <textarea placeholder="Consignes..." value={newPlanData.description} onChange={e => setNewPlanData({...newPlanData, description: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs h-20" />
+            <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowAddPlanModal(false)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl">Annuler</button><button type="submit" className="px-4 py-2 bg-cyan-600 text-white text-xs rounded-xl font-semibold">Publier</button></div>
           </form>
         </div>
       )}
 
-      {/* MODALE AJOUT MACHINE */}
       {showAddToolModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleCreateTool} className="bg-white border border-slate-200 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
+          <form onSubmit={handleCreateTool} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
             <h3 className="text-lg font-bold text-slate-900">Ajouter une machine</h3>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">ID Machine (ex: REM-04)</label>
-              <input type="text" placeholder="REM-04" value={newToolData.id} onChange={e => setNewToolData({...newToolData, id: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Nom de la machine</label>
-              <input type="text" placeholder="ex: Sertisseuse électro-hydraulique" value={newToolData.name} onChange={e => setNewToolData({...newToolData, name: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Marque</label>
-              <input type="text" value={newToolData.brand} onChange={e => setNewToolData({...newToolData, brand: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Affecter à (Ouvrier ou Dépôt)</label>
-              <select 
-                value={newToolData.assignedTo} 
-                onChange={e => setNewToolData({...newToolData, assignedTo: e.target.value})} 
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none"
-              >
-                <option value="Dépôt Central">📦 Dépôt Central</option>
-                {approvedUsers.map(u => (
-                  <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name} ({u.role})</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Statut initial</label>
-              <select value={newToolData.status} onChange={e => setNewToolData({...newToolData, status: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none">
-                <option value="Disponible">🟢 Disponible</option>
-                <option value="En service">⚡ En service</option>
-                <option value="En révision">🛠️ En révision</option>
-              </select>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setShowAddToolModal(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-xl font-medium border border-slate-200">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-xs text-white font-semibold rounded-xl shadow-sm">Ajouter</button>
-            </div>
+            <input type="text" placeholder="ID (ex: REM-04)" value={newToolData.id} onChange={e => setNewToolData({...newToolData, id: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
+            <input type="text" placeholder="Nom de la machine" value={newToolData.name} onChange={e => setNewToolData({...newToolData, name: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
+            <select value={newToolData.assignedTo} onChange={e => setNewToolData({...newToolData, assignedTo: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
+              <option value="Dépôt Central">📦 Dépôt Central</option>
+              {approvedUsers.map(u => <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name}</option>)}
+            </select>
+            <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowAddToolModal(false)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl">Annuler</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white text-xs rounded-xl font-semibold">Ajouter</button></div>
           </form>
         </div>
       )}
