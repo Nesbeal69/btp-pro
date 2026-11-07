@@ -80,8 +80,9 @@ export default function App() {
     files: []
   });
 
-  // États Module Demandes de Matériel avec Quantité et Pièce jointe optionnelle
+  // États Module Demandes de Matériel & Filtre de statut
   const [showAddRequestModal, setShowAddRequestModal] = useState(false);
+  const [requestStatusFilter, setRequestStatusFilter] = useState('all'); // all, En attente, Validé / Commandé, Reçu au dépôt, Refusé
   const [newRequestData, setNewRequestData] = useState({
     items: '',
     quantity: 1,
@@ -264,7 +265,7 @@ export default function App() {
         description: newRequestData.description || '',
         requester: currentUser.name,
         requesterId: currentUser.id,
-        status: 'En attente', // En attente, Validé / Commandé, Reçu au dépôt, Refusé
+        status: 'En attente',
         createdAt: new Date().toISOString().split('T')[0],
         receivedDate: null,
         attachmentName: newRequestData.attachmentName || '',
@@ -298,12 +299,16 @@ export default function App() {
     }
   };
 
-  // Filtrer les demandes selon le rôle (Admin voit tout, Ouvrier voit seulement les siennes)
+  // Filtrer les demandes selon le rôle (Admin voit tout, Ouvrier voit ses demandes) ET selon le filtre de statut choisi
   const visibleRequests = useMemo(() => {
     if (!currentUser) return [];
-    if (currentUser.role === 'admin') return requests;
-    return requests.filter(r => r.requesterId === currentUser.id);
-  }, [requests, currentUser]);
+    let list = currentUser.role === 'admin' ? requests : requests.filter(r => r.requesterId === currentUser.id);
+    
+    if (requestStatusFilter !== 'all') {
+      list = list.filter(r => r.status === requestStatusFilter);
+    }
+    return list;
+  }, [requests, currentUser, requestStatusFilter]);
 
   // Gestion de plusieurs fichiers PDF Planning
   const handleMultipleFilesChange = (e) => {
@@ -766,12 +771,27 @@ export default function App() {
                 </p>
               </div>
 
-              <button onClick={() => setShowAddRequestModal(true)} className="px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow">
-                <Plus className="w-4 h-4" /> Nouvelle Demande
-              </button>
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                {/* Filtre de statut pour Admin et Ouvrier */}
+                <select 
+                  value={requestStatusFilter} 
+                  onChange={e => setRequestStatusFilter(e.target.value)}
+                  className="px-3 py-2 bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl focus:outline-none"
+                >
+                  <option value="all">🔍 Tous les statuts</option>
+                  <option value="En attente">⏳ En attente</option>
+                  <option value="Validé / Commandé">✅ Validé / Commandé</option>
+                  <option value="Reçu au dépôt">📦 Reçu au dépôt</option>
+                  <option value="Refusé">❌ Refusé</option>
+                </select>
+
+                <button onClick={() => setShowAddRequestModal(true)} className="px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-xl flex items-center gap-1 shadow">
+                  <Plus className="w-4 h-4" /> Nouvelle Demande
+                </button>
+              </div>
             </div>
 
-            {/* Liste des demandes (Admin voit tout, Ouvrier voit seulement les siennes) */}
+            {/* Liste des demandes filtrées */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {visibleRequests.map(req => {
                 let urgencyBadge = <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold rounded">Normal</span>;
@@ -793,7 +813,6 @@ export default function App() {
 
                       {req.description && <p className="text-xs text-slate-300 mt-1">{req.description}</p>}
 
-                      {/* Pièce jointe optionnelle si présente */}
                       {req.attachmentData && (
                         <div className="mt-2 p-2 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -809,7 +828,6 @@ export default function App() {
                       <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between">
                         <span className="text-[11px] text-slate-400">Statut :</span>
                         {isAdmin ? (
-                          /* Menu déroulant pour l'Admin */
                           <select 
                             value={req.status} 
                             onChange={(e) => handleUpdateRequestStatus(req.firestoreId, e.target.value)}
@@ -826,7 +844,6 @@ export default function App() {
                             <option value="Refusé" className="bg-slate-900 text-red-300">❌ Refusé</option>
                           </select>
                         ) : (
-                          /* Affichage simple pour l'Ouvrier */
                           <span className={`px-2.5 py-1 text-xs font-bold rounded-lg ${
                             req.status === 'Validé / Commandé' ? 'bg-blue-500/20 text-blue-300' :
                             req.status === 'Reçu au dépôt' ? 'bg-emerald-500/20 text-emerald-300' :
@@ -839,7 +856,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Bouton Supprimer pour l'Admin */}
                     {isAdmin && (
                       <div className="pt-3 border-t border-slate-800 flex justify-end">
                         <button onClick={() => handleDeleteRequest(req.firestoreId)} className="px-2.5 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs rounded-lg transition-colors flex items-center gap-1">
@@ -852,7 +868,7 @@ export default function App() {
               })}
 
               {visibleRequests.length === 0 && (
-                <div className="col-span-full py-8 text-center bg-slate-900 border border-slate-800 rounded-2xl text-slate-400 text-xs italic">Aucune demande de matériel en cours.</div>
+                <div className="col-span-full py-8 text-center bg-slate-900 border border-slate-800 rounded-2xl text-slate-400 text-xs italic">Aucune demande de matériel ne correspond à ce filtre.</div>
               )}
             </div>
           </div>
@@ -952,7 +968,7 @@ export default function App() {
         )}
       </main>
 
-      {/* --- MODALE NOUVELLE DEMANDE DE MATÉRIEL (AVEC BOUTONS + / - ET PIÈCE JOINTE OPTIONNELLE) --- */}
+      {/* --- MODALE NOUVELLE DEMANDE DE MATÉRIEL --- */}
       {showAddRequestModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreateRequest} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -963,7 +979,6 @@ export default function App() {
               <input type="text" placeholder="ex: Couronnes multicouche Ø16, coudes..." value={newRequestData.items} onChange={e => setNewRequestData({...newRequestData, items: e.target.value})} required className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
             </div>
 
-            {/* Gestion de la quantité avec boutons + et - */}
             <div>
               <label className="block text-xs text-slate-400 mb-1">Quantité</label>
               <div className="flex items-center gap-3 bg-slate-950 p-2 rounded-xl border border-slate-800 w-fit">
