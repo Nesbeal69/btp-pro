@@ -72,7 +72,7 @@ export default function App() {
   const [newPlanData, setNewPlanData] = useState({
     title: '',
     targetUserId: 'all',
-    date: new Date().toISOString().split('T')[0], // Valeur par défaut pour le calendrier
+    date: new Date().toISOString().split('T')[0],
     description: '',
     fileName: '',
     fileData: ''
@@ -89,7 +89,7 @@ export default function App() {
         return d.toLocaleDateString('fr-FR', options).toUpperCase();
       }
     } catch (e) {
-      // Si format invalide, retourne l'original
+      // Si format invalide
     }
     return dateString;
   };
@@ -262,8 +262,8 @@ export default function App() {
         fileData: newPlanData.fileData || '',
         targetUserId: newPlanData.targetUserId === 'all' ? 'all' : Number(newPlanData.targetUserId),
         targetName: targetName,
-        date: newPlanData.date, // Stocke la date brute ex: 2026-11-09
-        formattedDate: formatDateFr(newPlanData.date) // Stocke la date lisible ex: LUNDI 9 NOVEMBRE 2026
+        date: newPlanData.date,
+        formattedDate: formatDateFr(newPlanData.date)
       });
       setShowAddPlanModal(false);
       setNewPlanData({ title: '', targetUserId: 'all', date: new Date().toISOString().split('T')[0], description: '', fileName: '', fileData: '' });
@@ -573,7 +573,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE PLANNING AVEC DATE LISIBLE & CALENDRIER --- */}
+        {/* --- MODULE PLANNING --- */}
         {activeTab === 'planning' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-md">
@@ -813,7 +813,6 @@ export default function App() {
 
             <div>
               <label className="block text-xs text-slate-400 mb-1">Date d'intervention (Ouvre le calendrier)</label>
-              {/* Le champ type="date" ouvre automatiquement le calendrier natif du téléphone ou du PC */}
               <input 
                 type="date" 
                 value={newPlanData.date} 
