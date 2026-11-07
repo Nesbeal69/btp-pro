@@ -206,20 +206,11 @@ export default function App() {
     setRequests(requests.filter(r => r.id !== reqId));
   };
 
-  const handleUploadPlan = (e) => {
-    e.preventDefault();
-    if (!newPlanTitle) return;
-
-    let targetName = 'Toute l’équipe';
-    if (newPlanTarget !== 'all') {
-      const foundUser = users.find(u => u.id === Number(newPlanTarget));
-      if (foundUser) targetName = foundUser.name;
-    }
-
-    const newPlanObj = {
+  const newPlanObj = {
       id: Date.now(),
       title: newPlanTitle,
       fileName: newPlanFile ? newPlanFile.name : 'Planning_General.pdf',
+      fileUrl: newPlanFile ? URL.createObjectURL(newPlanFile) : '', // <--- Ajoute cette ligne ici
       targetUserId: newPlanTarget === 'all' ? 'all' : Number(newPlanTarget),
       targetName: targetName,
       date: new Date().toISOString().split('T')[0]
