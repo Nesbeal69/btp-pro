@@ -29,9 +29,9 @@ import {
 } from 'lucide-react';
 
 const INITIAL_USERS = [
-  { id: 1, name: 'Jean Dupont', email: 'admin@btppro.fr', phone: '06 12 34 56 78', role: 'admin', team: 'Direction', status: 'approved', joinedAt: '2024-01-10' },
-  { id: 2, name: 'Marc Vasseur', email: 'marc@btppro.fr', phone: '06 98 76 54 32', role: 'Employé', team: 'Équipe Chauffage', status: 'approved', joinedAt: '2024-02-15' },
-  { id: 3, name: 'Thomas Bernard', email: 'thomas@btppro.fr', phone: '06 11 22 33 44', role: 'Intérimaire', team: 'Équipe Plomberie 1', status: 'approved', joinedAt: '2024-03-01' }
+  { id: 1, name: 'Jean Dupont', email: 'admin@btppro.fr', phone: '06 12 34 56 78', password: 'admin', role: 'admin', team: 'Direction', status: 'approved', joinedAt: '2024-01-10' },
+  { id: 2, name: 'Marc Vasseur', email: 'marc@btppro.fr', phone: '06 98 76 54 32', password: 'password123', role: 'Employé', team: 'Équipe Chauffage', status: 'approved', joinedAt: '2024-02-15' },
+  { id: 3, name: 'Thomas Bernard', email: 'thomas@btppro.fr', phone: '06 11 22 33 44', password: 'password123', role: 'Intérimaire', team: 'Équipe Plomberie 1', status: 'approved', joinedAt: '2024-03-01' }
 ];
 
 export default function App() {
@@ -421,22 +421,36 @@ export default function App() {
     document.body.removeChild(link);
   };
 
+  // --- CONNEXION SÉCURISÉE ---
   const handleLogin = (e) => {
     e.preventDefault();
     setAuthError('');
+    
+    // 1. Vérifier si l'e-mail existe dans la base
     const found = users.find(u => u.email.toLowerCase() === loginEmail.toLowerCase().trim());
     if (!found) {
-      setAuthError('Adresse email introuvable.');
+      setAuthError("Adresse email introuvable. Veuillez vous inscrire d'abord.");
       return;
     }
+
+    // 2. Vérifier si le mot de passe correspond (si défini, sinon valeur par défaut)
+    const validPassword = found.password || 'password123';
+    if (loginPassword !== validPassword) {
+      setAuthError("Mot de passe incorrect.");
+      return;
+    }
+
+    // 3. Vérifier si le compte est en attente de validation par l'admin
     if (found.status === 'pending') {
       setAuthMode('pending');
       return;
     }
+
     setCurrentUser(found);
     setActiveTab('dashboard');
   };
 
+  // --- INSCRIPTION ---
   const handleRegister = (e) => {
     e.preventDefault();
     setAuthError('');
@@ -444,16 +458,26 @@ export default function App() {
       setAuthError('Veuillez remplir tous les champs, y compris le numéro de téléphone.');
       return;
     }
+
+    // Vérifier si l'e-mail est déjà utilisé
+    const existing = users.find(u => u.email.toLowerCase() === regEmail.toLowerCase().trim());
+    if (existing) {
+      setAuthError('Cette adresse email est déjà utilisée.');
+      return;
+    }
+
     const newUser = {
       id: Date.now(),
       name: regName,
       email: regEmail,
       phone: regPhone,
-      role: 'Employé', // Rôle initial par défaut avant validation par l'admin
+      password: regPassword, // Enregistrement du mot de passe
+      role: 'Employé', 
       team: 'Ouvriers',
       status: 'pending', // 🛑 Mis en attente obligatoire pour validation par l'admin
       joinedAt: new Date().toISOString().split('T')[0]
     };
+    
     setUsers([...users, newUser]);
     setAuthMode('pending');
   };
@@ -461,6 +485,8 @@ export default function App() {
   const handleLogout = () => {
     setCurrentUser(null);
     setAuthMode('login');
+    setLoginEmail('');
+    setLoginPassword('');
   };
 
   const handleApproveAccount = (userId) => {
@@ -502,7 +528,7 @@ export default function App() {
                 <Clock className="w-12 h-12 text-amber-400 mx-auto" />
                 <h2 className="text-lg font-semibold text-amber-300">Compte en Attente de Validation</h2>
                 <p className="text-xs text-slate-300">Votre inscription a bien été enregistrée. L'administrateur doit valider votre compte et vous attribuer un rôle avant de vous donner l'accès[cite: 5].</p>
-                <button onClick={() => setAuthMode('login')} className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl transition-colors">Retour à la connexion</button>
+                <button onClick={() => { setAuthMode('login'); setAuthError(''); }} className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl transition-colors">Retour à la connexion</button>
               </div>
             ) : (
               <>
@@ -526,7 +552,7 @@ export default function App() {
                     <button type="submit" className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 transition-colors font-semibold rounded-xl text-xs shadow-lg">Se Connecter</button>
                     <div className="pt-3 border-t border-slate-800 flex justify-center gap-2">
                       <button type="button" onClick={() => { setLoginEmail('admin@btppro.fr'); setLoginPassword('admin'); }} className="px-2 py-1 bg-slate-800 text-blue-400 text-[11px] rounded">Démo Admin</button>
-                      <button type="button" onClick={() => { setLoginEmail('thomas@btppro.fr'); setLoginPassword('worker'); }} className="px-2 py-1 bg-slate-800 text-emerald-400 text-[11px] rounded">Démo Ouvrier</button>
+                      <button type="button" onClick={() => { setLoginEmail('thomas@btppro.fr'); setLoginPassword('password123'); }} className="px-2 py-1 bg-slate-800 text-emerald-400 text-[11px] rounded">Démo Ouvrier</button>
                     </div>
                   </form>
                 ) : (
