@@ -1186,11 +1186,9 @@ if (!currentUser) {
   {[...filteredGroupedReclamations]
     .sort((a, b) => (b.pendingCount || 0) - (a.pendingCount || 0))
     .map(group => {
-      const latest = (group.items && group.items.length > 0) 
-  ? group.items[0] 
-  : group.latest;
-      const hasPending = group.pendingCount > 0;
-
+     const latest = (group.items && group.items.length > 0) ? group.items[0] : group.latest;
+    const pendingItemsCount = group.items ? group.items.filter(i => i.status !== 'Fait').length : (group.pendingCount || 0);
+    const hasPending = pendingItemsCount > 0;
                 return (
                   <div key={group.key} className="bg-white border border-slate-200/80 hover:border-red-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative">
                     <div>
@@ -1203,8 +1201,8 @@ if (!currentUser) {
                           <p className="text-xs text-slate-500 mt-0.5">Étage : <strong>{group.floor || 'Non précisé'}</strong> {group.clientName && `| Occupant : ${group.clientName}`}</p>
                         </div>
 
-                        <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full ${hasPending ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
-                          {hasPending ? `⚠️ ${group.pendingCount} en cours` : '✅ Tout résolu'}
+                        <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full ${hasPending ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700'}`}>
+                         {hasPending ? `⚠️ ${pendingItemsCount} en cours` : '🟢 Tout résolu'}
                         </span>
                       </div>
 
