@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { 
   Building2, 
   Users, 
@@ -124,7 +125,7 @@ export default function App() {
         setDeferredPrompt(null);
       }
     } else {
-      alert("Pour installer l'application sur votre iPhone ou téléphone :\n1. Ouvrez le menu de votre navigateur (Partager ou 3 points).\n2. Sélectionnez 'Ajouter à l'écran d'accueil'.");
+      alert("Pour installer l'application sur votre téléphone :\n1. Ouvrez le menu de votre navigateur (Partager ou 3 points).\n2. Sélectionnez 'Ajouter à l'écran d'accueil'.");
     }
   };
 
@@ -491,21 +492,26 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
-  const handleForgotPassword = () => {
+  // FONCTION DE RÉINITIALISATION DE MOT DE PASSE (Envoi de e-mail officiel via Firebase)
+  const handleForgotPassword = async () => {
     if (!loginEmail.trim()) {
-      setAuthError("Veuillez d'abord saisir votre email ci-dessus, puis cliquer sur 'Mot de passe oublié ?'.");
-      return;
-    }
-    const found = users.find(u => u.email.toLowerCase() === loginEmail.toLowerCase().trim());
-    if (!found) {
-      setAuthError("Cet email n'est associé à aucun compte enregistré.");
+      setAuthError("Veuillez d'abord saisir votre adresse email dans le champ ci-dessus.");
       return;
     }
     setAuthError('');
-    setResetSent(true);
-    setTimeout(() => {
-      alert(`Un email de réinitialisation a été envoyé à : ${loginEmail}\n(Mot de passe de secours associé : ${found.password})`);
-    }, 300);
+    try {
+      await sendPasswordResetEmail(auth, loginEmail.trim());
+      setResetSent(true);
+    } catch (error) {
+      console.error(error);
+      if (error.code === 'auth/user-not-found') {
+        setAuthError("Cet e-mail n'est associé à aucun compte.");
+      } else if (error.code === 'auth/invalid-email') {
+        setAuthError("L'adresse e-mail saisie n'est pas valide.");
+      } else {
+        setAuthError("Erreur lors de l'envoi du mail de réinitialisation.");
+      }
+    }
   };
 
   const handleRegister = async (e) => {
@@ -602,7 +608,7 @@ export default function App() {
               </div>
 
               {authError && <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-xs text-red-200 font-medium">{authError}</div>}
-              {resetSent && <div className="mb-4 p-3 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-xs text-emerald-200 font-medium">✅ Un lien de réinitialisation a été envoyé à votre adresse e-mail.</div>}
+              {resetSent && <div className="mb-4 p-3 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-xs text-emerald-200 font-medium">✅ Un email avec un lien de réinitialisation sécurisé vient d'être envoyé à votre adresse.</div>}
 
               {authMode === 'login' ? (
                 <form onSubmit={handleLogin} className="space-y-4">
@@ -616,7 +622,7 @@ export default function App() {
                       <button 
                         type="button" 
                         onClick={handleForgotPassword}
-                        className="text-[11px] text-blue-400 hover:underline focus:outline-none"
+                        className="text-[11px] text-blue-400 hover:underline focus:outline-none font-medium"
                       >
                         Mot de passe oublié ?
                       </button>
