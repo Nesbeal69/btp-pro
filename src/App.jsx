@@ -1926,6 +1926,33 @@ const handleCreateReclamation = async (e) => {
         </div>
       )}
 
+      {/* 🏗️ CONTENEUR & STOCK (Bientôt disponible) */}
+      <div className="bg-slate-50 border border-slate-200/60 p-6 rounded-3xl space-y-4 shadow-sm opacity-80 flex flex-col justify-between group relative overflow-hidden">
+        
+        {/* Badge "Bientôt" en haut à droite */}
+        <div className="absolute top-4 right-4">
+          <span className="px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider rounded-full bg-amber-100 text-amber-800 border border-amber-200 shadow-xs">
+            Bientôt dispo
+          </span>
+        </div>
+
+        <div>
+          <div className="flex justify-between items-center mb-3">
+            <div className="w-10 h-10 rounded-2xl bg-slate-200 text-slate-500 flex items-center justify-center font-bold">🏗️</div>
+          </div>
+          <h3 className="text-base font-bold text-slate-700">Stock Conteneur</h3>
+          <p className="text-xs text-slate-400 mt-1 leading-relaxed">Suivi du matériel et gestion des stocks en direct depuis le conteneur.</p>
+        </div>
+
+        {/* Bouton désactivé */}
+        <button 
+          disabled
+          className="w-full py-2.5 bg-slate-200/60 text-slate-400 text-xs font-bold rounded-xl cursor-not-allowed flex items-center justify-center gap-2 border border-slate-200"
+        >
+          Bientôt disponible 🔒
+        </button>
+      </div>
+
       {showAddToolModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreateTool} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
