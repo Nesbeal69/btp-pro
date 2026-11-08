@@ -332,9 +332,8 @@ const handleConfirmResolveReclamation = async (e) => {
   const nowISO = new Date().toISOString();
   const authorName = currentUser?.name || 'Technicien';
 
-  // RÈGLE STRICTE : Seul "Fait" résout le problème. Tout le reste (Absent, Réintervenir) garde le statut "En cours".
+  // Si ce n'est pas "Fait", on bloque catégoriquement la résolution
   const isDone = (selectedStatus === 'Fait');
-  const itemNewStatus = isDone ? 'Fait' : 'En cours';
 
   const prefix = selectedStatus === 'Occupant absent' 
     ? 'Occupant absent' 
@@ -343,7 +342,7 @@ const handleConfirmResolveReclamation = async (e) => {
   const fullDetails = details ? `${prefix} : ${details}` : prefix;
 
   const newInterventionNote = {
-    status: itemNewStatus,
+    status: isDone ? 'Fait' : 'En cours',
     observation: fullDetails,
     resolutionDetails: fullDetails,
     createdBy: authorName,
@@ -352,16 +351,21 @@ const handleConfirmResolveReclamation = async (e) => {
     resolvedAt: isDone ? nowISO : null,
   };
 
-  // On applique la note à tous les éléments non résolus du logement
-  updatedItems = updatedItems.map(item => ({
-    ...item,
-    // SI isDone est false (donc Absent ou Réintervenir), on NE CHANGE SURTOUT PAS le statut existant !
-    status: isDone ? 'Fait' : item.status,
-    resolutionDetails: isDone ? fullDetails : item.resolutionDetails,
-    resolvedBy: isDone ? authorName : item.resolvedBy,
-    resolvedAt: isDone ? nowISO : item.resolvedAt,
-    items: [...(item.items || [item]), newInterventionNote]
-  }));
+  // Si c'est "Occupant absent" ou "Réintervenir", on ajoute juste la note au dernier item SANS changer son statut initial !
+  updatedItems = updatedItems.map((item, idx) => {
+    // On prend le dernier item ou l'item actuel
+    if (idx === updatedItems.length - 1) {
+      return {
+        ...item,
+        status: isDone ? 'Fait' : item.status, // Conserve le statut actuel si pas "Fait"
+        resolutionDetails: isDone ? fullDetails : item.resolutionDetails,
+        resolvedBy: isDone ? authorName : item.resolvedBy,
+        resolvedAt: isDone ? nowISO : item.resolvedAt,
+        items: [...(item.items || []), newInterventionNote]
+      };
+    }
+    return item;
+  });
 
   const allDone = updatedItems.every(item => item.status === 'Fait');
 
