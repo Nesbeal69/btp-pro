@@ -20,6 +20,7 @@ import {
   Upload,
   Download,
   Eye,
+  EyeOff,
   Filter,
   CheckCircle2,
   AlertCircle,
@@ -45,9 +46,9 @@ export default function App() {
   
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-   
-  const [showPassword, setShowPassword] = useState(false);
-
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
@@ -490,6 +491,23 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
+  const handleForgotPassword = () => {
+    if (!loginEmail.trim()) {
+      setAuthError("Veuillez d'abord saisir votre email ci-dessus, puis cliquer sur 'Mot de passe oublié ?'.");
+      return;
+    }
+    const found = users.find(u => u.email.toLowerCase() === loginEmail.toLowerCase().trim());
+    if (!found) {
+      setAuthError("Cet email n'est associé à aucun compte enregistré.");
+      return;
+    }
+    setAuthError('');
+    setResetSent(true);
+    setTimeout(() => {
+      alert(`Un email de réinitialisation a été envoyé à : ${loginEmail}\n(Mot de passe de secours associé : ${found.password})`);
+    }, 300);
+  };
+
   const handleRegister = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -546,6 +564,7 @@ export default function App() {
     setAuthMode('login');
     setLoginEmail('');
     setLoginPassword('');
+    setResetSent(false);
   };
 
   const isAdmin = currentUser?.role === 'admin';
@@ -578,11 +597,12 @@ export default function App() {
           ) : (
             <>
               <div className="flex rounded-xl bg-black/30 p-1 mb-6 border border-white/10">
-                <button onClick={() => { setAuthMode('login'); setAuthError(''); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'login' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Connexion</button>
+                <button onClick={() => { setAuthMode('login'); setAuthError(''); setResetSent(false); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'login' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Connexion</button>
                 <button onClick={() => { setAuthMode('register'); setAuthError(''); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'register' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Inscription</button>
               </div>
 
               {authError && <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-xs text-red-200 font-medium">{authError}</div>}
+              {resetSent && <div className="mb-4 p-3 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-xs text-emerald-200 font-medium">✅ Un lien de réinitialisation a été envoyé à votre adresse e-mail.</div>}
 
               {authMode === 'login' ? (
                 <form onSubmit={handleLogin} className="space-y-4">
@@ -591,8 +611,33 @@ export default function App() {
                     <input type="email" required value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="votre@email.fr" className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Mot de passe</label>
-                    <input type="password" required value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-xs font-medium text-slate-300">Mot de passe</label>
+                      <button 
+                        type="button" 
+                        onClick={handleForgotPassword}
+                        className="text-[11px] text-blue-400 hover:underline focus:outline-none"
+                      >
+                        Mot de passe oublié ?
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input 
+                        type={showLoginPassword ? "text" : "password"} 
+                        required 
+                        value={loginPassword} 
+                        onChange={e => setLoginPassword(e.target.value)} 
+                        placeholder="••••••••" 
+                        className="w-full px-4 py-2.5 pr-10 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white focus:outline-none"
+                      >
+                        {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                   <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-500 transition-colors font-bold rounded-xl text-xs text-white shadow-lg shadow-blue-600/30">Se Connecter</button>
                 </form>
@@ -675,7 +720,7 @@ export default function App() {
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-8">
         
-        {/* BANDEAU D'INSTALLATION PWA (S'affiche uniquement si l'app n'est PAS installée) */}
+        {/* BANDEAU D'INSTALLATION PWA */}
         {!isStandalone && (
           <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-blue-950 text-white p-4 rounded-3xl shadow-lg border border-blue-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -727,8 +772,8 @@ export default function App() {
                     <div className="p-3.5 bg-cyan-50 text-cyan-600 rounded-2xl"><CalendarIcon className="w-6 h-6" /></div>
                     <span className="px-2.5 py-1 bg-cyan-50 text-cyan-700 text-xs font-bold rounded-full">{projectPlans.length} dispo</span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-cyan-600">Planning </h3>
-                  <p className="text-xs text-slate-500 mt-1"> Retrouvez vos tâches programmées </p>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-cyan-600">Planning</h3>
+                  <p className="text-xs text-slate-500 mt-1">Retrouvez vos tâches programmées</p>
                 </div>
                 <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-cyan-600">
                   <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
@@ -741,8 +786,8 @@ export default function App() {
                     <div className="p-3.5 bg-amber-50 text-amber-600 rounded-2xl"><ClipboardList className="w-6 h-6" /></div>
                     <span className="px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full">{visibleRequests.length} demandes</span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-600">Demandes Matériel & Fournitures </h3>
-                  <p className="text-xs text-slate-500 mt-1">Transmettez tous vos besoins EPI, outillage, fournitures. </p>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-600">Demandes Matériel & Fournitures</h3>
+                  <p className="text-xs text-slate-500 mt-1">Transmettez tous vos besoins EPI, outillage, fournitures.</p>
                 </div>
                 <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-amber-600">
                   <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
@@ -1283,6 +1328,7 @@ export default function App() {
     </div>
   );
 }
+
 // --- COMPOSANT MODALE AJOUTER TÂCHE ---
 export function ModalAjouterTache({ isOpen, onClose, onSubmit }) {
   if (!isOpen) return null;
@@ -1326,7 +1372,7 @@ export function ModalAjouterTache({ isOpen, onClose, onSubmit }) {
             </select>
           </div>
 
-          {/* Champ Date avec ouverture au clic partout */}
+          {/* Champ Date */}
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1.5">Date d'exécution</label>
             <div className="relative cursor-pointer" onClick={(e) => {
@@ -1370,30 +1416,4 @@ export function ModalAjouterTache({ isOpen, onClose, onSubmit }) {
       </div>
     </div>
   );
-
-  <div>
-  <label className="block text-xs font-medium text-slate-300 mb-1">Mot de passe</label>
-  <div className="relative">
-    <input 
-      type={showPassword ? "text" : "password"} 
-      required 
-      value={loginPassword} 
-      onChange={e => setLoginPassword(e.target.value)} 
-      placeholder="••••••••" 
-      className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-10" 
-    />
-    <button 
-      type="button"
-      onClick={() => setShowPassword(!showPassword)}
-      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
-      title={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
-    >
-      {showPassword ? (
-        <EyeOff className="w-4 h-4" />
-      ) : (
-        <Eye className="w-4 h-4" />
-      )}
-    </button>
-  </div>
-</div>
 }
