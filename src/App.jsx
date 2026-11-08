@@ -1,7 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { db, auth } from './firebase';
-import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
-import { sendPasswordResetEmail } from 'firebase/auth';
+import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc } from 'firebase/firestore';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  sendPasswordResetEmail 
+} from 'firebase/auth';
 import { 
   Building2, 
   Users, 
@@ -9,35 +13,27 @@ import {
   ClipboardList, 
   UserCheck, 
   Plus, 
-  Minus,
   X, 
   Clock, 
-  MapPin, 
   LogOut,
-  ChevronRight,
   ArrowLeft,
   Calendar as CalendarIcon,
   FileText,
-  Upload,
   Download,
   Eye,
   EyeOff,
-  Filter,
-  CheckCircle2,
-  AlertCircle,
-  PackageCheck,
   Phone,
   Search,
   Settings,
-  ShieldAlert,
-  Sparkles,
   ArrowUpRight,
   Key,
-  Layers,
-  SlidersHorizontal,
   FolderOpen,
   Archive,
-  Smartphone
+  Smartphone,
+  AlertTriangle,
+  CheckCircle2,
+  History,
+  Home
 } from 'lucide-react';
 
 export default function App() {
@@ -70,8 +66,9 @@ export default function App() {
   const [equipment, setEquipment] = useState([]);
   const [requests, setRequests] = useState([]);
   const [plans, setPlans] = useState([]);
+  const [reclamations, setReclamations] = useState([]);
 
-  // État pour la gestion du prompt d'installation PWA
+  // PWA
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isStandalone, setIsStandalone] = useState(false);
 
@@ -100,10 +97,19 @@ export default function App() {
   const [requestStatusFilter, setRequestStatusFilter] = useState('all');
   const [newRequestData, setNewRequestData] = useState({ items: '', quantity: 1, urgency: 'Normal', description: '', attachmentName: '', attachmentData: '' });
 
+  // Nouveaux états pour les Réclamations Chantier
+  const [showAddReclamationModal, setShowAddReclamationModal] = useState(false);
+  const [newReclamation, setNewReclamation] = useState({ apartment: '', floor: '', clientName: '', observation: '' });
+  const [reclamationStatusFilter, setReclamationStatusFilter] = useState('all');
+  const [reclamationSearch, setReclamationSearch] = useState('');
+  const [selectedReclamationHistory, setSelectedReclamationHistory] = useState(null);
+  const [resolvingReclamation, setResolvingReclamation] = useState(null);
+  const [resolutionText, setResolutionText] = useState('');
+
   const [workerSearch, setWorkerSearch] = useState('');
   const [workerRoleFilter, setWorkerRoleFilter] = useState('all');
 
-  // Détection si l'application est déjà installée sur l'écran d'accueil
+  // Détection PWA
   useEffect(() => {
     const checkStandalone = () => {
       const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
@@ -174,12 +180,17 @@ export default function App() {
       setPlans(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
 
+    const unsubReclamations = onSnapshot(collection(db, "reclamations"), (snapshot) => {
+      setReclamations(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
+    });
+
     return () => {
       unsubUsers();
       unsubArchived();
       unsubEquipment();
       unsubRequests();
       unsubPlans();
+      unsubReclamations();
     };
   }, []);
 
@@ -217,8 +228,106 @@ export default function App() {
     return archivedUsers.filter(u => u.projectCode === myProjectCode);
   }, [archivedUsers, myProjectCode]);
 
+  const projectReclamations = useMemo(() => {
+    if (!myProjectCode) return [];
+    return reclamations.filter(r => r.projectCode === myProjectCode);
+  }, [reclamations, myProjectCode]);
+
   const approvedUsers = useMemo(() => projectUsers.filter(u => u.status === 'approved'), [projectUsers]);
   const pendingUsers = useMemo(() => projectUsers.filter(u => u.status === 'pending' && u.role !== 'admin'), [projectUsers]);
+
+  // Regroupement des réclamations par logement pour conserver l'historique
+  const groupedReclamations = useMemo(() => {
+    const groups = {};
+    projectReclamations.forEach(rec => {
+      const key = `${rec.apartment?.trim().toUpperCase()}_E${rec.floor}`;
+      if (!groups[key]) {
+        groups[key] = {
+          key,
+          apartment: rec.apartment,
+          floor: rec.floor,
+          clientName: rec.clientName,
+          items: []
+        };
+      }
+      groups[key].items.push(rec);
+    });
+
+    // Tri des éléments de chaque appartement par date descendante
+    Object.values(groups).forEach(g => {
+      g.items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      g.latest = g.items[0];
+      g.pendingCount = g.items.filter(i => i.status === 'À faire').length;
+    });
+
+    return Object.values(groups);
+  }, [projectReclamations]);
+
+  const filteredGroupedReclamations = useMemo(() => {
+    return groupedReclamations.filter(group => {
+      const q = reclamationSearch.toLowerCase().trim();
+      const matchesSearch = (
+        group.apartment?.toLowerCase().includes(q) ||
+        group.clientName?.toLowerCase().includes(q) ||
+        group.floor?.toString().includes(q) ||
+        group.items.some(i => i.observation?.toLowerCase().includes(q))
+      );
+      const matchesStatus = reclamationStatusFilter === 'all' || 
+        (reclamationStatusFilter === 'À faire' && group.pendingCount > 0) ||
+        (reclamationStatusFilter === 'Fait' && group.pendingCount === 0);
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [groupedReclamations, reclamationSearch, reclamationStatusFilter]);
+
+  const handleCreateReclamation = async (e) => {
+    e.preventDefault();
+    if (!newReclamation.apartment || !myProjectCode || !currentUser) return;
+    try {
+      await addDoc(collection(db, "reclamations"), {
+        projectCode: myProjectCode,
+        apartment: newReclamation.apartment.trim(),
+        floor: newReclamation.floor.trim(),
+        clientName: newReclamation.clientName.trim(),
+        observation: newReclamation.observation.trim(),
+        status: 'À faire',
+        createdBy: currentUser.name,
+        createdAt: new Date().toISOString(),
+        resolutionDetails: null
+      });
+      setShowAddReclamationModal(false);
+      setNewReclamation({ apartment: '', floor: '', clientName: '', observation: '' });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleConfirmResolveReclamation = async (e) => {
+    e.preventDefault();
+    if (!resolvingReclamation || !currentUser) return;
+    try {
+      await updateDoc(doc(db, "reclamations", resolvingReclamation.firestoreId), {
+        status: 'Fait',
+        resolvedBy: currentUser.name,
+        resolvedAt: new Date().toISOString(),
+        resolutionDetails: resolutionText.trim()
+      });
+      setResolvingReclamation(null);
+      setResolutionText('');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteReclamation = async (firestoreId) => {
+    if (window.confirm("Voulez-vous vraiment supprimer cette réclamation ?")) {
+      try {
+        await deleteDoc(doc(db, "reclamations", firestoreId));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
 
   const filteredEquipment = useMemo(() => {
     return projectEquipment.filter(tool => {
@@ -481,18 +590,34 @@ export default function App() {
     return projectPlans.filter(p => p.targetUserId === Number(selectedWorkerFilter));
   }, [projectPlans, currentUser, selectedWorkerFilter]);
 
-  const handleLogin = (e) => {
+  // Connexion officielle avec Firebase Auth
+  const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
-    const found = users.find(u => u.email.toLowerCase() === loginEmail.toLowerCase().trim());
-    if (!found) { setAuthError("Email introuvable. Veuillez vous inscrire."); return; }
-    if (loginPassword !== found.password) { setAuthError("Mot de passe incorrect."); return; }
-    if (found.status === 'pending') { setAuthMode('pending'); return; }
-    setCurrentUser(found);
-    setActiveTab('dashboard');
+    try {
+      await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
+      const found = users.find(u => u.email.toLowerCase() === loginEmail.toLowerCase().trim());
+      if (!found) {
+        setAuthError("Compte authentifié, mais profil introuvable dans la base.");
+        return;
+      }
+      if (found.status === 'pending') {
+        setAuthMode('pending');
+        return;
+      }
+      setCurrentUser(found);
+      setActiveTab('dashboard');
+    } catch (error) {
+      console.error(error);
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        setAuthError("Email ou mot de passe incorrect.");
+      } else {
+        setAuthError("Erreur de connexion : " + error.message);
+      }
+    }
   };
 
-  // FONCTION DE RÉINITIALISATION DE MOT DE PASSE (Envoi de e-mail officiel via Firebase)
+  // Réinitialisation officielle du mot de passe
   const handleForgotPassword = async () => {
     if (!loginEmail.trim()) {
       setAuthError("Veuillez d'abord saisir votre adresse email dans le champ ci-dessus.");
@@ -505,7 +630,7 @@ export default function App() {
     } catch (error) {
       console.error(error);
       if (error.code === 'auth/user-not-found') {
-        setAuthError("Cet e-mail n'est associé à aucun compte.");
+        setAuthError("Cet e-mail n'est associé à aucun compte Firebase Auth.");
       } else if (error.code === 'auth/invalid-email') {
         setAuthError("L'adresse e-mail saisie n'est pas valide.");
       } else {
@@ -514,6 +639,7 @@ export default function App() {
     }
   };
 
+  // Inscription officielle avec Firebase Auth + Firestore
   const handleRegister = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -521,11 +647,8 @@ export default function App() {
       setAuthError('Veuillez remplir tous les champs.');
       return;
     }
-    const existing = users.find(u => u.email.toLowerCase() === regEmail.toLowerCase().trim());
-    if (existing) { setAuthError('Cet email est déjà utilisé.'); return; }
 
     let assignedProjectCode = '';
-
     if (regIsAdmin) {
       assignedProjectCode = 'CHANTIER-' + Math.floor(1000 + Math.random() * 9000);
     } else {
@@ -538,34 +661,45 @@ export default function App() {
       assignedProjectCode = trimmedCode;
     }
 
-    const newUser = {
-      userIdNum: Date.now(),
-      name: regName,
-      email: regEmail,
-      phone: regPhone,
-      password: regPassword,
-      role: regIsAdmin ? 'admin' : 'Employé',
-      team: regIsAdmin ? 'Direction Chantier' : 'Ouvriers',
-      status: regIsAdmin ? 'approved' : 'pending',
-      projectCode: assignedProjectCode,
-      joinedAt: new Date().toISOString().split('T')[0]
-    };
-
     try {
-      await addDoc(collection(db, "users"), newUser);
+      const userCredential = await createUserWithEmailAndPassword(auth, regEmail.trim(), regPassword);
+      const authUser = userCredential.user;
+
+      const newUser = {
+        uid: authUser.uid,
+        userIdNum: Date.now(),
+        name: regName,
+        email: regEmail.toLowerCase().trim(),
+        phone: regPhone,
+        role: regIsAdmin ? 'admin' : 'Employé',
+        team: regIsAdmin ? 'Direction Chantier' : 'Ouvriers',
+        status: regIsAdmin ? 'approved' : 'pending',
+        projectCode: assignedProjectCode,
+        joinedAt: new Date().toISOString().split('T')[0]
+      };
+
+      await setDoc(doc(db, "users", authUser.uid), newUser);
+
       if (regIsAdmin) {
         setCurrentUser(newUser);
         setActiveTab('dashboard');
       } else {
         setAuthMode('pending');
       }
-    } catch (e) {
-      console.error(e);
-      setAuthError("Erreur lors de l'inscription.");
+    } catch (error) {
+      console.error(error);
+      if (error.code === 'auth/email-already-in-use') {
+        setAuthError('Cette adresse email est déjà utilisée.');
+      } else if (error.code === 'auth/weak-password') {
+        setAuthError('Le mot de passe doit contenir au moins 6 caractères.');
+      } else {
+        setAuthError("Erreur lors de l'inscription : " + error.message);
+      }
     }
   };
 
   const handleLogout = () => {
+    auth.signOut();
     setCurrentUser(null);
     setAuthMode('login');
     setLoginEmail('');
@@ -603,8 +737,8 @@ export default function App() {
           ) : (
             <>
               <div className="flex rounded-xl bg-black/30 p-1 mb-6 border border-white/10">
-                <button onClick={() => { setAuthMode('login'); setAuthError(''); setResetSent(false); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'login' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Connexion</button>
-                <button onClick={() => { setAuthMode('register'); setAuthError(''); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'register' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Inscription</button>
+                <button type="button" onClick={() => { setAuthMode('login'); setAuthError(''); setResetSent(false); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'login' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Connexion</button>
+                <button type="button" onClick={() => { setAuthMode('register'); setAuthError(''); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'register' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Inscription</button>
               </div>
 
               {authError && <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-xs text-red-200 font-medium">{authError}</div>}
@@ -772,6 +906,22 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div onClick={() => setActiveTab('reclamations')} className="group bg-white border border-slate-200/80 hover:border-red-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-3.5 bg-red-50 text-red-600 rounded-2xl"><AlertTriangle className="w-6 h-6" /></div>
+                    <span className="px-2.5 py-1 bg-red-50 text-red-700 text-xs font-bold rounded-full">
+                      {projectReclamations.filter(r => r.status === 'À faire').length} en cours
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-red-600">Réclamations & Réserves</h3>
+                  <p className="text-xs text-slate-500 mt-1">Suivi par logement, appartement et étage.</p>
+                </div>
+                <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-red-600">
+                  <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
+                </div>
+              </div>
+
               <div onClick={() => setActiveTab('planning')} className="group bg-white border border-slate-200/80 hover:border-cyan-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
@@ -841,6 +991,156 @@ export default function App() {
                   <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-purple-600">
                     <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
                   </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* --- MODULE RÉCLAMATIONS & RÉSERVES --- */}
+        {activeTab === 'reclamations' && (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-slate-900 via-red-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-red-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-red-600/20 border border-red-400/30 rounded-2xl">
+                  <AlertTriangle className="w-7 h-7 text-red-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black tracking-wide">Réclamations & Réserves Chantier</h2>
+                  <p className="text-xs text-slate-300 mt-0.5">Suivi des interventions par logement, appartement et étage avec historique.</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                <div className="relative flex-1 sm:w-48">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    value={reclamationSearch}
+                    onChange={e => setReclamationSearch(e.target.value)}
+                    placeholder="Appartement, nom..."
+                    className="w-full pl-9 pr-3 py-2 bg-black/40 border border-white/20 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none"
+                  />
+                </div>
+
+                <select 
+                  value={reclamationStatusFilter} 
+                  onChange={e => setReclamationStatusFilter(e.target.value)}
+                  className="px-3 py-2 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none"
+                >
+                  <option value="all" className="bg-slate-900">🔍 Tous les statuts</option>
+                  <option value="À faire" className="bg-slate-900">⚠️ Réserves en cours</option>
+                  <option value="Fait" className="bg-slate-900">✅ Toutes résolues</option>
+                </select>
+
+                {isAdmin && (
+                  <button 
+                    onClick={() => setShowAddReclamationModal(true)} 
+                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-red-600/30 transition-all"
+                  >
+                    <Plus className="w-4 h-4" /> Ajouter Réclamation
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredGroupedReclamations.map(group => {
+                const latest = group.latest;
+                const hasPending = group.pendingCount > 0;
+
+                return (
+                  <div key={group.key} className="bg-white border border-slate-200/80 hover:border-red-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative">
+                    <div>
+                      {/* En-tête du logement */}
+                      <div className="flex justify-between items-start pb-3 border-b border-slate-100">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Localisation</span>
+                          <h3 className="text-lg font-black text-slate-900 flex items-center gap-1.5">
+                            <Home className="w-4 h-4 text-blue-600" /> Logement {group.apartment}
+                          </h3>
+                          <p className="text-xs text-slate-500 mt-0.5">Étage : <strong>{group.floor || 'Non précisé'}</strong> {group.clientName && `| Occupant : ${group.clientName}`}</p>
+                        </div>
+
+                        <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full ${hasPending ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+                          {hasPending ? `⚠️ ${group.pendingCount} en cours` : '✅ Tout résolu'}
+                        </span>
+                      </div>
+
+                      {/* Dernière observation / demande active */}
+                      <div className="mt-3 space-y-2">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Dernière Réclamation</span>
+                        <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2">
+                          <p className="text-xs text-slate-800 font-medium leading-relaxed">
+                            "{latest.observation}"
+                          </p>
+                          <div className="flex justify-between items-center text-[10px] text-slate-400 pt-1 border-t border-slate-200/60">
+                            <span>Ajouté par : <strong>{latest.createdBy}</strong></span>
+                            <span>{new Date(latest.createdAt).toLocaleDateString('fr-FR')}</span>
+                          </div>
+                        </div>
+
+                        {latest.status === 'Fait' && latest.resolutionDetails && (
+                          <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl space-y-1">
+                            <span className="text-[10px] font-bold text-emerald-800 uppercase flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Intervention effectuée
+                            </span>
+                            <p className="text-xs text-emerald-950 font-medium">
+                              "{latest.resolutionDetails}"
+                            </p>
+                            <p className="text-[10px] text-emerald-700">Par : {latest.resolvedBy} le {new Date(latest.resolvedAt).toLocaleDateString('fr-FR')}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions & Historique */}
+                    <div className="pt-4 border-t border-slate-100 flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        {latest.status === 'À faire' ? (
+                          <button
+                            onClick={() => { setResolvingReclamation(latest); setResolutionText(''); }}
+                            className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-1"
+                          >
+                            <CheckCircle2 className="w-4 h-4" /> Marquer comme Fait
+                          </button>
+                        ) : (
+                          <span className="flex-1 py-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl text-center border border-emerald-200">
+                            ✅ Résolu
+                          </span>
+                        )}
+
+                        <button
+                          onClick={() => setSelectedReclamationHistory(group)}
+                          className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1"
+                          title="Voir l'historique complet de ce logement"
+                        >
+                          <History className="w-4 h-4" /> ({group.items.length})
+                        </button>
+                      </div>
+
+                      {isAdmin && (
+                        <div className="flex justify-end">
+                          <button
+                            onClick={() => handleDeleteReclamation(latest.firestoreId)}
+                            className="text-[11px] text-red-500 hover:underline font-semibold"
+                          >
+                            Supprimer la dernière fiche
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {filteredGroupedReclamations.length === 0 && (
+                <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                  <div className="w-12 h-12 bg-red-50 text-red-600 rounded-2xl mx-auto flex items-center justify-center">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">Aucune réclamation trouvée</h4>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Toutes les réclamations et réserves de ce chantier sont réglées ou aucune n'a été ajoutée.</p>
                 </div>
               )}
             </div>
@@ -1205,6 +1505,136 @@ export default function App() {
       </main>
 
       {/* --- MODALES --- */}
+
+      {/* MODALE HISTORIQUE DES RÉCLAMATIONS D'UN LOGEMENT */}
+      {selectedReclamationHistory && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white p-6 rounded-3xl w-full max-w-lg space-y-4 shadow-2xl max-h-[85vh] overflow-y-auto">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Historique - Logement {selectedReclamationHistory.apartment}</h3>
+                <p className="text-xs text-slate-500">Étage : {selectedReclamationHistory.floor} {selectedReclamationHistory.clientName && `| Nom : ${selectedReclamationHistory.clientName}`}</p>
+              </div>
+              <button onClick={() => setSelectedReclamationHistory(null)} className="p-1 hover:bg-slate-100 rounded-lg text-slate-400">✕</button>
+            </div>
+
+            <div className="space-y-3">
+              {selectedReclamationHistory.items.map((item, idx) => (
+                <div key={item.firestoreId} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-bold text-slate-400">Signalement #{selectedReclamationHistory.items.length - idx}</span>
+                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${item.status === 'Fait' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                      {item.status}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-800 font-medium">"{item.observation}"</p>
+                  <p className="text-[10px] text-slate-400">Ajouté par {item.createdBy} le {new Date(item.createdAt).toLocaleDateString('fr-FR')}</p>
+
+                  {item.status === 'Fait' && item.resolutionDetails && (
+                    <div className="mt-2 pt-2 border-t border-slate-200 text-xs text-emerald-900 space-y-0.5">
+                      <span className="font-bold text-[10px] text-emerald-700 block">✔ Travaux réalisés :</span>
+                      <p className="bg-emerald-50 p-2 rounded-xl text-emerald-950 font-medium">{item.resolutionDetails}</p>
+                      <p className="text-[10px] text-emerald-700">Effectué par {item.resolvedBy} le {new Date(item.resolvedAt).toLocaleDateString('fr-FR')}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODALE POUR VALIDER UNE RÉCLAMATION (Explication des travaux par l'ouvrier) */}
+      {resolvingReclamation && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleConfirmResolveReclamation} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl">
+            <h3 className="text-base font-bold text-slate-900">Finaliser l'intervention</h3>
+            <p className="text-xs text-slate-500">Logement {resolvingReclamation.apartment} (Étage {resolvingReclamation.floor})</p>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Détails des travaux réalisés *</label>
+              <textarea
+                required
+                value={resolutionText}
+                onChange={e => setResolutionText(e.target.value)}
+                placeholder="Ex : Changement du siphon, test de pression effectué..."
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 h-24"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setResolvingReclamation(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Annuler</button>
+              <button type="submit" className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-md shadow-emerald-600/20">Valider & Fermer la réserve</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODALE AJOUT RÉCLAMATION (ADMIN) */}
+      {showAddReclamationModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleCreateReclamation} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900">Nouvelle Réclamation / Réserve</h3>
+              <button type="button" onClick={() => setShowAddReclamationModal(false)}>✕</button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">N° Appartement / Logement *</label>
+              <input
+                type="text"
+                required
+                placeholder="ex: A-102"
+                value={newReclamation.apartment}
+                onChange={e => setNewReclamation({ ...newReclamation, apartment: e.target.value })}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Étage</label>
+                <input
+                  type="text"
+                  placeholder="ex: 2ème"
+                  value={newReclamation.floor}
+                  onChange={e => setNewReclamation({ ...newReclamation, floor: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Nom Client / Lot</label>
+                <input
+                  type="text"
+                  placeholder="ex: Dupont"
+                  value={newReclamation.clientName}
+                  onChange={e => setNewReclamation({ ...newReclamation, clientName: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Observation / Problème constaté *</label>
+              <textarea
+                required
+                placeholder="Ex: Fuite sous lavabo salle de bain..."
+                value={newReclamation.observation}
+                onChange={e => setNewReclamation({ ...newReclamation, observation: e.target.value })}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs h-24"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setShowAddReclamationModal(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Annuler</button>
+              <button type="submit" className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-xl shadow-md shadow-red-600/20">Enregistrer</button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {showApproveModal && userToApprove && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleConfirmApprove} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl border border-slate-200">
@@ -1331,95 +1761,6 @@ export default function App() {
           </form>
         </div>
       )}
-    </div>
-  );
-}
-
-// --- COMPOSANT MODALE AJOUTER TÂCHE ---
-export function ModalAjouterTache({ isOpen, onClose, onSubmit }) {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
-      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
-        
-        {/* Entête */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/50">
-          <div>
-            <h3 className="text-lg font-semibold text-white">Assigner une tâche</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Renseignez les détails de l'intervention pour vos équipes.</p>
-          </div>
-          <button 
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Formulaire */}
-        <form onSubmit={onSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Titre de l'intervention</label>
-            <input
-              type="text"
-              placeholder="Ex: Pose raccordement sanitaire Bâtiment A"
-              className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Attribuer à</label>
-            <select className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="all">Toute l'équipe</option>
-              <option value="eq1">Équipe Plomberie</option>
-              <option value="eq2">Équipe Chauffage</option>
-            </select>
-          </div>
-
-          {/* Champ Date */}
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Date d'exécution</label>
-            <div className="relative cursor-pointer" onClick={(e) => {
-              const input = e.currentTarget.querySelector('input[type="date"]');
-              if (input && input.showPicker) input.showPicker();
-            }}>
-              <input
-                type="date"
-                defaultValue={new Date().toISOString().split('T')[0]}
-                className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Consignes spécifiques</label>
-            <textarea
-              rows="3"
-              placeholder="Détails du travail, matériel requis..."
-              className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            ></textarea>
-          </div>
-
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800 mt-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-xl shadow-lg shadow-blue-600/20"
-            >
-              Publier l'intervention
-            </button>
-          </div>
-        </form>
-
-      </div>
     </div>
   );
 }
