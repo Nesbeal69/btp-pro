@@ -1155,7 +1155,9 @@ if (!currentUser) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredGroupedReclamations.map(group => {
-                const latest = group.latest;
+                const latest = (group.items && group.items.length > 0) 
+          ? group.items[group.items.length - 1] 
+          : group.latest;
                 const hasPending = group.pendingCount > 0;
 
                 return (
