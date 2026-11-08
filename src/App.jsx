@@ -1154,12 +1154,14 @@ if (!currentUser) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredGroupedReclamations.map(group => {
-                const latest = (group.items && group.items.length > 0) 
-          ? group.items[group.items.length - 1] 
-          : group.latest;
-                const hasPending = group.pendingCount > 0;
-
+  {[...filteredGroupedReclamations]
+    .sort((a, b) => (b.pendingCount || 0) - (a.pendingCount || 0))
+    .map(group => {
+      const latest = (group.items && group.items.length > 0) 
+        ? group.items[group.items.length - 1] 
+        : group.latest;
+      const hasPending = group.pendingCount > 0;
+      
                 return (
                   <div key={group.key} className="bg-white border border-slate-200/80 hover:border-red-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative">
                     <div>
