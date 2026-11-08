@@ -244,6 +244,7 @@ export default function App() {
       if (!groups[key]) {
         groups[key] = {
           key,
+          building: rec.building,
           apartment: rec.apartment,
           floor: rec.floor,
           clientName: rec.clientName,
@@ -252,6 +253,8 @@ export default function App() {
       }
       groups[key].items.push(rec);
     });
+
+    
 
     // Tri des éléments de chaque appartement par date descendante
     Object.values(groups).forEach(g => {
@@ -280,12 +283,13 @@ export default function App() {
     });
   }, [groupedReclamations, reclamationSearch, reclamationStatusFilter]);
 
-  const handleCreateReclamation = async (e) => {
+const handleCreateReclamation = async (e) => {
     e.preventDefault();
     if (!newReclamation.apartment || !myProjectCode || !currentUser) return;
     try {
       await addDoc(collection(db, "reclamations"), {
         projectCode: myProjectCode,
+        building: newReclamation.building ? newReclamation.building.trim().toUpperCase() : '',
         apartment: newReclamation.apartment.trim(),
         floor: newReclamation.floor.trim(),
         clientName: newReclamation.clientName.trim(),
@@ -296,7 +300,7 @@ export default function App() {
         resolutionDetails: null
       });
       setShowAddReclamationModal(false);
-      setNewReclamation({ apartment: '', floor: '', clientName: '', observation: '' });
+      setNewReclamation({ building: '', apartment: '', floor: '', clientName: '', observation: '' });
     } catch (e) {
       console.error(e);
     }
@@ -1744,6 +1748,82 @@ export default function App() {
             <input type="file" accept=".pdf" multiple onChange={handleMultipleFilesChange} className="w-full text-xs" />
             <textarea placeholder="Consignes..." value={newPlanData.description} onChange={e => setNewPlanData({...newPlanData, description: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs h-20" />
             <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowAddPlanModal(false)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl">Annuler</button><button type="submit" className="px-4 py-2 bg-cyan-600 text-white text-xs rounded-xl font-semibold">Publier</button></div>
+          </form>
+        </div>
+      )}
+
+      {/* MODALE AJOUT RÉCLAMATION (ADMIN) */}
+      {showAddReclamationModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleCreateReclamation} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900">Nouvelle Réclamation / Réserve</h3>
+              <button type="button" onClick={() => setShowAddReclamationModal(false)}>✕</button>
+            </div>
+
+            {/* Champ Bâtiment ajouté ici */}
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Bâtiment / Résidence</label>
+              <input
+                type="text"
+                placeholder="ex: Bâtiment A"
+                value={newReclamation.building}
+                onChange={e => setNewReclamation({ ...newReclamation, building: e.target.value })}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">N° Appartement / Logement *</label>
+              <input
+                type="text"
+                required
+                placeholder="ex: A-102"
+                value={newReclamation.apartment}
+                onChange={e => setNewReclamation({ ...newReclamation, apartment: e.target.value })}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Étage</label>
+                <input
+                  type="text"
+                  placeholder="ex: 2ème"
+                  value={newReclamation.floor}
+                  onChange={e => setNewReclamation({ ...newReclamation, floor: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Nom Client / Lot</label>
+                <input
+                  type="text"
+                  placeholder="ex: Dupont"
+                  value={newReclamation.clientName}
+                  onChange={e => setNewReclamation({ ...newReclamation, clientName: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Observation / Problème constaté *</label>
+              <textarea
+                required
+                placeholder="Ex: Fuite sous lavabo salle de bain..."
+                value={newReclamation.observation}
+                onChange={e => setNewReclamation({ ...newReclamation, observation: e.target.value })}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs h-24"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setShowAddReclamationModal(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Annuler</button>
+              <button type="submit" className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-xl shadow-md shadow-red-600/20">Enregistrer</button>
+            </div>
           </form>
         </div>
       )}
