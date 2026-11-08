@@ -1247,13 +1247,14 @@ if (!currentUser) {
     </span>
   )}
 
-                        <button
-                          onClick={() => setSelectedReclamationHistory(group)}
-                          className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1"
-                          title="Voir l'historique complet de ce logement"
-                        >
-                          <History className="w-4 h-4" /> ({group.items.length})
-                        </button>
+                       <button
+  onClick={() => setSelectedReclamationHistory(group.items || group.reclamations || group)}
+  className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1"
+  title="Voir l'historique complet de ce logement"
+>
+  <History className="w-4 h-4" /> 
+  <span>({group.items ? group.items.length : 0})</span>
+</button>
                       </div>
 
                       {isAdmin && (
@@ -2120,6 +2121,64 @@ if (!currentUser) {
           </div>
         </div>
       )}
+
+      {/* Modal d'historique des interventions */}
+{selectedReclamationHistory && (
+  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 max-h-[80vh] overflow-y-auto shadow-2xl">
+      
+      <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+        <h3 className="font-bold text-slate-900 text-base">
+          Historique des interventions
+        </h3>
+        <button 
+          onClick={() => setSelectedReclamationHistory(null)}
+          className="text-slate-400 hover:text-slate-600 font-bold text-lg p-1"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {(Array.isArray(selectedReclamationHistory) 
+          ? selectedReclamationHistory 
+          : (selectedReclamationHistory.items || [selectedReclamationHistory])
+        ).map((item, idx) => (
+          <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
+            <div className="flex justify-between items-center font-semibold">
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                item.status === 'Fait' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+              }`}>
+                {item.status || 'En cours'}
+              </span>
+              <span className="text-slate-400">
+                {item.createdAt ? new Date(item.createdAt).toLocaleDateString('fr-FR') : ''}
+              </span>
+            </div>
+            
+            <p className="text-slate-800 font-medium pt-1">
+              {item.observation || item.resolutionDetails || item.title || 'Signalement / Passage'}
+            </p>
+
+            {(item.createdBy || item.resolvedBy) && (
+              <p className="text-[10px] text-slate-400">
+                Par : {item.resolvedBy || item.createdBy}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={() => setSelectedReclamationHistory(null)}
+        className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
+      >
+        Fermer
+      </button>
+
+    </div>
+  </div>
+)}
 
       {showAddPlanModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
