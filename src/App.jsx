@@ -1717,21 +1717,119 @@ const handleCreateReclamation = async (e) => {
         </div>
       )}
 
+{/* MODALE AJOUT DE MATÉRIEL - PROPRE & PRO */}
       {showAddRequestModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleCreateRequest} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-900">Demande de matériel</h3>
-            <input type="text" placeholder="Matériel (ex: Coudes Ø20)" value={newRequestData.items} onChange={e => setNewRequestData({...newRequestData, items: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
-            <input type="number" min="1" value={newRequestData.quantity} onChange={e => setNewRequestData({...newRequestData, quantity: Number(e.target.value)})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
-            <select value={newRequestData.urgency} onChange={e => setNewRequestData({...newRequestData, urgency: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
-              <option value="Normal">Normal</option>
-              <option value="Urgent">Urgent</option>
-              <option value="Critique">Critique</option>
-            </select>
-            <input type="file" accept="image/*,.pdf" onChange={handleRequestAttachmentChange} className="w-full text-xs" />
-            <textarea placeholder="Précisions..." value={newRequestData.description} onChange={e => setNewRequestData({...newRequestData, description: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs h-20" />
-            <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowAddRequestModal(false)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl">Annuler</button><button type="submit" className="px-4 py-2 bg-amber-600 text-white text-xs rounded-xl font-semibold">Envoyer</button></div>
-          </form>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden">
+            
+            {/* En-tête */}
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-bold text-sm">
+                  📦
+                </div>
+                <h3 className="text-base font-bold text-slate-900">Demande de Matériel & Fournitures</h3>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowAddRequestModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Formulaire */}
+            <form onSubmit={handleCreateRequest} className="p-6 space-y-4">
+              
+              {/* Matériel & Quantité */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Désignation du matériel *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ex: Coudes Ø20, Multicouche..."
+                    value={newRequestData.items}
+                    onChange={e => setNewRequestData({ ...newRequestData, items: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Quantité *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={newRequestData.quantity}
+                    onChange={e => setNewRequestData({ ...newRequestData, quantity: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Urgence */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Niveau d'urgence</label>
+                <select
+                  value={newRequestData.urgency}
+                  onChange={e => setNewRequestData({ ...newRequestData, urgency: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
+                >
+                  <option value="Normal">Normal (Standard chantier)</option>
+                  <option value="Urgent">Urgent (Besoin rapide)</option>
+                  <option value="Critique">Critique (Bloquant)</option>
+                </select>
+              </div>
+
+              {/* Fichier joint */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Pièce jointe / Photo (optionnel)</label>
+                <div className="flex items-center gap-3 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                  <input
+                    type="file"
+                    onChange={e => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        setNewRequestData({ ...newRequestData, attachmentName: file.name });
+                      }
+                    }}
+                    className="text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Précisions */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Précisions / Références</label>
+                <textarea
+                  placeholder="Ex: Prévoir raccord pour cuivre, livraison pour le bâtiment B..."
+                  value={newRequestData.description}
+                  onChange={e => setNewRequestData({ ...newRequestData, description: e.target.value })}
+                  className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 h-24 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all resize-none"
+                />
+              </div>
+
+              {/* Boutons */}
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowAddRequestModal(false)}
+                  className="px-5 py-2.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 text-xs font-bold text-white bg-orange-600 hover:bg-orange-500 rounded-xl shadow-lg shadow-orange-600/20 transition-all"
+                >
+                  Envoyer la demande
+                </button>
+              </div>
+
+            </form>
+          </div>
         </div>
       )}
 
