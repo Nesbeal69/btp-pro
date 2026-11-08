@@ -45,7 +45,9 @@ export default function App() {
   
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  
+   
+  const [showPassword, setShowPassword] = useState(false);
+
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
@@ -1368,4 +1370,30 @@ export function ModalAjouterTache({ isOpen, onClose, onSubmit }) {
       </div>
     </div>
   );
+
+  <div>
+  <label className="block text-xs font-medium text-slate-300 mb-1">Mot de passe</label>
+  <div className="relative">
+    <input 
+      type={showPassword ? "text" : "password"} 
+      required 
+      value={loginPassword} 
+      onChange={e => setLoginPassword(e.target.value)} 
+      placeholder="••••••••" 
+      className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-10" 
+    />
+    <button 
+      type="button"
+      onClick={() => setShowPassword(!showPassword)}
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+      title={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+    >
+      {showPassword ? (
+        <EyeOff className="w-4 h-4" />
+      ) : (
+        <Eye className="w-4 h-4" />
+      )}
+    </button>
+  </div>
+</div>
 }
