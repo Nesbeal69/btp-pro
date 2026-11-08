@@ -318,47 +318,79 @@ const handleCreateReclamation = async (e) => {
   };
 
 const handleConfirmResolveReclamation = async (e) => {
-    e.preventDefault();
-    if (!resolvingReclamation || !currentUser) return;
+  e.preventDefault();
+  if (!resolvingReclamation) return;
 
-    // Récupère le statut choisi dans le menu déroulant
-    const statusSelect = document.getElementById('interventionStatus');
-    const selectedStatus = statusSelect ? statusSelect.value : 'Fait';
+  // Récupère le statut choisi dans le menu déroulant
+  const statusSelect = document.getElementById('interventionStatus');
+  const selectedStatus = statusSelect ? statusSelect.value : 'Fait'; // "Fait", "Absent", ou "Réintervenir"
 
-    const newStatus = selectedStatus === 'Fait' ? 'Résolu' : 'À faire';
+  // Récupère le champ texte des détails
+  const resolutionText = document.getElementById('resolutionText');
+  const details = resolutionText ? resolutionText.value.trim() : '';
 
-    let prefix = "Intervention effectuée";
-    if (selectedStatus === 'Absent') prefix = "Occupant absent";
-    if (selectedStatus === 'Réintervenir') prefix = "À réintervenir";
+  // Récupère l'index du signalement ciblé (si le select existe)
+  const targetSelect = document.getElementById('targetItemIndex');
+  const targetIndex = targetSelect ? targetSelect.value : 'all';
 
-    const fullDetails = `${prefix} : ${resolutionText.trim()}`;
+  let updatedItems = [...(resolvingReclamation.items || [resolvingReclamation])];
 
-    // Crée le nouvel élément de suivi pour l'historique
-    const newItem = {
-      status: newStatus,
-      resolutionDetails: fullDetails,
-      resolvedBy: currentUser.name,
-      resolvedAt: new Date().toISOString(),
-      interventionType: selectedStatus // 'Fait', 'Absent', ou 'Réintervenir'
-    };
+  const nowISO = new Date().toISOString();
+  const authorName = currentUser?.name || 'Technicien';
 
-    // Récupère les items existants et ajoute le nouveau à la liste
-    const updatedItems = [...(resolvingReclamation.items || []), newItem];
+  // Détermine le statut final pour l'item
+  const itemNewStatus = selectedStatus === 'Fait' ? 'Fait' : 'En cours';
+  const prefix = selectedStatus === 'Absent' ? 'Occupant absent' : (selectedStatus === 'Réintervenir' ? 'À réintervenir' : 'Travaux effectués');
+  const fullDetails = details ? `${prefix} : ${details}` : prefix;
 
-    try {
-      await updateDoc(doc(db, "reclamations", resolvingReclamation.firestoreId), {
-        status: newStatus,
-        resolvedBy: currentUser.name,
-        resolvedAt: new Date().toISOString(),
-        resolutionDetails: fullDetails,
-        items: updatedItems // On sauvegarde toute la liste des passages
-      });
-      setResolvingReclamation(null);
-      setResolutionText('');
-    } catch (e) {
-      console.error(e);
-    }
+  // Objet représentant la note / l'intervention de ce passage
+  const newInterventionNote = {
+    status: itemNewStatus,
+    observation: fullDetails,
+    resolutionDetails: fullDetails,
+    createdBy: authorName,
+    resolvedBy: selectedStatus === 'Fait' ? authorName : null,
+    createdAt: nowISO,
+    resolvedAt: selectedStatus === 'Fait' ? nowISO : null,
   };
+
+  if (targetIndex === 'all') {
+    // Si "all", on applique à tous les items non faits
+    updatedItems = updatedItems.map(item => ({
+      ...item,
+      status: selectedStatus === 'Fait' ? 'Fait' : item.status,
+      resolutionDetails: selectedStatus === 'Fait' ? fullDetails : item.resolutionDetails,
+      resolvedBy: selectedStatus === 'Fait' ? authorName : item.resolvedBy,
+      resolvedAt: selectedStatus === 'Fait' ? nowISO : item.resolvedAt,
+      items: [...(item.items || []), newInterventionNote] // Ajoute à l'historique interne de l'item
+    }));
+  } else {
+    // On cible un signalement précis par son index
+    const idx = parseInt(targetIndex, 10);
+    const targetItem = updatedItems[idx];
+    
+    updatedItems[idx] = {
+      ...targetItem,
+      status: itemNewStatus,
+      resolutionDetails: selectedStatus === 'Fait' ? fullDetails : targetItem.resolutionDetails,
+      resolvedBy: selectedStatus === 'Fait' ? authorName : targetItem.resolvedBy,
+      resolvedAt: selectedStatus === 'Fait' ? nowISO : targetItem.resolvedAt,
+      items: [...(targetItem.items || [targetItem]), newInterventionNote]
+    };
+  }
+
+  // Vérifie si TOUS les signalements sont résolus pour mettre à jour le statut global du logement
+  const allDone = updatedItems.every(item => item.status === 'Fait');
+
+  // Envoi de la mise à jour dans Firebase
+  await updateDoc(doc(db, 'reclamations', resolvingReclamation.firestoreId), {
+    items: updatedItems,
+    status: allDone ? 'Fait' : 'En cours',
+    updatedAt: nowISO
+  });
+
+  setResolvingReclamation(null);
+};
 
   const handleDeleteReclamation = async (firestoreId) => {
     if (window.confirm("Voulez-vous vraiment supprimer cette réclamation ?")) {
@@ -1628,40 +1660,70 @@ if (!currentUser) {
   {/* --- MODALES --- */}
 
   {/* MODALE HISTORIQUE DES RÉCLAMATIONS D'UN LOGEMENT */}
-  {selectedReclamationHistory && (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-      <div className="bg-white p-6 rounded-3xl w-full max-w-lg space-y-4 shadow-2xl max-h-[85vh] overflow-y-auto">
-        <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-          <div>
-            <h3 className="text-base font-bold text-slate-900">Historique - Logement {selectedReclamationHistory.apartment}</h3>
-            <p className="text-xs text-slate-500">Étage : {selectedReclamationHistory.floor} {selectedReclamationHistory.clientName && `| Nom : ${selectedReclamationHistory.clientName}`}</p>
-          </div>
-          <button onClick={() => setSelectedReclamationHistory(null)} className="p-1 hover:bg-slate-100 rounded-lg text-slate-400">✕</button>
+  {/* MODALE DE SUIVI D'INTERVENTION SUR UN LOGEMENT */}
+{resolvingReclamation && (
+  <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+    <form onSubmit={handleConfirmResolveReclamation} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden space-y-4 p-6">
+      <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+        <div>
+          <h3 className="text-base font-bold text-slate-900">Suivi d'intervention</h3>
+          <p className="text-xs text-slate-500">Logement {resolvingReclamation.apartment} (Étage {resolvingReclamation.floor})</p>
         </div>
-
-        <div className="space-y-3">
-          {selectedReclamationHistory.items
-            .flatMap(rec => rec.items || [rec])
-            .sort((a, b) => new Date(b.createdAt || b.resolvedAt) - new Date(a.createdAt || a.resolvedAt))
-            .map((item, idx) => (
-              <div key={item.firestoreId || idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-[11px] font-bold text-slate-400">Intervention / Signalement</span>
-                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${item.status === 'Fait' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                    {item.status}
-                  </span>
-                </div>
-                <p className="text-sm font-semibold text-slate-900">{item.resolutionDetails || item.observation}</p>
-                <div className="text-[11px] text-slate-500 flex justify-between">
-                  <span>Par : {item.resolvedBy || item.createdBy || 'N/A'}</span>
-                  <span>{item.resolvedAt ? new Date(item.resolvedAt).toLocaleDateString('fr-FR') : (item.createdAt ? new Date(item.createdAt).toLocaleDateString('fr-FR') : '')}</span>
-                </div>
-              </div>
-            ))}
-        </div>
+        <button type="button" onClick={() => setResolvingReclamation(null)} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center">✕</button>
       </div>
-    </div>
-  )}
+
+      {/* Sélection du signalement concerné s'il y en a plusieurs */}
+      {resolvingReclamation.items && resolvingReclamation.items.length > 1 && (
+        <div className="space-y-1">
+          <label className="text-xs font-bold text-slate-700 block">Signalement concerné :</label>
+          <select 
+            name="targetItemIndex"
+            className="w-full text-xs bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-slate-800 font-medium"
+          >
+            <option value="all">Tous les signalements du logement</option>
+            {resolvingReclamation.items.map((item, idx) => (
+              <option key={idx} value={idx}>
+                #{resolvingReclamation.items.length - idx} - {item.observation || item.resolutionDetails || 'Signalement'} ({item.status})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Choix de l'action / statut du passage */}
+      <div className="space-y-1">
+        <label className="text-xs font-bold text-slate-700 block">Résultat de la visite / Statut :</label>
+        <select 
+          name="interventionResult"
+          className="w-full text-xs bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-slate-800 font-bold"
+        >
+          <option value="Fait">🟢 Fait / Travaux réalisés (Clôturer le signalement)</option>
+          <option value="Occupant absent">🚨 Occupant absent (Ajouter une note de passage)</option>
+          <option value="À réintervenir">⚠️ À réintervenir (Ajouter une note de passage)</option>
+        </select>
+      </div>
+
+      {/* Détails et observations */}
+      <div className="space-y-1">
+        <label className="text-xs font-bold text-slate-700 block">Observations / Travaux réalisés :</label>
+        <textarea 
+          name="resolutionDetails"
+          required
+          rows="3"
+          placeholder="Ex: Remplacement du joint effectué / Passage à 14h occupant absent..."
+          className="w-full text-xs bg-slate-50 border border-slate-200 p-3 rounded-xl text-slate-900 focus:outline-none focus:border-emerald-500"
+        />
+      </div>
+
+      <button 
+        type="submit" 
+        className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/20 transition-all"
+      >
+        Valider le passage
+      </button>
+    </form>
+  </div>
+)}
 
       {/* MODALE DE SUIVI D'INTERVENTION SUR UN LOGEMENT */}
       {resolvingReclamation && (
