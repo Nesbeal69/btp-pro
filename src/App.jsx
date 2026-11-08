@@ -714,7 +714,7 @@ const handleCreateReclamation = async (e) => {
 
   const isAdmin = currentUser?.role === 'admin';
 
-  if (!currentUser) {
+if (!currentUser) {
     return (
       <div className="min-h-screen text-slate-100 flex items-center justify-center p-4 relative overflow-hidden">
         <div 
@@ -910,6 +910,10 @@ const handleCreateReclamation = async (e) => {
               </div>
             </div>
 
+            {/* GRILLE UNIFORME DES 7 MODULES DU TABLEAU DE BORD */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+              {/* 1. PLANNING */}
               <div onClick={() => setActiveTab('planning')} className="group bg-white border border-slate-200/80 hover:border-cyan-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
@@ -924,6 +928,7 @@ const handleCreateReclamation = async (e) => {
                 </div>
               </div>
 
+              {/* 2. DEMANDES MATÉRIEL */}
               <div onClick={() => setActiveTab('requests')} className="group bg-white border border-slate-200/80 hover:border-amber-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
@@ -938,7 +943,7 @@ const handleCreateReclamation = async (e) => {
                 </div>
               </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* 3. RÉCLAMATIONS & RÉSERVES */}
               <div onClick={() => setActiveTab('reclamations')} className="group bg-white border border-slate-200/80 hover:border-red-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
@@ -955,6 +960,7 @@ const handleCreateReclamation = async (e) => {
                 </div>
               </div>
 
+              {/* 4. EFFECTIFS */}
               <div onClick={() => setActiveTab('workers')} className="group bg-white border border-slate-200/80 hover:border-emerald-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
@@ -969,6 +975,7 @@ const handleCreateReclamation = async (e) => {
                 </div>
               </div>
 
+              {/* 5. PARC OUTILLAGE */}
               <div onClick={() => setActiveTab('tools')} className="group bg-white border border-slate-200/80 hover:border-indigo-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
@@ -983,6 +990,7 @@ const handleCreateReclamation = async (e) => {
                 </div>
               </div>
 
+              {/* 6. VALIDATION DES COMPTES (Admin seulement) */}
               {isAdmin && (
                 <div onClick={() => setActiveTab('accounts')} className="group bg-white border border-slate-200/80 hover:border-purple-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                   <div>
@@ -998,6 +1006,29 @@ const handleCreateReclamation = async (e) => {
                   </div>
                 </div>
               )}
+
+              {/* 7. STOCK CONTENEUR (Bientôt disponible - Intégré proprement dans la grille) */}
+              <div className="bg-slate-50 border border-slate-200/60 p-6 rounded-3xl space-y-4 shadow-sm opacity-80 flex flex-col justify-between group relative overflow-hidden">
+                <div className="absolute top-4 right-4">
+                  <span className="px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider rounded-full bg-amber-100 text-amber-800 border border-amber-200 shadow-xs">
+                    Bientôt dispo
+                  </span>
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <div className="w-10 h-10 rounded-2xl bg-slate-200 text-slate-500 flex items-center justify-center font-bold">🏗️</div>
+                  </div>
+                  <h3 className="text-base font-bold text-slate-700">Stock Conteneur</h3>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">Suivi du matériel et gestion des stocks en direct depuis le conteneur.</p>
+                </div>
+                <button 
+                  disabled
+                  className="w-full py-2.5 bg-slate-200/60 text-slate-400 text-xs font-bold rounded-xl cursor-not-allowed flex items-center justify-center gap-2 border border-slate-200"
+                >
+                  Bientôt disponible 🔒
+                </button>
+              </div>
+
             </div>
           </div>
         )}
@@ -1060,7 +1091,7 @@ const handleCreateReclamation = async (e) => {
                       {/* En-tête du logement */}
                       <div className="flex justify-between items-start pb-3 border-b border-slate-100">
                         <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Localisation</span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Localisation {group.building && `(${group.building})`}</span>
                           <h3 className="text-lg font-black text-slate-900 flex items-center gap-1.5">
                             <Home className="w-4 h-4 text-blue-600" /> Logement {group.apartment}
                           </h3>
@@ -1550,7 +1581,7 @@ const handleCreateReclamation = async (e) => {
         </div>
       )}
 
-      {/* MODALE POUR VALIDER UNE RÉCLAMATION (Explication des travaux par l'ouvrier) */}
+      {/* MODALE POUR VALIDER UNE RÉCLAMATION */}
       {resolvingReclamation && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleConfirmResolveReclamation} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl">
@@ -1576,13 +1607,24 @@ const handleCreateReclamation = async (e) => {
         </div>
       )}
 
-      {/* MODALE AJOUT RÉCLAMATION (ADMIN) */}
+      {/* MODALE AJOUT RÉCLAMATION (ADMIN) AVEC CHAMP BÂTIMENT */}
       {showAddReclamationModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreateReclamation} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl">
             <div className="flex justify-between items-center pb-2 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900">Nouvelle Réclamation / Réserve</h3>
               <button type="button" onClick={() => setShowAddReclamationModal(false)}>✕</button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Bâtiment / Résidence</label>
+              <input
+                type="text"
+                placeholder="ex: Bâtiment A"
+                value={newReclamation.building}
+                onChange={e => setNewReclamation({ ...newReclamation, building: e.target.value })}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+              />
             </div>
 
             <div>
@@ -1717,12 +1759,10 @@ const handleCreateReclamation = async (e) => {
         </div>
       )}
 
-{/* MODALE AJOUT DE MATÉRIEL - PROPRE & PRO */}
+      {/* MODALE AJOUT DE MATÉRIEL - PROPRE & PRO */}
       {showAddRequestModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden">
-            
-            {/* En-tête */}
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-bold text-sm">
@@ -1739,10 +1779,7 @@ const handleCreateReclamation = async (e) => {
               </button>
             </div>
 
-            {/* Formulaire */}
             <form onSubmit={handleCreateRequest} className="p-6 space-y-4">
-              
-              {/* Matériel & Quantité */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="md:col-span-2">
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Désignation du matériel *</label>
@@ -1769,7 +1806,6 @@ const handleCreateReclamation = async (e) => {
                 </div>
               </div>
 
-              {/* Urgence */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Niveau d'urgence</label>
                 <select
@@ -1783,7 +1819,6 @@ const handleCreateReclamation = async (e) => {
                 </select>
               </div>
 
-              {/* Fichier joint */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Pièce jointe / Photo (optionnel)</label>
                 <div className="flex items-center gap-3 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">
@@ -1800,7 +1835,6 @@ const handleCreateReclamation = async (e) => {
                 </div>
               </div>
 
-              {/* Précisions */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Précisions / Références</label>
                 <textarea
@@ -1811,7 +1845,6 @@ const handleCreateReclamation = async (e) => {
                 />
               </div>
 
-              {/* Boutons */}
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
@@ -1827,7 +1860,6 @@ const handleCreateReclamation = async (e) => {
                   Envoyer la demande
                 </button>
               </div>
-
             </form>
           </div>
         </div>
@@ -1850,104 +1882,6 @@ const handleCreateReclamation = async (e) => {
         </div>
       )}
 
-      {/* MODALE AJOUT RÉCLAMATION (ADMIN) */}
-      {showAddReclamationModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleCreateReclamation} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900">Nouvelle Réclamation / Réserve</h3>
-              <button type="button" onClick={() => setShowAddReclamationModal(false)}>✕</button>
-            </div>
-
-            {/* Champ Bâtiment ajouté ici */}
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Bâtiment / Résidence</label>
-              <input
-                type="text"
-                placeholder="ex: Bâtiment A"
-                value={newReclamation.building}
-                onChange={e => setNewReclamation({ ...newReclamation, building: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">N° Appartement / Logement *</label>
-              <input
-                type="text"
-                required
-                placeholder="ex: A-102"
-                value={newReclamation.apartment}
-                onChange={e => setNewReclamation({ ...newReclamation, apartment: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Étage</label>
-                <input
-                  type="text"
-                  placeholder="ex: 2ème"
-                  value={newReclamation.floor}
-                  onChange={e => setNewReclamation({ ...newReclamation, floor: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Nom Client / Lot</label>
-                <input
-                  type="text"
-                  placeholder="ex: Dupont"
-                  value={newReclamation.clientName}
-                  onChange={e => setNewReclamation({ ...newReclamation, clientName: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Observation / Problème constaté *</label>
-              <textarea
-                required
-                placeholder="Ex: Fuite sous lavabo salle de bain..."
-                value={newReclamation.observation}
-                onChange={e => setNewReclamation({ ...newReclamation, observation: e.target.value })}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs h-24"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setShowAddReclamationModal(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Annuler</button>
-              <button type="submit" className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-xl shadow-md shadow-red-600/20">Enregistrer</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-{/* 7. STOCK CONTENEUR (Bientôt disponible - Intégré proprement dans la grille) */}
-      <div className="bg-slate-50 border border-slate-200/60 p-6 rounded-3xl space-y-4 shadow-sm opacity-80 flex flex-col justify-between group relative overflow-hidden">
-        <div className="absolute top-4 right-4">
-          <span className="px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider rounded-full bg-amber-100 text-amber-800 border border-amber-200 shadow-xs">
-            Bientôt dispo
-          </span>
-        </div>
-        <div>
-          <div className="flex justify-between items-center mb-3">
-            <div className="w-10 h-10 rounded-2xl bg-slate-200 text-slate-500 flex items-center justify-center font-bold">🏗️</div>
-          </div>
-          <h3 className="text-base font-bold text-slate-700">Stock Conteneur</h3>
-          <p className="text-xs text-slate-400 mt-1 leading-relaxed">Suivi du matériel et gestion des stocks en direct depuis le conteneur.</p>
-        </div>
-        <button 
-          disabled
-          className="w-full py-2.5 bg-slate-200/60 text-slate-400 text-xs font-bold rounded-xl cursor-not-allowed flex items-center justify-center gap-2 border border-slate-200"
-        >
-          Bientôt disponible 🔒
-        </button>
-      </div>
-
       {showAddToolModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreateTool} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
@@ -1962,6 +1896,7 @@ const handleCreateReclamation = async (e) => {
           </form>
         </div>
       )}
+
     </div>
   );
 }
