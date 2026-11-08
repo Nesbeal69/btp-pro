@@ -1512,159 +1512,156 @@ if (!currentUser) {
           </div>
         )}
 
-        {/* --- MODULE PARC OUTILLAGE --- */}
-        {activeTab === 'tools' && (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-indigo-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div className="flex items-center gap-4">
-                <div className="p-4 bg-indigo-600/20 border border-indigo-400/30 rounded-2xl">
-                  <Wrench className="w-7 h-7 text-indigo-400" />
+{/* --- MODULE PARC OUTILLAGE --- */}
+    {activeTab === 'tools' && (
+      <div className="space-y-6">
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-indigo-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-4 bg-indigo-600/20 border border-indigo-400/30 rounded-2xl">
+              <Wrench className="w-7 h-7 text-indigo-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black tracking-wide">Parc Outillage</h2>
+              <p className="text-xs text-slate-300 mt-0.5">Suivi du parc, des maintenances et de leur affectation.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <select value={toolStatusFilter} onChange={e => setToolStatusFilter(e.target.value)} className="px-3.5 py-2.5 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none">
+              <option value="all" className="bg-slate-900">🔍 Tous les statuts</option>
+              <option value="Disponible" className="bg-slate-900">🟢 Disponible</option>
+              <option value="En service" className="bg-slate-900">⚡ Attribué</option>
+              <option value="En révision" className="bg-slate-900">🛠️ En révision</option>
+            </select>
+            {isAdmin && (
+              <button onClick={() => setShowAddToolModal(true)} className="px-4 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all">
+                <Plus className="w-4 h-4" /> Ajouter une Machine
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredEquipment.map(tool => (
+            <div key={tool.firestoreId} className="bg-white border border-slate-200/80 hover:border-indigo-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-mono text-xs font-bold rounded-xl border border-indigo-100">{tool.id}</span>
+                  <span className="text-xs text-slate-500 font-medium">{tool.brand || 'REMS'}</span>
                 </div>
-                <div>
-                  <h2 className="text-xl font-black tracking-wide">Parc Outillage</h2>
-                  <p className="text-xs text-slate-300 mt-0.5">Suivi du parc, des maintenances et de leur affectation.</p>
+
+                <h3 className="text-base font-bold text-slate-900">{tool.name}</h3>
+
+                <div className="mt-4 space-y-2 text-xs bg-slate-50 p-3 rounded-2xl border border-slate-200/60">
+                  <div className="flex justify-between"><span className="text-slate-500 font-medium">Statut :</span><span className="font-bold text-emerald-600">{tool.status}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500 font-medium">Affecté à :</span><span className="font-bold text-slate-800">{tool.assignedTo}</span></div>
                 </div>
               </div>
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <select value={toolStatusFilter} onChange={e => setToolStatusFilter(e.target.value)} className="px-3.5 py-2.5 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none">
-                  <option value="all" className="bg-slate-900">🔍 Tous les statuts</option>
-                  <option value="Disponible" className="bg-slate-900">🟢 Disponible</option>
-                  <option value="En service" className="bg-slate-900">⚡ Attribué</option>
-                  <option value="En révision" className="bg-slate-900">🛠️ En révision</option>
-                </select>
+
+              <div className="pt-4 border-t border-slate-100 flex items-center gap-2">
+                <button onClick={() => setSelectedTool(tool)} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 font-bold rounded-xl transition-colors">
+                  💬 Notes ({tool.notes?.length || 0})
+                </button>
                 {isAdmin && (
-                  <button onClick={() => setShowAddToolModal(true)} className="px-4 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all">
-                    <Plus className="w-4 h-4" /> Ajouter une Machine
-                  </button>
+                  <>
+                    <button onClick={() => handleOpenEditModal(tool)} className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold rounded-xl transition-colors">Modifier</button>
+                    <button onClick={() => handleDeleteTool(tool.firestoreId)} className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-colors">🗑️</button>
+                  </>
                 )}
               </div>
             </div>
+          ))}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredEquipment.map(tool => (
-                <div key={tool.firestoreId} className="bg-white border border-slate-200/80 hover:border-indigo-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-mono text-xs font-bold rounded-xl border border-indigo-100">{tool.id}</span>
-                      <span className="text-xs text-slate-500 font-medium">{tool.brand || 'REMS'}</span>
-                    </div>
-
-                    <h3 className="text-base font-bold text-slate-900">{tool.name}</h3>
-
-                    <div className="mt-4 space-y-2 text-xs bg-slate-50 p-3 rounded-2xl border border-slate-200/60">
-                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Statut :</span><span className="font-bold text-emerald-600">{tool.status}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Affecté à :</span><span className="font-bold text-slate-800">{tool.assignedTo}</span></div>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-100 flex items-center gap-2">
-                    <button onClick={() => setSelectedTool(tool)} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 font-bold rounded-xl transition-colors">
-                      💬 Notes ({tool.notes?.length || 0})
-                    </button>
-                    {isAdmin && (
-                      <>
-                        <button onClick={() => handleOpenEditModal(tool)} className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold rounded-xl transition-colors">Modifier</button>
-                        <button onClick={() => handleDeleteTool(tool.firestoreId)} className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-colors">🗑️</button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              {filteredEquipment.length === 0 && (
-                <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
-                  <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl mx-auto flex items-center justify-center">
-                    <Wrench className="w-6 h-6" />
-                  </div>
-                  <h4 className="text-sm font-bold text-slate-800">Aucune machine trouvée</h4>
-                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Aucun outil ne correspond à votre recherche ou le parc est vide.</p>
-                </div>
-              )}
+          {filteredEquipment.length === 0 && (
+            <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl mx-auto flex items-center justify-center">
+                <Wrench className="w-6 h-6" />
+              </div>
+              <h4 className="text-sm font-bold text-slate-800">Aucune machine trouvée</h4>
+              <p className="text-xs text-slate-400 max-w-xs mx-auto">Aucun outil ne correspond à votre recherche ou le parc est vide.</p>
             </div>
+          )}
+        </div>
+      </div>
+    )}
+
+    {/* --- VALIDATION COMPTES (ADMIN) --- */}
+    {activeTab === 'accounts' && isAdmin && (
+      <div className="space-y-6">
+        <div className="bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-purple-900/40 flex items-center gap-4">
+          <div className="p-4 bg-purple-600/20 border border-purple-400/30 rounded-2xl">
+            <UserCheck className="w-7 h-7 text-purple-400" />
           </div>
-        )}
-
-        {/* --- VALIDATION COMPTES (ADMIN) --- */}
-        {activeTab === 'accounts' && isAdmin && (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-purple-900/40 flex items-center gap-4">
-              <div className="p-4 bg-purple-600/20 border border-purple-400/30 rounded-2xl">
-                <UserCheck className="w-7 h-7 text-purple-400" />
-              </div>
-              <div>
-                <h2 className="text-xl font-black tracking-wide">Validation des Collaborateurs</h2>
-                <p className="text-xs text-slate-300 mt-0.5">Gérez les demandes d'accès des utilisateurs : <strong className="font-mono text-white">{myProjectCode}</strong></p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {pendingUsers.map(user => (
-                <div key={user.firestoreId} className="bg-white border border-slate-200/80 p-6 rounded-3xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">{user.name} <span className="text-xs font-normal text-slate-500">({user.email})</span></h3>
-                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-emerald-600" /> <span className="font-mono">{formatPhoneFr(user.phone)}</span></p>
-                  </div>
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <button onClick={() => handleOpenApproveModal(user)} className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all">Approuver & Assigner un rôle</button>
-                    <button onClick={() => handleRejectAccount(user.firestoreId)} className="flex-1 sm:flex-none px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-colors">Refuser</button>
-                  </div>
-                </div>
-              ))}
-
-              {pendingUsers.length === 0 && (
-                <div className="py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
-                  <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl mx-auto flex items-center justify-center">
-                    <UserCheck className="w-6 h-6" />
-                  </div>
-                  <h4 className="text-sm font-bold text-slate-800">Aucun compte en attente</h4>
-                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Tous les utilisateurs ayant demandé l'accès avec votre code de chantier ont été validés.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* --- MODALES --- */}
-
-      {/* MODALE HISTORIQUE DES RÉCLAMATIONS D'UN LOGEMENT */}
-      {selectedReclamationHistory && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white p-6 rounded-3xl w-full max-w-lg space-y-4 shadow-2xl max-h-[85vh] overflow-y-auto">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">Historique - Logement {selectedReclamationHistory.apartment}</h3>
-                <p className="text-xs text-slate-500">Étage : {selectedReclamationHistory.floor} {selectedReclamationHistory.clientName && `| Nom : ${selectedReclamationHistory.clientName}`}</p>
-              </div>
-              <button onClick={() => setSelectedReclamationHistory(null)} className="p-1 hover:bg-slate-100 rounded-lg text-slate-400">✕</button>
-            </div>
-
-            <div className="space-y-3">
-              {selectedReclamationHistory.items.map((item, idx) => (
-                <div key={item.firestoreId} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-slate-400">Signalement #{selectedReclamationHistory.items.length - idx}</span>
-                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${item.status === 'Fait' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                      {item.status}
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-slate-800 font-medium">"{item.observation}"</p>
-                  <p className="text-[10px] text-slate-400">Ajouté par {item.createdBy} le {new Date(item.createdAt).toLocaleDateString('fr-FR')}</p>
-
-                  {item.status === 'Fait' && item.resolutionDetails && (
-                    <div className="mt-2 pt-2 border-t border-slate-200 text-xs text-emerald-900 space-y-0.5">
-                      <span className="font-bold text-[10px] text-emerald-700 block">✔ Travaux réalisés :</span>
-                      <p className="bg-emerald-50 p-2 rounded-xl text-emerald-950 font-medium">{item.resolutionDetails}</p>
-                      <p className="text-[10px] text-emerald-700">Effectué par {item.resolvedBy} le {new Date(item.resolvedAt).toLocaleDateString('fr-FR')}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+          <div>
+            <h2 className="text-xl font-black tracking-wide">Validation des Collaborateurs</h2>
+            <p className="text-xs text-slate-300 mt-0.5">Gérez les demandes d'accès des utilisateurs : <strong className="font-mono text-white">{myProjectCode}</strong></p>
           </div>
         </div>
-      )}
+
+        <div className="space-y-4">
+          {pendingUsers.map(user => (
+            <div key={user.firestoreId} className="bg-white border border-slate-200/80 p-6 rounded-3xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">{user.name} <span className="text-xs font-normal text-slate-500">({user.email})</span></h3>
+                <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-emerald-600" /> <span className="font-mono">{formatPhoneFr(user.phone)}</span></p>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button onClick={() => handleOpenApproveModal(user)} className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all">Approuver & Assigner un rôle</button>
+                <button onClick={() => handleRejectAccount(user.firestoreId)} className="flex-1 sm:flex-none px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-colors">Refuser</button>
+              </div>
+            </div>
+          ))}
+
+          {pendingUsers.length === 0 && (
+            <div className="py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+              <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl mx-auto flex items-center justify-center">
+                <UserCheck className="w-6 h-6" />
+              </div>
+              <h4 className="text-sm font-bold text-slate-800">Aucun compte en attente</h4>
+              <p className="text-xs text-slate-400 max-w-xs mx-auto">Tous les utilisateurs ayant demandé l'accès avec votre code de chantier ont été validés.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+  </main>
+
+  {/* --- MODALES --- */}
+
+  {/* MODALE HISTORIQUE DES RÉCLAMATIONS D'UN LOGEMENT */}
+  {selectedReclamationHistory && (
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+      <div className="bg-white p-6 rounded-3xl w-full max-w-lg space-y-4 shadow-2xl max-h-[85vh] overflow-y-auto">
+        <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Historique - Logement {selectedReclamationHistory.apartment}</h3>
+            <p className="text-xs text-slate-500">Étage : {selectedReclamationHistory.floor} {selectedReclamationHistory.clientName && `| Nom : ${selectedReclamationHistory.clientName}`}</p>
+          </div>
+          <button onClick={() => setSelectedReclamationHistory(null)} className="p-1 hover:bg-slate-100 rounded-lg text-slate-400">✕</button>
+        </div>
+
+        <div className="space-y-3">
+          {selectedReclamationHistory.items
+            .flatMap(rec => rec.items || [rec])
+            .sort((a, b) => new Date(b.createdAt || b.resolvedAt) - new Date(a.createdAt || a.resolvedAt))
+            .map((item, idx) => (
+              <div key={item.firestoreId || idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] font-bold text-slate-400">Intervention / Signalement</span>
+                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${item.status === 'Fait' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                    {item.status}
+                  </span>
+                </div>
+                <p className="text-sm font-semibold text-slate-900">{item.resolutionDetails || item.observation}</p>
+                <div className="text-[11px] text-slate-500 flex justify-between">
+                  <span>Par : {item.resolvedBy || item.createdBy || 'N/A'}</span>
+                  <span>{item.resolvedAt ? new Date(item.resolvedAt).toLocaleDateString('fr-FR') : (item.createdAt ? new Date(item.createdAt).toLocaleDateString('fr-FR') : '')}</span>
+                </div>
+              </div>
+            ))}
+        </div>
+      </div>
+    </div>
+  )}
 
       {/* MODALE DE SUIVI D'INTERVENTION SUR UN LOGEMENT */}
       {resolvingReclamation && (
