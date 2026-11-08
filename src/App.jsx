@@ -1625,28 +1625,49 @@ if (!currentUser) {
         </div>
       )}
 
-      {/* MODALE POUR VALIDER UNE RÉCLAMATION */}
+      {/* MODALE DE SUIVI D'INTERVENTION SUR UN LOGEMENT */}
       {resolvingReclamation && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleConfirmResolveReclamation} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-base font-bold text-slate-900">Finaliser l'intervention</h3>
-            <p className="text-xs text-slate-500">Logement {resolvingReclamation.apartment} (Étage {resolvingReclamation.floor})</p>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Détails des travaux réalisés *</label>
-              <textarea
-                required
-                value={resolutionText}
-                onChange={e => setResolutionText(e.target.value)}
-                placeholder="Ex : Changement du siphon, test de pression effectué..."
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 h-24"
-              />
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleConfirmResolveReclamation} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
+            
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Suivi d'intervention</h3>
+                <p className="text-xs text-slate-500">Logement {resolvingReclamation.apartment} (Étage {resolvingReclamation.floor})</p>
+              </div>
+              <button type="button" onClick={() => setResolvingReclamation(null)} className="w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">✕</button>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setResolvingReclamation(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Annuler</button>
-              <button type="submit" className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-md shadow-emerald-600/20">Valider & Fermer la réserve</button>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Statut de l'intervention *</label>
+                <select 
+                  id="interventionStatus"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                >
+                  <option value="Fait">✅ Résolu / Fait</option>
+                  <option value="Absent">🏠 Client / Occupant Absent</option>
+                  <option value="Réintervenir">🔄 À réintervenir</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Détails / Motif de l'intervention *</label>
+                <textarea
+                  required
+                  value={resolutionText}
+                  onChange={e => setResolutionText(e.target.value)}
+                  placeholder="Ex : Personne ne répond à l'interphone / Changement du siphon effectué / Fuite persistante..."
+                  className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 h-28 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button type="button" onClick={() => setResolvingReclamation(null)} className="px-5 py-2.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">Annuler</button>
+                <button type="submit" className="px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-lg shadow-emerald-600/20 transition-all">Enregistrer le suivi</button>
+              </div>
             </div>
+
           </form>
         </div>
       )}
