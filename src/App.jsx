@@ -310,11 +310,10 @@ const handleConfirmResolveReclamation = async (e) => {
     e.preventDefault();
     if (!resolvingReclamation || !currentUser) return;
 
-    // Récupère le statut choisi dans le menu déroulant de la modale
+    // Récupère le statut choisi dans le menu déroulant
     const statusSelect = document.getElementById('interventionStatus');
     const selectedStatus = statusSelect ? statusSelect.value : 'Fait';
 
-    // Si 'Fait', on passe en Résolu. Sinon (Absent ou Réintervenir), la réclamation reste À faire.
     const newStatus = selectedStatus === 'Fait' ? 'Résolu' : 'À faire';
 
     let prefix = "Intervention effectuée";
@@ -323,13 +322,25 @@ const handleConfirmResolveReclamation = async (e) => {
 
     const fullDetails = `${prefix} : ${resolutionText.trim()}`;
 
+    // Crée le nouvel élément de suivi pour l'historique
+    const newItem = {
+      status: newStatus,
+      resolutionDetails: fullDetails,
+      resolvedBy: currentUser.name,
+      resolvedAt: new Date().toISOString(),
+      interventionType: selectedStatus // 'Fait', 'Absent', ou 'Réintervenir'
+    };
+
+    // Récupère les items existants et ajoute le nouveau à la liste
+    const updatedItems = [...(resolvingReclamation.items || []), newItem];
+
     try {
       await updateDoc(doc(db, "reclamations", resolvingReclamation.firestoreId), {
         status: newStatus,
         resolvedBy: currentUser.name,
         resolvedAt: new Date().toISOString(),
         resolutionDetails: fullDetails,
-        interventionType: selectedStatus
+        items: updatedItems // On sauvegarde toute la liste des passages
       });
       setResolvingReclamation(null);
       setResolutionText('');
