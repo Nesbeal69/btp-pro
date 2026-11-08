@@ -321,68 +321,50 @@ const handleConfirmResolveReclamation = async (e) => {
   e.preventDefault();
   if (!resolvingReclamation) return;
 
-  // Récupère le statut choisi dans le menu déroulant
   const statusSelect = document.getElementById('interventionStatus');
-  const selectedStatus = statusSelect ? statusSelect.value : 'Fait'; // "Fait", "Absent", ou "Réintervenir"
+  const selectedStatus = statusSelect ? statusSelect.value : 'Fait'; 
 
-  // Récupère le champ texte des détails
   const resolutionText = document.getElementById('resolutionText');
   const details = resolutionText ? resolutionText.value.trim() : '';
-
-  // Récupère l'index du signalement ciblé (si le select existe)
-  const targetSelect = document.getElementById('targetItemIndex');
-  const targetIndex = targetSelect ? targetSelect.value : 'all';
 
   let updatedItems = [...(resolvingReclamation.items || [resolvingReclamation])];
 
   const nowISO = new Date().toISOString();
   const authorName = currentUser?.name || 'Technicien';
 
-  // Détermine le statut final pour l'item
-  const itemNewStatus = selectedStatus === 'Fait' ? 'Fait' : 'En cours';
-  const prefix = selectedStatus === 'Absent' ? 'Occupant absent' : (selectedStatus === 'Réintervenir' ? 'À réintervenir' : 'Travaux effectués');
+  // RÈGLE STRICTE : Seul "Fait" résout le problème. Tout le reste (Absent, Réintervenir) garde le statut "En cours".
+  const isDone = (selectedStatus === 'Fait');
+  const itemNewStatus = isDone ? 'Fait' : 'En cours';
+
+  const prefix = selectedStatus === 'Occupant absent' 
+    ? 'Occupant absent' 
+    : (selectedStatus === 'Réintervenir' ? 'À réintervenir' : 'Travaux effectués');
+    
   const fullDetails = details ? `${prefix} : ${details}` : prefix;
 
-  // Objet représentant la note / l'intervention de ce passage
   const newInterventionNote = {
     status: itemNewStatus,
     observation: fullDetails,
     resolutionDetails: fullDetails,
     createdBy: authorName,
-    resolvedBy: selectedStatus === 'Fait' ? authorName : null,
+    resolvedBy: isDone ? authorName : null,
     createdAt: nowISO,
-    resolvedAt: selectedStatus === 'Fait' ? nowISO : null,
+    resolvedAt: isDone ? nowISO : null,
   };
 
-  if (targetIndex === 'all') {
-    // Si "all", on applique à tous les items non faits
-    updatedItems = updatedItems.map(item => ({
-      ...item,
-      status: selectedStatus === 'Fait' ? 'Fait' : item.status,
-      resolutionDetails: selectedStatus === 'Fait' ? fullDetails : item.resolutionDetails,
-      resolvedBy: selectedStatus === 'Fait' ? authorName : item.resolvedBy,
-      resolvedAt: selectedStatus === 'Fait' ? nowISO : item.resolvedAt,
-      items: [...(item.items || []), newInterventionNote] // Ajoute à l'historique interne de l'item
-    }));
-  } else {
-    // On cible un signalement précis par son index
-    const idx = parseInt(targetIndex, 10);
-    const targetItem = updatedItems[idx];
-    
-    updatedItems[idx] = {
-      ...targetItem,
-      status: itemNewStatus,
-      resolutionDetails: selectedStatus === 'Fait' ? fullDetails : targetItem.resolutionDetails,
-      resolvedBy: selectedStatus === 'Fait' ? authorName : targetItem.resolvedBy,
-      resolvedAt: selectedStatus === 'Fait' ? nowISO : targetItem.resolvedAt,
-      items: [...(targetItem.items || [targetItem]), newInterventionNote]
-    };
-  }
+  // On applique la note à tous les éléments non résolus du logement
+  updatedItems = updatedItems.map(item => ({
+    ...item,
+    // SI isDone est false (donc Absent ou Réintervenir), on NE CHANGE SURTOUT PAS le statut existant !
+    status: isDone ? 'Fait' : item.status,
+    resolutionDetails: isDone ? fullDetails : item.resolutionDetails,
+    resolvedBy: isDone ? authorName : item.resolvedBy,
+    resolvedAt: isDone ? nowISO : item.resolvedAt,
+    items: [...(item.items || [item]), newInterventionNote]
+  }));
 
-  // Vérifie si TOUS les signalements sont résolus pour mettre à jour le statut global du logement
   const allDone = updatedItems.every(item => item.status === 'Fait');
 
-  // Envoi de la mise à jour dans Firebase
   await updateDoc(doc(db, 'reclamations', resolvingReclamation.firestoreId), {
     items: updatedItems,
     status: allDone ? 'Fait' : 'En cours',
