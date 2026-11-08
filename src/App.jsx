@@ -286,6 +286,18 @@ export default function App() {
 const handleCreateReclamation = async (e) => {
     e.preventDefault();
     if (!newReclamation.apartment || !myProjectCode || !currentUser) return;
+
+    const initialObservation = newReclamation.observation ? newReclamation.observation.trim() : "";
+    
+    // Premier élément de l'historique pour cette nouvelle réclamation
+    const firstItem = {
+      status: 'À faire',
+      resolutionDetails: `Signalement : ${initialObservation}`,
+      resolvedBy: currentUser.name,
+      resolvedAt: new Date().toISOString(),
+      interventionType: 'Création'
+    };
+
     try {
       await addDoc(collection(db, "reclamations"), {
         projectCode: myProjectCode,
@@ -293,11 +305,12 @@ const handleCreateReclamation = async (e) => {
         apartment: newReclamation.apartment.trim(),
         floor: newReclamation.floor.trim(),
         clientName: newReclamation.clientName.trim(),
-        observation: newReclamation.observation.trim(),
+        observation: initialObservation,
         status: 'À faire',
         createdBy: currentUser.name,
         createdAt: new Date().toISOString(),
-        resolutionDetails: null
+        resolutionDetails: initialObservation,
+        items: [firstItem] // On initialise l'historique avec cette première note
       });
       setShowAddReclamationModal(false);
       setNewReclamation({ building: '', apartment: '', floor: '', clientName: '', observation: '' });
@@ -1161,7 +1174,7 @@ if (!currentUser) {
         ? group.items[group.items.length - 1] 
         : group.latest;
       const hasPending = group.pendingCount > 0;
-      
+
                 return (
                   <div key={group.key} className="bg-white border border-slate-200/80 hover:border-red-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative">
                     <div>
