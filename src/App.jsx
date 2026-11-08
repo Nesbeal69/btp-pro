@@ -2122,7 +2122,7 @@ if (!currentUser) {
         </div>
       )}
 
-      {/* Modal d'historique des interventions */}
+     {/* Modal d'historique des interventions */}
 {selectedReclamationHistory && (
   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 max-h-[80vh] overflow-y-auto shadow-2xl">
@@ -2144,7 +2144,7 @@ if (!currentUser) {
           ? selectedReclamationHistory 
           : (selectedReclamationHistory.items || [selectedReclamationHistory])
         ).map((item, idx) => (
-          <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
+          <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
             <div className="flex justify-between items-center font-semibold">
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                 item.status === 'Fait' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
@@ -2156,7 +2156,7 @@ if (!currentUser) {
               </span>
             </div>
             
-            <p className="text-slate-800 font-medium pt-1">
+            <p className="text-slate-800 font-semibold pt-1">
               {item.observation || item.resolutionDetails || item.title || 'Signalement / Passage'}
             </p>
 
@@ -2164,6 +2164,30 @@ if (!currentUser) {
               <p className="text-[10px] text-slate-400">
                 Par : {item.resolvedBy || item.createdBy}
               </p>
+            )}
+
+            {/* Affichage des sous-historiques ou remarques de passages (Occupant absent, etc.) */}
+            {((item.history && item.history.length > 0) || (item.notes && item.notes.length > 0) || (item.suivis && item.suivis.length > 0)) && (
+              <div className="mt-2 pt-2 border-t border-slate-200 space-y-1.5">
+                <p className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">
+                  Suivi des passages :
+                </p>
+                
+                {(item.history || item.notes || item.suivis).map((log, lIdx) => (
+                  <div key={lIdx} className="pl-2 border-l-2 border-blue-500 text-[11px] space-y-0.5 bg-white p-2 rounded-lg border border-slate-200">
+                    <div className="flex justify-between items-center font-bold text-slate-700">
+                      <span className="text-blue-700">{log.status || log.type || 'Intervention'}</span>
+                      <span className="text-[9px] text-slate-400">
+                        {log.date ? new Date(log.date).toLocaleDateString('fr-FR') : (log.createdAt ? new Date(log.createdAt).toLocaleDateString('fr-FR') : '')}
+                      </span>
+                    </div>
+                    <p className="text-slate-600">{log.note || log.observation || log.details || log.resolutionDetails || 'Aucun détail'}</p>
+                    {(log.author || log.createdBy) && (
+                      <p className="text-[9px] text-slate-400 italic">Par : {log.author || log.createdBy}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         ))}
