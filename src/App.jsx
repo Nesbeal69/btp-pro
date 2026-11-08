@@ -1745,9 +1745,9 @@ if (!currentUser) {
                   id="interventionStatus"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
                 >
-                  <option value="Fait">✅ Résolu / Fait</option>
-                  <option value="Absent">🏠 Client / Occupant Absent</option>
-                  <option value="Réintervenir">🔄 À réintervenir</option>
+                  <option value="Fait">🟢 Résolu / Fait</option>
+                  <option value="Occupant absent">🚨 Client / Occupant Absent</option>
+                  <option value="Réintervenir">⚠️ À réintervenir</option>
                 </select>
               </div>
 
