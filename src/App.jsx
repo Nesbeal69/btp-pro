@@ -306,15 +306,30 @@ const handleCreateReclamation = async (e) => {
     }
   };
 
-  const handleConfirmResolveReclamation = async (e) => {
+const handleConfirmResolveReclamation = async (e) => {
     e.preventDefault();
     if (!resolvingReclamation || !currentUser) return;
+
+    // Récupère le statut choisi dans le menu déroulant de la modale
+    const statusSelect = document.getElementById('interventionStatus');
+    const selectedStatus = statusSelect ? statusSelect.value : 'Fait';
+
+    // Si 'Fait', on passe en Résolu. Sinon (Absent ou Réintervenir), la réclamation reste À faire.
+    const newStatus = selectedStatus === 'Fait' ? 'Résolu' : 'À faire';
+
+    let prefix = "Intervention effectuée";
+    if (selectedStatus === 'Absent') prefix = "Occupant absent";
+    if (selectedStatus === 'Réintervenir') prefix = "À réintervenir";
+
+    const fullDetails = `${prefix} : ${resolutionText.trim()}`;
+
     try {
       await updateDoc(doc(db, "reclamations", resolvingReclamation.firestoreId), {
-        status: 'Fait',
+        status: newStatus,
         resolvedBy: currentUser.name,
         resolvedAt: new Date().toISOString(),
-        resolutionDetails: resolutionText.trim()
+        resolutionDetails: fullDetails,
+        interventionType: selectedStatus
       });
       setResolvingReclamation(null);
       setResolutionText('');
