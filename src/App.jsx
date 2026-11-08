@@ -831,7 +831,7 @@ if (!currentUser) {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans">
-      <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm sticky top-0 z-20">
+     <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm sticky top-0 z-20">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
           <div className="p-1.5 bg-blue-600 text-white rounded-lg shadow-sm">
             <Building2 className="w-4 h-4" />
@@ -839,10 +839,18 @@ if (!currentUser) {
           <span className="font-bold text-sm text-slate-900 tracking-wide">BÂTIR+ <span className="text-blue-600 font-light">PRO</span></span>
         </div>
         <div className="flex items-center gap-3">
-          <div className="text-right text-xs">
-            <span className="font-bold text-slate-900">{currentUser.name}</span>
-            <span className="text-[10px] ml-2 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200">{isAdmin ? 'CHEF / ADMIN' : currentUser.role.toUpperCase()}</span>
-            {isAdmin && <span className="ml-2 font-mono text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold border border-indigo-200">Code : {myProjectCode}</span>}
+          <div className="flex items-center gap-2.5">
+            {currentUser.photoURL ? (
+              <img src={currentUser.photoURL} alt={currentUser.name} className="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-xs" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                {currentUser.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="text-right text-xs">
+              <span className="font-bold text-slate-900 block">{currentUser.name}</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200">{isAdmin ? 'CHEF / ADMIN' : currentUser.role.toUpperCase()}</span>
+            </div>
           </div>
           
           <button onClick={() => handleOpenUserModal(currentUser)} className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs px-2.5 font-medium border border-slate-200 flex items-center gap-1">
@@ -1782,16 +1790,91 @@ if (!currentUser) {
           </form>
         </div>
       )}
-
+      {/* MODALE MODIFICATION PROFIL UTILISATEUR */}
       {showUserModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleSaveUserModal} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-900">Modifier mon profil</h3>
-            <input type="text" value={userModalData.name} onChange={e => setUserModalData({...userModalData, name: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" required />
-            <input type="tel" value={userModalData.phone} onChange={e => setUserModalData({...userModalData, phone: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" required />
-            <input type="password" placeholder="Nouveau mot de passe" value={userModalData.password} onChange={e => setUserModalData({...userModalData, password: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
-            <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowUserModal(false)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl">Annuler</button><button type="submit" className="px-4 py-2 bg-emerald-600 text-white text-xs rounded-xl">Enregistrer</button></div>
-          </form>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
+            
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
+                  ⚙️
+                </div>
+                <h3 className="text-base font-bold text-slate-900">Modifier mon profil</h3>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowUserModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveUserModal} className="p-6 space-y-4">
+              
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Nom complet *</label>
+                <input 
+                  type="text" 
+                  value={userModalData.name} 
+                  onChange={e => setUserModalData({...userModalData, name: e.target.value})} 
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium" 
+                  required 
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Numéro de téléphone *</label>
+                <input 
+                  type="tel" 
+                  value={userModalData.phone} 
+                  onChange={e => setUserModalData({...userModalData, phone: e.target.value})} 
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium" 
+                  required 
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Lien de la photo de profil (URL)</label>
+                <input 
+                  type="url" 
+                  placeholder="https://exemple.com/ma-photo.jpg" 
+                  value={userModalData.photoURL || ''} 
+                  onChange={e => setUserModalData({...userModalData, photoURL: e.target.value})} 
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all" 
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Nouveau mot de passe (optionnel)</label>
+                <input 
+                  type="password" 
+                  placeholder="Laisser vide pour ne pas changer" 
+                  value={userModalData.password} 
+                  onChange={e => setUserModalData({...userModalData, password: e.target.value})} 
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all" 
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button 
+                  type="button" 
+                  onClick={() => setShowUserModal(false)} 
+                  className="px-5 py-2.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                >
+                  Annuler
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-lg shadow-emerald-600/20 transition-all"
+                >
+                  Enregistrer
+                </button>
+              </div>
+
+            </form>
+          </div>
         </div>
       )}
 
