@@ -254,8 +254,6 @@ export default function App() {
       groups[key].items.push(rec);
     });
 
-    
-
     // Tri des éléments de chaque appartement par date descendante
     Object.values(groups).forEach(g => {
       g.items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -1171,8 +1169,8 @@ if (!currentUser) {
     .sort((a, b) => (b.pendingCount || 0) - (a.pendingCount || 0))
     .map(group => {
       const latest = (group.items && group.items.length > 0) 
-        ? group.items[group.items.length - 1] 
-        : group.latest;
+  ? group.items[0] 
+  : group.latest;
       const hasPending = group.pendingCount > 0;
 
                 return (
