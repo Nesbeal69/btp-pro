@@ -596,7 +596,8 @@ export default function App() {
     setAuthError('');
     try {
       await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
-      const found = users.find(u => u.email.toLowerCase() === loginEmail.toLowerCase().trim());
+      let found = users.find(u => u.email.toLowerCase() === loginEmail.toLowerCase().trim());
+      
       if (!found) {
         setAuthError("Compte authentifié, mais profil introuvable dans la base.");
         return;
