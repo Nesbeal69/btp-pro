@@ -910,23 +910,6 @@ const handleCreateReclamation = async (e) => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div onClick={() => setActiveTab('reclamations')} className="group bg-white border border-slate-200/80 hover:border-red-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-3.5 bg-red-50 text-red-600 rounded-2xl"><AlertTriangle className="w-6 h-6" /></div>
-                    <span className="px-2.5 py-1 bg-red-50 text-red-700 text-xs font-bold rounded-full">
-                      {projectReclamations.filter(r => r.status === 'À faire').length} en cours
-                    </span>
-                  </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-red-600">Réclamations & Réserves</h3>
-                  <p className="text-xs text-slate-500 mt-1">Suivi par logement, appartement et étage.</p>
-                </div>
-                <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-red-600">
-                  <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
-                </div>
-              </div>
-
               <div onClick={() => setActiveTab('planning')} className="group bg-white border border-slate-200/80 hover:border-cyan-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
@@ -951,6 +934,23 @@ const handleCreateReclamation = async (e) => {
                   <p className="text-xs text-slate-500 mt-1">Transmettez tous vos besoins EPI, outillage, fournitures.</p>
                 </div>
                 <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-amber-600">
+                  <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
+                </div>
+              </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div onClick={() => setActiveTab('reclamations')} className="group bg-white border border-slate-200/80 hover:border-red-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-3.5 bg-red-50 text-red-600 rounded-2xl"><AlertTriangle className="w-6 h-6" /></div>
+                    <span className="px-2.5 py-1 bg-red-50 text-red-700 text-xs font-bold rounded-full">
+                      {projectReclamations.filter(r => r.status === 'À faire').length} en cours
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-red-600">Réclamations & Réserves</h3>
+                  <p className="text-xs text-slate-500 mt-1">Suivi par logement, appartement et étage.</p>
+                </div>
+                <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-red-600">
                   <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
                 </div>
               </div>
