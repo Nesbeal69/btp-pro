@@ -4,13 +4,13 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyB6NIS1-Q8vWUQ1Tase-77oHL79FVsXHW",
+  apiKey: "AIzaSyB6NIS1-Q0VwUQltAae-77oHL79FVsXH_w",
   authDomain: "batirplus.firebaseapp.com",
   projectId: "batirplus",
-  storageBucket: "batirplus.appspot.com",
-  messagingSenderId: "784365389497",
-  appId: "1:784365389497:web:160eabc83b598b51a88802",
-  measurementId: "G-8G718DZM0"
+  storageBucket: "batirplus.firebasestorage.app",
+  messagingSenderId: "784365309479",
+  appId: "1:784365309479:web:160eebc83b598851a88802",
+  measurementId: "G-8G718D7WD"
 };
 
 const app = initializeApp(firebaseConfig);
