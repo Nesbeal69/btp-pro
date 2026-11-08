@@ -4,7 +4,7 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyB6NIS1-Q8vwUQ1tAse-77oHL79FVsXHW",
+  apiKey: "AIzaSyB6NIS1-Q8vWUQ1Tase-77oHL79FVsXHW",
   authDomain: "batirplus.firebaseapp.com",
   projectId: "batirplus",
   storageBucket: "batirplus.appspot.com",
@@ -13,7 +13,6 @@ const firebaseConfig = {
   measurementId: "G-8G718DZM0"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 export const db = getFirestore(app);
