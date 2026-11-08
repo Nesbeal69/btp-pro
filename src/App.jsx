@@ -1,7 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { db, auth } from './firebase';
-import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
-import { sendPasswordResetEmail } from 'firebase/auth';
+import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc } from 'firebase/firestore';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  sendPasswordResetEmail 
+} from 'firebase/auth';
 import { 
   Building2, 
   Users, 
@@ -9,32 +13,20 @@ import {
   ClipboardList, 
   UserCheck, 
   Plus, 
-  Minus,
   X, 
   Clock, 
-  MapPin, 
   LogOut,
-  ChevronRight,
   ArrowLeft,
   Calendar as CalendarIcon,
   FileText,
-  Upload,
   Download,
   Eye,
   EyeOff,
-  Filter,
-  CheckCircle2,
-  AlertCircle,
-  PackageCheck,
   Phone,
   Search,
   Settings,
-  ShieldAlert,
-  Sparkles,
   ArrowUpRight,
   Key,
-  Layers,
-  SlidersHorizontal,
   FolderOpen,
   Archive,
   Smartphone
@@ -71,7 +63,7 @@ export default function App() {
   const [requests, setRequests] = useState([]);
   const [plans, setPlans] = useState([]);
 
-  // État pour la gestion du prompt d'installation PWA
+  // PWA
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isStandalone, setIsStandalone] = useState(false);
 
@@ -103,7 +95,7 @@ export default function App() {
   const [workerSearch, setWorkerSearch] = useState('');
   const [workerRoleFilter, setWorkerRoleFilter] = useState('all');
 
-  // Détection si l'application est déjà installée sur l'écran d'accueil
+  // Détection PWA
   useEffect(() => {
     const checkStandalone = () => {
       const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
@@ -481,18 +473,37 @@ export default function App() {
     return projectPlans.filter(p => p.targetUserId === Number(selectedWorkerFilter));
   }, [projectPlans, currentUser, selectedWorkerFilter]);
 
-  const handleLogin = (e) => {
+  // Connexion officielle avec Firebase Auth
+  const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
-    const found = users.find(u => u.email.toLowerCase() === loginEmail.toLowerCase().trim());
-    if (!found) { setAuthError("Email introuvable. Veuillez vous inscrire."); return; }
-    if (loginPassword !== found.password) { setAuthError("Mot de passe incorrect."); return; }
-    if (found.status === 'pending') { setAuthMode('pending'); return; }
-    setCurrentUser(found);
-    setActiveTab('dashboard');
+    try {
+      // 1. Authentification Firebase Auth
+      await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
+
+      // 2. Récupération du profil depuis Firestore
+      const found = users.find(u => u.email.toLowerCase() === loginEmail.toLowerCase().trim());
+      if (!found) {
+        setAuthError("Compte authentifié, mais profil introuvable dans la base.");
+        return;
+      }
+      if (found.status === 'pending') {
+        setAuthMode('pending');
+        return;
+      }
+      setCurrentUser(found);
+      setActiveTab('dashboard');
+    } catch (error) {
+      console.error(error);
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        setAuthError("Email ou mot de passe incorrect.");
+      } else {
+        setAuthError("Erreur de connexion : " + error.message);
+      }
+    }
   };
 
-  // FONCTION DE RÉINITIALISATION DE MOT DE PASSE (Envoi de e-mail officiel via Firebase)
+  // Réinitialisation officielle du mot de passe
   const handleForgotPassword = async () => {
     if (!loginEmail.trim()) {
       setAuthError("Veuillez d'abord saisir votre adresse email dans le champ ci-dessus.");
@@ -505,7 +516,7 @@ export default function App() {
     } catch (error) {
       console.error(error);
       if (error.code === 'auth/user-not-found') {
-        setAuthError("Cet e-mail n'est associé à aucun compte.");
+        setAuthError("Cet e-mail n'est associé à aucun compte Firebase Auth.");
       } else if (error.code === 'auth/invalid-email') {
         setAuthError("L'adresse e-mail saisie n'est pas valide.");
       } else {
@@ -514,6 +525,7 @@ export default function App() {
     }
   };
 
+  // Inscription officielle avec Firebase Auth + Firestore
   const handleRegister = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -521,11 +533,8 @@ export default function App() {
       setAuthError('Veuillez remplir tous les champs.');
       return;
     }
-    const existing = users.find(u => u.email.toLowerCase() === regEmail.toLowerCase().trim());
-    if (existing) { setAuthError('Cet email est déjà utilisé.'); return; }
 
     let assignedProjectCode = '';
-
     if (regIsAdmin) {
       assignedProjectCode = 'CHANTIER-' + Math.floor(1000 + Math.random() * 9000);
     } else {
@@ -538,34 +547,47 @@ export default function App() {
       assignedProjectCode = trimmedCode;
     }
 
-    const newUser = {
-      userIdNum: Date.now(),
-      name: regName,
-      email: regEmail,
-      phone: regPhone,
-      password: regPassword,
-      role: regIsAdmin ? 'admin' : 'Employé',
-      team: regIsAdmin ? 'Direction Chantier' : 'Ouvriers',
-      status: regIsAdmin ? 'approved' : 'pending',
-      projectCode: assignedProjectCode,
-      joinedAt: new Date().toISOString().split('T')[0]
-    };
-
     try {
-      await addDoc(collection(db, "users"), newUser);
+      // 1. Création dans Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, regEmail.trim(), regPassword);
+      const authUser = userCredential.user;
+
+      // 2. Création de la fiche dans Firestore
+      const newUser = {
+        uid: authUser.uid,
+        userIdNum: Date.now(),
+        name: regName,
+        email: regEmail.toLowerCase().trim(),
+        phone: regPhone,
+        role: regIsAdmin ? 'admin' : 'Employé',
+        team: regIsAdmin ? 'Direction Chantier' : 'Ouvriers',
+        status: regIsAdmin ? 'approved' : 'pending',
+        projectCode: assignedProjectCode,
+        joinedAt: new Date().toISOString().split('T')[0]
+      };
+
+      await setDoc(doc(db, "users", authUser.uid), newUser);
+
       if (regIsAdmin) {
         setCurrentUser(newUser);
         setActiveTab('dashboard');
       } else {
         setAuthMode('pending');
       }
-    } catch (e) {
-      console.error(e);
-      setAuthError("Erreur lors de l'inscription.");
+    } catch (error) {
+      console.error(error);
+      if (error.code === 'auth/email-already-in-use') {
+        setAuthError('Cette adresse email est déjà utilisée.');
+      } else if (error.code === 'auth/weak-password') {
+        setAuthError('Le mot de passe doit contenir au moins 6 caractères.');
+      } else {
+        setAuthError("Erreur lors de l'inscription : " + error.message);
+      }
     }
   };
 
   const handleLogout = () => {
+    auth.signOut();
     setCurrentUser(null);
     setAuthMode('login');
     setLoginEmail('');
@@ -603,8 +625,8 @@ export default function App() {
           ) : (
             <>
               <div className="flex rounded-xl bg-black/30 p-1 mb-6 border border-white/10">
-                <button onClick={() => { setAuthMode('login'); setAuthError(''); setResetSent(false); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'login' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Connexion</button>
-                <button onClick={() => { setAuthMode('register'); setAuthError(''); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'register' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Inscription</button>
+                <button type="button" onClick={() => { setAuthMode('login'); setAuthError(''); setResetSent(false); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'login' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Connexion</button>
+                <button type="button" onClick={() => { setAuthMode('register'); setAuthError(''); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'register' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Inscription</button>
               </div>
 
               {authError && <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-xs text-red-200 font-medium">{authError}</div>}
@@ -1331,95 +1353,6 @@ export default function App() {
           </form>
         </div>
       )}
-    </div>
-  );
-}
-
-// --- COMPOSANT MODALE AJOUTER TÂCHE ---
-export function ModalAjouterTache({ isOpen, onClose, onSubmit }) {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
-      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
-        
-        {/* Entête */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/50">
-          <div>
-            <h3 className="text-lg font-semibold text-white">Assigner une tâche</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Renseignez les détails de l'intervention pour vos équipes.</p>
-          </div>
-          <button 
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Formulaire */}
-        <form onSubmit={onSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Titre de l'intervention</label>
-            <input
-              type="text"
-              placeholder="Ex: Pose raccordement sanitaire Bâtiment A"
-              className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Attribuer à</label>
-            <select className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="all">Toute l'équipe</option>
-              <option value="eq1">Équipe Plomberie</option>
-              <option value="eq2">Équipe Chauffage</option>
-            </select>
-          </div>
-
-          {/* Champ Date */}
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Date d'exécution</label>
-            <div className="relative cursor-pointer" onClick={(e) => {
-              const input = e.currentTarget.querySelector('input[type="date"]');
-              if (input && input.showPicker) input.showPicker();
-            }}>
-              <input
-                type="date"
-                defaultValue={new Date().toISOString().split('T')[0]}
-                className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Consignes spécifiques</label>
-            <textarea
-              rows="3"
-              placeholder="Détails du travail, matériel requis..."
-              className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            ></textarea>
-          </div>
-
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800 mt-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-xl shadow-lg shadow-blue-600/20"
-            >
-              Publier l'intervention
-            </button>
-          </div>
-        </form>
-
-      </div>
     </div>
   );
 }
