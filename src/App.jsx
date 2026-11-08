@@ -852,7 +852,7 @@ if (!currentUser) {
         </div>
       </header>
 
-      {/* BARRE DE NAVIGATION RAPIDE PAR ONGLETS */}
+      {/* BARRE DE NAVIGATION RAPIDE PAR ONGLETS (Remplace le bouton Retour) */}
       <div className="bg-white border-b border-slate-200 px-4 py-2 overflow-x-auto sticky top-[57px] z-10 shadow-xs">
         <div className="flex items-center gap-2 min-max-content">
           <button 
@@ -904,9 +904,9 @@ if (!currentUser) {
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-8">
         
-        {/* BANDEAU D'INSTALLATION PWA (AVEC CROIX DE FERMETURE) */}
-        {!isStandalone && showInstallBanner && (
-          <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-blue-950 text-white p-4 rounded-3xl shadow-lg border border-blue-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 relative overflow-hidden">
+        {/* BANDEAU D'INSTALLATION PWA */}
+        {!isStandalone && (
+          <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-blue-950 text-white p-4 rounded-3xl shadow-lg border border-blue-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-md">
                 <Smartphone className="w-6 h-6 animate-pulse" />
@@ -916,23 +916,12 @@ if (!currentUser) {
                 <p className="text-xs text-slate-300 mt-0.5">Accédez à l'application en un clic depuis votre écran d'accueil, sans passer par le navigateur.</p>
               </div>
             </div>
-
-            <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-              <button 
-                onClick={handleInstallClick}
-                className="px-5 py-2.5 bg-blue-500 hover:bg-blue-400 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
-              >
-                📱 Installer l'application
-              </button>
-              
-              <button 
-                onClick={() => setShowInstallBanner(false)}
-                title="Masquer"
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-colors text-xs font-bold"
-              >
-                ✕
-              </button>
-            </div>
+            <button 
+              onClick={handleInstallClick}
+              className="w-full sm:w-auto px-5 py-2.5 bg-blue-500 hover:bg-blue-400 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
+            >
+              📱 Installer l'application
+            </button>
           </div>
         )}
 
@@ -1744,8 +1733,6 @@ if (!currentUser) {
               >
                 <option value="Employé">👷‍♂️ Employé</option>
                 <option value="Intérimaire">⚡ Intérimaire</option>
-                <option value="Conducteur de Travaux">🏗️ Conducteur de Travaux</option>
-                <option value="Locataire / Résident">🏠 Locataire / Résident</option>
                 <option value="admin">🛡️ Admin</option>
               </select>
             </div>
