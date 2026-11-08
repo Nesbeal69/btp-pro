@@ -1926,16 +1926,31 @@ const handleCreateReclamation = async (e) => {
         </div>
       )}
 
-      {/* 🏗️ CONTENEUR & STOCK (Bientôt disponible) */}
+{/* 6. VALIDATION DES COMPTES */}
+      <div className="bg-white border border-slate-200/80 hover:border-indigo-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between group">
+        <div>
+          <div className="flex justify-between items-center mb-3">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">🛡️</div>
+            <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">0 en attente</span>
+          </div>
+          <h3 className="text-base font-bold text-slate-900">Validation des Comptes</h3>
+          <p className="text-xs text-slate-500 mt-1 leading-relaxed">Validez les comptes qui ont utilisé votre code.</p>
+        </div>
+        <button 
+          onClick={() => setActiveTab('validations')} 
+          className="w-full py-2.5 bg-slate-50 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 text-xs font-bold rounded-xl transition-all flex items-center justify-between px-4 border border-slate-200/60"
+        >
+          <span>Accéder</span> <span>↗</span>
+        </button>
+      </div>
+
+      {/* 7. STOCK CONTENEUR (Bientôt disponible - Intégré proprement dans la grille) */}
       <div className="bg-slate-50 border border-slate-200/60 p-6 rounded-3xl space-y-4 shadow-sm opacity-80 flex flex-col justify-between group relative overflow-hidden">
-        
-        {/* Badge "Bientôt" en haut à droite */}
         <div className="absolute top-4 right-4">
           <span className="px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider rounded-full bg-amber-100 text-amber-800 border border-amber-200 shadow-xs">
             Bientôt dispo
           </span>
         </div>
-
         <div>
           <div className="flex justify-between items-center mb-3">
             <div className="w-10 h-10 rounded-2xl bg-slate-200 text-slate-500 flex items-center justify-center font-bold">🏗️</div>
@@ -1943,8 +1958,6 @@ const handleCreateReclamation = async (e) => {
           <h3 className="text-base font-bold text-slate-700">Stock Conteneur</h3>
           <p className="text-xs text-slate-400 mt-1 leading-relaxed">Suivi du matériel et gestion des stocks en direct depuis le conteneur.</p>
         </div>
-
-        {/* Bouton désactivé */}
         <button 
           disabled
           className="w-full py-2.5 bg-slate-200/60 text-slate-400 text-xs font-bold rounded-xl cursor-not-allowed flex items-center justify-center gap-2 border border-slate-200"
@@ -1952,7 +1965,7 @@ const handleCreateReclamation = async (e) => {
           Bientôt disponible 🔒
         </button>
       </div>
-
+      
       {showAddToolModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreateTool} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
