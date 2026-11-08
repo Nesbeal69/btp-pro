@@ -1234,18 +1234,18 @@ if (!currentUser) {
 
                   <div className="pt-4 border-t border-slate-100 flex flex-col gap-2">
                       <div className="flex items-center gap-2">
-                        {latest.status === 'À faire' ? (
-                          <button
-                            onClick={() => { setResolvingReclamation(latest); setResolutionText(''); }}
-                            className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-600/20 transition-all flex items-center justify-center gap-1"
-                          >
-                            <CheckCircle2 className="w-4 h-4" /> 📝 Suivi d'intervention
-                          </button>
-                        ) : (
-                          <span className="flex-1 py-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl text-center border border-emerald-200">
-                            ✅ Résolu
-                          </span>
-                        )}
+  {latest.status !== 'Fait' ? (
+    <button
+      onClick={() => { setResolvingReclamation(latest); setResolutionText(''); }}
+      className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-blue-600/20 transition-all flex items-center justify-center gap-2"
+    >
+      <CheckCircle2 className="w-4 h-4" /> Suivi d'intervention
+    </button>
+  ) : (
+    <span className="flex-1 py-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl text-center border border-emerald-200">
+      ✅ Résolu
+    </span>
+  )}
 
                         <button
                           onClick={() => setSelectedReclamationHistory(group)}
