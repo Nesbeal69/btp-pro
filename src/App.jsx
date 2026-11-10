@@ -165,14 +165,9 @@ export default function App() {
     return dateString;
   };
 
+  // Gestion de l'expiration de session après 24h et des abonnements Firestore
   useEffect(() => {
-    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
-      setUsers(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
-    });
-
-    // Gestion de l'expiration de session après 24h
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
         const loginTimestamp = localStorage.getItem('loginTimestamp');
         const now = Date.now();
@@ -190,8 +185,9 @@ export default function App() {
       }
     });
 
-    return () => unsubscribe();
-  }, []);
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+      setUsers(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
+    });
 
     const unsubArchived = onSnapshot(collection(db, "archivedUsers"), (snapshot) => {
       setArchivedUsers(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
@@ -214,6 +210,7 @@ export default function App() {
     });
 
     return () => {
+      unsubscribeAuth();
       unsubUsers();
       unsubArchived();
       unsubEquipment();
@@ -283,7 +280,6 @@ export default function App() {
       groups[key].items.push(rec);
     });
 
-    // Tri des éléments de chaque appartement par date descendante
     Object.values(groups).forEach(g => {
       g.items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       g.latest = g.items[0];
@@ -310,13 +306,12 @@ export default function App() {
     });
   }, [groupedReclamations, reclamationSearch, reclamationStatusFilter]);
 
-const handleCreateReclamation = async (e) => {
+  const handleCreateReclamation = async (e) => {
     e.preventDefault();
     if (!newReclamation.apartment || !myProjectCode || !currentUser) return;
 
     const initialObservation = newReclamation.observation ? newReclamation.observation.trim() : "";
     
-    // Premier élément de l'historique pour cette nouvelle réclamation
     const firstItem = {
       status: 'À faire',
       resolutionDetails: `Signalement : ${initialObservation}`,
@@ -337,7 +332,7 @@ const handleCreateReclamation = async (e) => {
         createdBy: currentUser.name,
         createdAt: new Date().toISOString(),
         resolutionDetails: initialObservation,
-        items: [firstItem] // On initialise l'historique avec cette première note
+        items: [firstItem]
       });
       setShowAddReclamationModal(false);
       setNewReclamation({ building: '', apartment: '', floor: '', clientName: '', observation: '' });
@@ -346,66 +341,63 @@ const handleCreateReclamation = async (e) => {
     }
   };
 
-const handleConfirmResolveReclamation = async (e) => {
-  e.preventDefault();
-  if (!resolvingReclamation) return;
+  const handleConfirmResolveReclamation = async (e) => {
+    e.preventDefault();
+    if (!resolvingReclamation) return;
 
-  const statusSelect = document.getElementById('interventionStatus');
-  const selectedStatus = statusSelect ? statusSelect.value : 'Fait'; 
+    const statusSelect = document.getElementById('interventionStatus');
+    const selectedStatus = statusSelect ? statusSelect.value : 'Fait'; 
 
-  const resolutionText = document.getElementById('resolutionText');
-  const details = resolutionText ? resolutionText.value.trim() : '';
+    const resolutionTextElem = document.getElementById('resolutionText');
+    const details = resolutionTextElem ? resolutionTextElem.value.trim() : '';
 
-  let updatedItems = [...(resolvingReclamation.items || [resolvingReclamation])];
+    let updatedItems = [...(resolvingReclamation.items || [resolvingReclamation])];
 
-  const nowISO = new Date().toISOString();
-  const authorName = currentUser?.name || 'Technicien';
+    const nowISO = new Date().toISOString();
+    const authorName = currentUser?.name || 'Technicien';
 
-  // Si ce n'est pas "Fait", on bloque catégoriquement la résolution
-  const isDone = (selectedStatus === 'Fait');
+    const isDone = (selectedStatus === 'Fait');
 
-  const prefix = selectedStatus === 'Occupant absent' 
-    ? 'Occupant absent' 
-    : (selectedStatus === 'Réintervenir' ? 'À réintervenir' : 'Travaux effectués');
-    
-  const fullDetails = details ? `${prefix} : ${details}` : prefix;
+    const prefix = selectedStatus === 'Occupant absent' 
+      ? 'Occupant absent' 
+      : (selectedStatus === 'Réintervenir' ? 'À réintervenir' : 'Travaux effectués');
+      
+    const fullDetails = details ? `${prefix} : ${details}` : prefix;
 
-  const newInterventionNote = {
-    status: isDone ? 'Fait' : 'En cours',
-    observation: fullDetails,
-    resolutionDetails: fullDetails,
-    createdBy: authorName,
-    resolvedBy: isDone ? authorName : null,
-    createdAt: nowISO,
-    resolvedAt: isDone ? nowISO : null,
+    const newInterventionNote = {
+      status: isDone ? 'Fait' : 'En cours',
+      observation: fullDetails,
+      resolutionDetails: fullDetails,
+      createdBy: authorName,
+      resolvedBy: isDone ? authorName : null,
+      createdAt: nowISO,
+      resolvedAt: isDone ? nowISO : null,
+    };
+
+    updatedItems = updatedItems.map((item, idx) => {
+      if (idx === updatedItems.length - 1) {
+        return {
+          ...item,
+          status: isDone ? 'Fait' : item.status,
+          resolutionDetails: isDone ? fullDetails : item.resolutionDetails,
+          resolvedBy: isDone ? authorName : item.resolvedBy,
+          resolvedAt: isDone ? nowISO : item.resolvedAt,
+          items: [...(item.items || []), newInterventionNote]
+        };
+      }
+      return item;
+    });
+
+    const allDone = updatedItems.every(item => item.status === 'Fait');
+
+    await updateDoc(doc(db, 'reclamations', resolvingReclamation.firestoreId), {
+      items: updatedItems,
+      status: allDone ? 'Fait' : 'En cours',
+      updatedAt: nowISO
+    });
+
+    setResolvingReclamation(null);
   };
-
-  // Si c'est "Occupant absent" ou "Réintervenir", on ajoute juste la note au dernier item SANS changer son statut initial !
-  updatedItems = updatedItems.map((item, idx) => {
-    // On prend le dernier item ou l'item actuel
-    if (idx === updatedItems.length - 1) {
-      return {
-        ...item,
-        status: isDone ? 'Fait' : item.status, // Conserve le statut actuel si pas "Fait"
-        resolutionDetails: isDone ? fullDetails : item.resolutionDetails,
-        resolvedBy: isDone ? authorName : item.resolvedBy,
-        resolvedAt: isDone ? nowISO : item.resolvedAt,
-        items: [...(item.items || []), newInterventionNote]
-      };
-    }
-    return item;
-  });
-
-  const allDone = updatedItems.every(item => item.status === 'Fait');
-
-  await updateDoc(doc(db, 'reclamations', resolvingReclamation.firestoreId), {
-    items: updatedItems,
-    status: allDone ? 'Fait' : 'En cours',
-    updatedAt: nowISO
-  });
-
-  setResolvingReclamation(null);
-};
 
   const handleDeleteReclamation = async (firestoreId) => {
     if (window.confirm("Voulez-vous vraiment supprimer cette réclamation ?")) {
@@ -494,17 +486,6 @@ const handleConfirmResolveReclamation = async (e) => {
     } catch (e) { console.error(e); }
   };
 
-  const handleRequestAttachmentChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewRequestData(prev => ({ ...prev, attachmentName: file.name, attachmentData: reader.result }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleCreateRequest = async (e) => {
     e.preventDefault();
     if (!newRequestData.items || !myProjectCode || !currentUser) return;
@@ -553,7 +534,7 @@ const handleConfirmResolveReclamation = async (e) => {
   }, [approvedUsers, workerSearch, workerRoleFilter]);
 
   const handleOpenUserModal = (userToEdit) => {
-    setUserModalData({ firestoreId: userToEdit.firestoreId, name: userToEdit.name, phone: userToEdit.phone || '', role: userToEdit.role, password: userToEdit.password || '' });
+    setUserModalData({ firestoreId: userToEdit.firestoreId, name: userToEdit.name, phone: userToEdit.phone || '', role: userToEdit.role, password: userToEdit.password || '', photoURL: userToEdit.photoURL || '' });
     setShowUserModal(true);
   };
 
@@ -565,6 +546,7 @@ const handleConfirmResolveReclamation = async (e) => {
         name: userModalData.name,
         phone: userModalData.phone,
         password: userModalData.password,
+        photoURL: userModalData.photoURL || '',
         ...(currentUser.role === 'admin' ? { role: userModalData.role } : {})
       });
       setShowUserModal(false);
@@ -789,6 +771,7 @@ const handleConfirmResolveReclamation = async (e) => {
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('loginTimestamp');
     auth.signOut();
     setCurrentUser(null);
     setAuthMode('login');
@@ -799,7 +782,7 @@ const handleConfirmResolveReclamation = async (e) => {
 
   const isAdmin = currentUser?.role === 'admin';
 
-if (!currentUser) {
+  if (!currentUser) {
     return (
       <div className="min-h-screen text-slate-100 flex items-center justify-center p-4 relative overflow-hidden">
         <div 
@@ -916,7 +899,7 @@ if (!currentUser) {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans">
-     <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm sticky top-0 z-20">
+      <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm sticky top-0 z-20">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
           <div className="p-1.5 bg-blue-600 text-white rounded-lg shadow-sm">
             <Building2 className="w-4 h-4" />
@@ -945,9 +928,9 @@ if (!currentUser) {
         </div>
       </header>
 
-      {/* BARRE DE NAVIGATION RAPIDE PAR ONGLETS (Remplace le bouton Retour) */}
+      {/* BARRE DE NAVIGATION RAPIDE PAR ONGLETS */}
       <div className="bg-white border-b border-slate-200 px-4 py-2 overflow-x-auto sticky top-[57px] z-10 shadow-xs">
-        <div className="flex items-center gap-2 min-max-content">
+        <div className="flex items-center gap-2 min-w-max">
           <button 
             onClick={() => setActiveTab('dashboard')} 
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
@@ -1042,10 +1025,8 @@ if (!currentUser) {
               </div>
             </div>
 
-            {/* GRILLE UNIFORME DES 7 MODULES DU TABLEAU DE BORD */}
+            {/* GRILLE DES MODULES */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-              {/* 1. PLANNING */}
               <div onClick={() => setActiveTab('planning')} className="group bg-white border border-slate-200/80 hover:border-cyan-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
@@ -1060,7 +1041,6 @@ if (!currentUser) {
                 </div>
               </div>
 
-              {/* 2. DEMANDES MATÉRIEL */}
               <div onClick={() => setActiveTab('requests')} className="group bg-white border border-slate-200/80 hover:border-amber-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
@@ -1075,7 +1055,6 @@ if (!currentUser) {
                 </div>
               </div>
 
-              {/* 3. RÉCLAMATIONS & RÉSERVES */}
               <div onClick={() => setActiveTab('reclamations')} className="group bg-white border border-slate-200/80 hover:border-red-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
@@ -1092,7 +1071,6 @@ if (!currentUser) {
                 </div>
               </div>
 
-              {/* 4. EFFECTIFS */}
               <div onClick={() => setActiveTab('workers')} className="group bg-white border border-slate-200/80 hover:border-emerald-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
@@ -1107,7 +1085,6 @@ if (!currentUser) {
                 </div>
               </div>
 
-              {/* 5. PARC OUTILLAGE */}
               <div onClick={() => setActiveTab('tools')} className="group bg-white border border-slate-200/80 hover:border-indigo-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
@@ -1122,7 +1099,6 @@ if (!currentUser) {
                 </div>
               </div>
 
-              {/* 6. VALIDATION DES COMPTES (Admin seulement) */}
               {isAdmin && (
                 <div onClick={() => setActiveTab('accounts')} className="group bg-white border border-slate-200/80 hover:border-purple-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                   <div>
@@ -1138,34 +1114,11 @@ if (!currentUser) {
                   </div>
                 </div>
               )}
-
-              {/* 7. STOCK CONTENEUR (Bientôt disponible) */}
-              <div className="bg-slate-50 border border-slate-200/60 p-6 rounded-3xl space-y-4 shadow-sm opacity-80 flex flex-col justify-between group relative overflow-hidden">
-                <div className="absolute top-4 right-4">
-                  <span className="px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider rounded-full bg-amber-100 text-amber-800 border border-amber-200 shadow-xs">
-                    Bientôt dispo
-                  </span>
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-3">
-                    <div className="w-10 h-10 rounded-2xl bg-slate-200 text-slate-500 flex items-center justify-center font-bold">🏗️</div>
-                  </div>
-                  <h3 className="text-base font-bold text-slate-700">Stock Conteneur</h3>
-                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">Suivi du matériel et gestion des stocks en direct depuis le conteneur.</p>
-                </div>
-                <button 
-                  disabled
-                  className="w-full py-2.5 bg-slate-200/60 text-slate-400 text-xs font-bold rounded-xl cursor-not-allowed flex items-center justify-center gap-2 border border-slate-200"
-                >
-                  Bientôt disponible 🔒
-                </button>
-              </div>
-
             </div>
           </div>
         )}
 
-        {/* --- MODULE RÉCLAMATIONS & RÉSERVES --- */}
+        {/* --- MODULE RÉCLAMATIONS --- */}
         {activeTab === 'reclamations' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-red-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-red-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1213,94 +1166,94 @@ if (!currentUser) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-  {[...filteredGroupedReclamations]
-    .sort((a, b) => (b.pendingCount || 0) - (a.pendingCount || 0))
-    .map(group => {
-     const latest = (group.items && group.items.length > 0) ? group.items[0] : group.latest;
-    const pendingItemsCount = group.items ? group.items.filter(i => i.status !== 'Fait').length : (group.pendingCount || 0);
-    const hasPending = pendingItemsCount > 0;
-                return (
-                  <div key={group.key} className="bg-white border border-slate-200/80 hover:border-red-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative">
-                    <div>
-                      <div className="flex justify-between items-start pb-3 border-b border-slate-100">
-                        <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Localisation {group.building && `(${group.building})`}</span>
-                          <h3 className="text-lg font-black text-slate-900 flex items-center gap-1.5">
-                            <Home className="w-4 h-4 text-blue-600" /> Logement {group.apartment}
-                          </h3>
-                          <p className="text-xs text-slate-500 mt-0.5">Étage : <strong>{group.floor || 'Non précisé'}</strong> {group.clientName && `| Occupant : ${group.clientName}`}</p>
+              {[...filteredGroupedReclamations]
+                .sort((a, b) => (b.pendingCount || 0) - (a.pendingCount || 0))
+                .map(group => {
+                  const latest = (group.items && group.items.length > 0) ? group.items[0] : group.latest;
+                  const pendingItemsCount = group.items ? group.items.filter(i => i.status !== 'Fait').length : (group.pendingCount || 0);
+                  const hasPending = pendingItemsCount > 0;
+                  return (
+                    <div key={group.key} className="bg-white border border-slate-200/80 hover:border-red-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative">
+                      <div>
+                        <div className="flex justify-between items-start pb-3 border-b border-slate-100">
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Localisation {group.building && `(${group.building})`}</span>
+                            <h3 className="text-lg font-black text-slate-900 flex items-center gap-1.5">
+                              <Home className="w-4 h-4 text-blue-600" /> Logement {group.apartment}
+                            </h3>
+                            <p className="text-xs text-slate-500 mt-0.5">Étage : <strong>{group.floor || 'Non précisé'}</strong> {group.clientName && `| Occupant : ${group.clientName}`}</p>
+                          </div>
+
+                          <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full ${hasPending ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700'}`}>
+                           {hasPending ? `⚠️ ${pendingItemsCount} en cours` : '🟢 Tout résolu'}
+                          </span>
                         </div>
 
-                        <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full ${hasPending ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700'}`}>
-                         {hasPending ? `⚠️ ${pendingItemsCount} en cours` : '🟢 Tout résolu'}
-                        </span>
+                        <div className="mt-3 space-y-2">
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Dernière Réclamation</span>
+                          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2">
+                            <p className="text-xs text-slate-800 font-medium leading-relaxed">
+                              "{latest.observation}"
+                            </p>
+                            <div className="flex justify-between items-center text-[10px] text-slate-400 pt-1 border-t border-slate-200/60">
+                              <span>Ajouté par : <strong>{latest.createdBy}</strong></span>
+                              <span>{new Date(latest.createdAt).toLocaleDateString('fr-FR')}</span>
+                            </div>
+                          </div>
+
+                          {latest.status === 'Fait' && latest.resolutionDetails && (
+                            <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl space-y-1">
+                              <span className="text-[10px] font-bold text-emerald-800 uppercase flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Intervention effectuée
+                              </span>
+                              <p className="text-xs text-emerald-950 font-medium">
+                                "{latest.resolutionDetails}"
+                              </p>
+                              <p className="text-[10px] text-emerald-700">Par : {latest.resolvedBy} le {new Date(latest.resolvedAt).toLocaleDateString('fr-FR')}</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="mt-3 space-y-2">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Dernière Réclamation</span>
-                        <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2">
-                          <p className="text-xs text-slate-800 font-medium leading-relaxed">
-                            "{latest.observation}"
-                          </p>
-                          <div className="flex justify-between items-center text-[10px] text-slate-400 pt-1 border-t border-slate-200/60">
-                            <span>Ajouté par : <strong>{latest.createdBy}</strong></span>
-                            <span>{new Date(latest.createdAt).toLocaleDateString('fr-FR')}</span>
-                          </div>
+                      <div className="pt-4 border-t border-slate-100 flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          {latest.status !== 'Fait' ? (
+                            <button
+                              onClick={() => { setResolvingReclamation(latest); setResolutionText(''); }}
+                              className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-blue-600/20 transition-all flex items-center justify-center gap-2"
+                            >
+                              <CheckCircle2 className="w-4 h-4" /> Suivi d'intervention
+                            </button>
+                          ) : (
+                            <span className="flex-1 py-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl text-center border border-emerald-200">
+                              ✅ Résolu
+                            </span>
+                          )}
+
+                          <button
+                            onClick={() => setSelectedReclamationHistory(group.items)}
+                            className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1"
+                            title="Voir l'historique complet de ce logement"
+                          >
+                            <History className="w-4 h-4" /> 
+                            <span>({group.items ? group.items.length : 0})</span>
+                          </button>
                         </div>
 
-                        {latest.status === 'Fait' && latest.resolutionDetails && (
-                          <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl space-y-1">
-                            <span className="text-[10px] font-bold text-emerald-800 uppercase flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Intervention effectuée
-                            </span>
-                            <p className="text-xs text-emerald-950 font-medium">
-                              "{latest.resolutionDetails}"
-                            </p>
-                            <p className="text-[10px] text-emerald-700">Par : {latest.resolvedBy} le {new Date(latest.resolvedAt).toLocaleDateString('fr-FR')}</p>
+                        {isAdmin && (
+                          <div className="flex justify-end">
+                            <button
+                              onClick={() => handleDeleteReclamation(latest.firestoreId)}
+                              className="text-[11px] text-red-500 hover:underline font-semibold"
+                            >
+                              Supprimer la dernière fiche
+                            </button>
                           </div>
                         )}
                       </div>
                     </div>
-
-                  <div className="pt-4 border-t border-slate-100 flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-  {latest.status !== 'Fait' ? (
-    <button
-      onClick={() => { setResolvingReclamation(latest); setResolutionText(''); }}
-      className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-blue-600/20 transition-all flex items-center justify-center gap-2"
-    >
-      <CheckCircle2 className="w-4 h-4" /> Suivi d'intervention
-    </button>
-  ) : (
-    <span className="flex-1 py-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl text-center border border-emerald-200">
-      ✅ Résolu
-    </span>
-  )}
-
-                       <button
-  onClick={() => setSelectedReclamationHistory(group.items || group.reclamations || group)}
-  className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1"
-  title="Voir l'historique complet de ce logement"
->
-  <History className="w-4 h-4" /> 
-  <span>({group.items ? group.items.length : 0})</span>
-</button>
-                      </div>
-
-                      {isAdmin && (
-                        <div className="flex justify-end">
-                          <button
-                            onClick={() => handleDeleteReclamation(latest.firestoreId)}
-                            className="text-[11px] text-red-500 hover:underline font-semibold"
-                          >
-                            Supprimer la dernière fiche
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
 
               {filteredGroupedReclamations.length === 0 && (
                 <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
@@ -1559,192 +1512,125 @@ if (!currentUser) {
           </div>
         )}
 
-{/* --- MODULE PARC OUTILLAGE --- */}
-    {activeTab === 'tools' && (
-      <div className="space-y-6">
-        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-indigo-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex items-center gap-4">
-            <div className="p-4 bg-indigo-600/20 border border-indigo-400/30 rounded-2xl">
-              <Wrench className="w-7 h-7 text-indigo-400" />
-            </div>
-            <div>
-              <h2 className="text-xl font-black tracking-wide">Parc Outillage</h2>
-              <p className="text-xs text-slate-300 mt-0.5">Suivi du parc, des maintenances et de leur affectation.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <select value={toolStatusFilter} onChange={e => setToolStatusFilter(e.target.value)} className="px-3.5 py-2.5 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none">
-              <option value="all" className="bg-slate-900">🔍 Tous les statuts</option>
-              <option value="Disponible" className="bg-slate-900">🟢 Disponible</option>
-              <option value="En service" className="bg-slate-900">⚡ Attribué</option>
-              <option value="En révision" className="bg-slate-900">🛠️ En révision</option>
-            </select>
-            {isAdmin && (
-              <button onClick={() => setShowAddToolModal(true)} className="px-4 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all">
-                <Plus className="w-4 h-4" /> Ajouter une Machine
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredEquipment.map(tool => (
-            <div key={tool.firestoreId} className="bg-white border border-slate-200/80 hover:border-indigo-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-mono text-xs font-bold rounded-xl border border-indigo-100">{tool.id}</span>
-                  <span className="text-xs text-slate-500 font-medium">{tool.brand || 'REMS'}</span>
+        {/* --- MODULE PARC OUTILLAGE --- */}
+        {activeTab === 'tools' && (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-indigo-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-indigo-600/20 border border-indigo-400/30 rounded-2xl">
+                  <Wrench className="w-7 h-7 text-indigo-400" />
                 </div>
-
-                <h3 className="text-base font-bold text-slate-900">{tool.name}</h3>
-
-                <div className="mt-4 space-y-2 text-xs bg-slate-50 p-3 rounded-2xl border border-slate-200/60">
-                  <div className="flex justify-between"><span className="text-slate-500 font-medium">Statut :</span><span className="font-bold text-emerald-600">{tool.status}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500 font-medium">Affecté à :</span><span className="font-bold text-slate-800">{tool.assignedTo}</span></div>
+                <div>
+                  <h2 className="text-xl font-black tracking-wide">Parc Outillage</h2>
+                  <p className="text-xs text-slate-300 mt-0.5">Suivi du parc, des maintenances et de leur affectation.</p>
                 </div>
               </div>
-
-              <div className="pt-4 border-t border-slate-100 flex items-center gap-2">
-                <button onClick={() => setSelectedTool(tool)} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 font-bold rounded-xl transition-colors">
-                  💬 Notes ({tool.notes?.length || 0})
-                </button>
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <select value={toolStatusFilter} onChange={e => setToolStatusFilter(e.target.value)} className="px-3.5 py-2.5 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none">
+                  <option value="all" className="bg-slate-900">🔍 Tous les statuts</option>
+                  <option value="Disponible" className="bg-slate-900">🟢 Disponible</option>
+                  <option value="En service" className="bg-slate-900">⚡ Attribué</option>
+                  <option value="En révision" className="bg-slate-900">🛠️ En révision</option>
+                </select>
                 {isAdmin && (
-                  <>
-                    <button onClick={() => handleOpenEditModal(tool)} className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold rounded-xl transition-colors">Modifier</button>
-                    <button onClick={() => handleDeleteTool(tool.firestoreId)} className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-colors">🗑️</button>
-                  </>
+                  <button onClick={() => setShowAddToolModal(true)} className="px-4 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all">
+                    <Plus className="w-4 h-4" /> Ajouter une Machine
+                  </button>
                 )}
               </div>
             </div>
-          ))}
 
-          {filteredEquipment.length === 0 && (
-            <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
-              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl mx-auto flex items-center justify-center">
-                <Wrench className="w-6 h-6" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-800">Aucune machine trouvée</h4>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto">Aucun outil ne correspond à votre recherche ou le parc est vide.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredEquipment.map(tool => (
+                <div key={tool.firestoreId} className="bg-white border border-slate-200/80 hover:border-indigo-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-mono text-xs font-bold rounded-xl border border-indigo-100">{tool.id}</span>
+                      <span className="text-xs text-slate-500 font-medium">{tool.brand || 'REMS'}</span>
+                    </div>
+
+                    <h3 className="text-base font-bold text-slate-900">{tool.name}</h3>
+
+                    <div className="mt-4 space-y-2 text-xs bg-slate-50 p-3 rounded-2xl border border-slate-200/60">
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Statut :</span><span className="font-bold text-emerald-600">{tool.status}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Affecté à :</span><span className="font-bold text-slate-800">{tool.assignedTo}</span></div>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-100 flex items-center gap-2">
+                    <button onClick={() => setSelectedTool(tool)} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 font-bold rounded-xl transition-colors">
+                      💬 Notes ({tool.notes?.length || 0})
+                    </button>
+                    {isAdmin && (
+                      <>
+                        <button onClick={() => handleOpenEditModal(tool)} className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold rounded-xl transition-colors">Modifier</button>
+                        <button onClick={() => handleDeleteTool(tool.firestoreId)} className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-colors">🗑️</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {filteredEquipment.length === 0 && (
+                <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                  <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl mx-auto flex items-center justify-center">
+                    <Wrench className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">Aucune machine trouvée</h4>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Aucun outil ne correspond à votre recherche ou le parc est vide.</p>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </div>
-    )}
-
-    {/* --- VALIDATION COMPTES (ADMIN) --- */}
-    {activeTab === 'accounts' && isAdmin && (
-      <div className="space-y-6">
-        <div className="bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-purple-900/40 flex items-center gap-4">
-          <div className="p-4 bg-purple-600/20 border border-purple-400/30 rounded-2xl">
-            <UserCheck className="w-7 h-7 text-purple-400" />
           </div>
-          <div>
-            <h2 className="text-xl font-black tracking-wide">Validation des Collaborateurs</h2>
-            <p className="text-xs text-slate-300 mt-0.5">Gérez les demandes d'accès des utilisateurs : <strong className="font-mono text-white">{myProjectCode}</strong></p>
-          </div>
-        </div>
+        )}
 
-        <div className="space-y-4">
-          {pendingUsers.map(user => (
-            <div key={user.firestoreId} className="bg-white border border-slate-200/80 p-6 rounded-3xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
+        {/* --- VALIDATION COMPTES (ADMIN) --- */}
+        {activeTab === 'accounts' && isAdmin && (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-purple-900/40 flex items-center gap-4">
+              <div className="p-4 bg-purple-600/20 border border-purple-400/30 rounded-2xl">
+                <UserCheck className="w-7 h-7 text-purple-400" />
+              </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">{user.name} <span className="text-xs font-normal text-slate-500">({user.email})</span></h3>
-                <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-emerald-600" /> <span className="font-mono">{formatPhoneFr(user.phone)}</span></p>
-              </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button onClick={() => handleOpenApproveModal(user)} className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all">Approuver & Assigner un rôle</button>
-                <button onClick={() => handleRejectAccount(user.firestoreId)} className="flex-1 sm:flex-none px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-colors">Refuser</button>
+                <h2 className="text-xl font-black tracking-wide">Validation des Collaborateurs</h2>
+                <p className="text-xs text-slate-300 mt-0.5">Gérez les demandes d'accès des utilisateurs : <strong className="font-mono text-white">{myProjectCode}</strong></p>
               </div>
             </div>
-          ))}
 
-          {pendingUsers.length === 0 && (
-            <div className="py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
-              <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl mx-auto flex items-center justify-center">
-                <UserCheck className="w-6 h-6" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-800">Aucun compte en attente</h4>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto">Tous les utilisateurs ayant demandé l'accès avec votre code de chantier ont été validés.</p>
+            <div className="space-y-4">
+              {pendingUsers.map(user => (
+                <div key={user.firestoreId} className="bg-white border border-slate-200/80 p-6 rounded-3xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">{user.name} <span className="text-xs font-normal text-slate-500">({user.email})</span></h3>
+                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-emerald-600" /> <span className="font-mono">{formatPhoneFr(user.phone)}</span></p>
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button onClick={() => handleOpenApproveModal(user)} className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all">Approuver & Assigner un rôle</button>
+                    <button onClick={() => handleRejectAccount(user.firestoreId)} className="flex-1 sm:flex-none px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-colors">Refuser</button>
+                  </div>
+                </div>
+              ))}
+
+              {pendingUsers.length === 0 && (
+                <div className="py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                  <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl mx-auto flex items-center justify-center">
+                    <UserCheck className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">Aucun compte en attente</h4>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Tous les utilisateurs ayant demandé l'accès avec votre code de chantier ont été validés.</p>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </div>
-    )}
-  </main>
+          </div>
+        )}
+      </main>
 
-  {/* --- MODALES --- */}
-
-  {/* MODALE HISTORIQUE DES RÉCLAMATIONS D'UN LOGEMENT */}
-  {/* MODALE DE SUIVI D'INTERVENTION SUR UN LOGEMENT */}
-{resolvingReclamation && (
-  <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-    <form onSubmit={handleConfirmResolveReclamation} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden space-y-4 p-6">
-      <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-        <div>
-          <h3 className="text-base font-bold text-slate-900">Suivi d'intervention</h3>
-          <p className="text-xs text-slate-500">Logement {resolvingReclamation.apartment} (Étage {resolvingReclamation.floor})</p>
-        </div>
-        <button type="button" onClick={() => setResolvingReclamation(null)} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center">✕</button>
-      </div>
-
-      {/* Sélection du signalement concerné s'il y en a plusieurs */}
-      {resolvingReclamation.items && resolvingReclamation.items.length > 1 && (
-        <div className="space-y-1">
-          <label className="text-xs font-bold text-slate-700 block">Signalement concerné :</label>
-          <select 
-            name="targetItemIndex"
-            className="w-full text-xs bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-slate-800 font-medium"
-          >
-            <option value="all">Tous les signalements du logement</option>
-            {resolvingReclamation.items.map((item, idx) => (
-              <option key={idx} value={idx}>
-                #{resolvingReclamation.items.length - idx} - {item.observation || item.resolutionDetails || 'Signalement'} ({item.status})
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* Choix de l'action / statut du passage */}
-      <div className="space-y-1">
-        <label className="text-xs font-bold text-slate-700 block">Résultat de la visite / Statut :</label>
-        <select 
-          name="interventionResult"
-          className="w-full text-xs bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-slate-800 font-bold"
-        >
-          <option value="Fait">🟢 Fait / Travaux réalisés (Clôturer le signalement)</option>
-          <option value="Occupant absent">🚨 Occupant absent (Ajouter une note de passage)</option>
-          <option value="À réintervenir">⚠️ À réintervenir (Ajouter une note de passage)</option>
-        </select>
-      </div>
-
-      {/* Détails et observations */}
-      <div className="space-y-1">
-        <label className="text-xs font-bold text-slate-700 block">Observations / Travaux réalisés :</label>
-        <textarea 
-          name="resolutionDetails"
-          required
-          rows="3"
-          placeholder="Ex: Remplacement du joint effectué / Passage à 14h occupant absent..."
-          className="w-full text-xs bg-slate-50 border border-slate-200 p-3 rounded-xl text-slate-900 focus:outline-none focus:border-emerald-500"
-        />
-      </div>
-
-      <button 
-        type="submit" 
-        className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/20 transition-all"
-      >
-        Valider le passage
-      </button>
-    </form>
-  </div>
-)}
+      {/* --- MODALES --- */}
 
       {/* MODALE DE SUIVI D'INTERVENTION SUR UN LOGEMENT */}
       {resolvingReclamation && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleConfirmResolveReclamation} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
-            
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <div>
                 <h3 className="text-base font-bold text-slate-900">Suivi d'intervention</h3>
@@ -1769,6 +1655,7 @@ if (!currentUser) {
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">Détails / Motif de l'intervention *</label>
                 <textarea
+                  id="resolutionText"
                   required
                   value={resolutionText}
                   onChange={e => setResolutionText(e.target.value)}
@@ -1782,12 +1669,11 @@ if (!currentUser) {
                 <button type="submit" className="px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-lg shadow-emerald-600/20 transition-all">Enregistrer le suivi</button>
               </div>
             </div>
-
           </form>
         </div>
       )}
 
-      {/* MODALE AJOUT RÉCLAMATION (ADMIN) AVEC CHAMP BÂTIMENT */}
+      {/* MODALE AJOUT RÉCLAMATION */}
       {showAddReclamationModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreateReclamation} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl">
@@ -1862,6 +1748,7 @@ if (!currentUser) {
         </div>
       )}
 
+      {/* MODALE APPROBATION COMPTE */}
       {showApproveModal && userToApprove && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleConfirmApprove} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl border border-slate-200">
@@ -1889,6 +1776,7 @@ if (!currentUser) {
         </div>
       )}
 
+      {/* MODALE NOTES OUTIL */}
       {selectedTool && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white p-6 rounded-2xl w-full max-w-lg space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -1909,6 +1797,7 @@ if (!currentUser) {
         </div>
       )}
 
+      {/* MODALE EDITION OUTIL */}
       {editingTool && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleSaveToolEdit} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
@@ -1926,13 +1815,11 @@ if (!currentUser) {
           </form>
         </div>
       )}
+
       {/* MODALE MODIFICATION PROFIL UTILISATEUR */}
-      
       {showUserModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
-            
-            {/* En-tête */}
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
@@ -1949,10 +1836,7 @@ if (!currentUser) {
               </button>
             </div>
 
-            {/* Formulaire */}
             <form onSubmit={handleSaveUserModal} className="p-6 space-y-5">
-              
-              {/* SECTION PHOTO DE PROFIL AVEC APERÇU ET BOUTON */}
               <div className="flex flex-col items-center justify-center space-y-3 pb-2 border-b border-slate-100">
                 <div className="relative group">
                   {userModalData.photoURL ? (
@@ -2024,7 +1908,6 @@ if (!currentUser) {
                 />
               </div>
 
-              {/* Boutons d'action */}
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
                 <button 
                   type="button" 
@@ -2040,13 +1923,12 @@ if (!currentUser) {
                   Enregistrer
                 </button>
               </div>
-
             </form>
           </div>
         </div>
       )}
 
-      {/* MODALE AJOUT DE MATÉRIEL - PROPRE & PRO */}
+      {/* MODALE AJOUT DE MATÉRIEL */}
       {showAddRequestModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden">
@@ -2114,7 +1996,11 @@ if (!currentUser) {
                     onChange={e => {
                       const file = e.target.files[0];
                       if (file) {
-                        setNewRequestData({ ...newRequestData, attachmentName: file.name });
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setNewRequestData(prev => ({ ...prev, attachmentName: file.name, attachmentData: reader.result }));
+                        };
+                        reader.readAsDataURL(file);
                       }
                     }}
                     className="text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 cursor-pointer"
@@ -2152,88 +2038,86 @@ if (!currentUser) {
         </div>
       )}
 
-     {/* Modal d'historique des interventions */}
-{selectedReclamationHistory && (
-  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 max-h-[80vh] overflow-y-auto shadow-2xl">
-      
-      <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-        <h3 className="font-bold text-slate-900 text-base">
-          Historique des interventions
-        </h3>
-        <button 
-          onClick={() => setSelectedReclamationHistory(null)}
-          className="text-slate-400 hover:text-slate-600 font-bold text-lg p-1"
-        >
-          ✕
-        </button>
-      </div>
-
-      <div className="space-y-3">
-        {(Array.isArray(selectedReclamationHistory) 
-          ? selectedReclamationHistory 
-          : (selectedReclamationHistory.items || [selectedReclamationHistory])
-        ).map((item, idx) => (
-          <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
-            <div className="flex justify-between items-center font-semibold">
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                item.status === 'Fait' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-              }`}>
-                {item.status || 'En cours'}
-              </span>
-              <span className="text-slate-400">
-                {item.createdAt ? new Date(item.createdAt).toLocaleDateString('fr-FR') : ''}
-              </span>
+      {/* MODALE HISTORIQUE DES INTERVENTIONS */}
+      {selectedReclamationHistory && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 max-h-[80vh] overflow-y-auto shadow-2xl">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+              <h3 className="font-bold text-slate-900 text-base">
+                Historique des interventions
+              </h3>
+              <button 
+                onClick={() => setSelectedReclamationHistory(null)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-lg p-1"
+              >
+                ✕
+              </button>
             </div>
-            
-            <p className="text-slate-800 font-semibold pt-1">
-              {item.observation || item.resolutionDetails || item.title || 'Signalement / Passage'}
-            </p>
 
-            {(item.createdBy || item.resolvedBy) && (
-              <p className="text-[10px] text-slate-400">
-                Par : {item.resolvedBy || item.createdBy}
-              </p>
-            )}
-
-            {/* Affichage des sous-historiques ou remarques de passages (Occupant absent, etc.) */}
-            {((item.history && item.history.length > 0) || (item.notes && item.notes.length > 0) || (item.suivis && item.suivis.length > 0)) && (
-              <div className="mt-2 pt-2 border-t border-slate-200 space-y-1.5">
-                <p className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">
-                  Suivi des passages :
-                </p>
-                
-                {(item.history || item.notes || item.suivis).map((log, lIdx) => (
-                  <div key={lIdx} className="pl-2 border-l-2 border-blue-500 text-[11px] space-y-0.5 bg-white p-2 rounded-lg border border-slate-200">
-                    <div className="flex justify-between items-center font-bold text-slate-700">
-                      <span className="text-blue-700">{log.status || log.type || 'Intervention'}</span>
-                      <span className="text-[9px] text-slate-400">
-                        {log.date ? new Date(log.date).toLocaleDateString('fr-FR') : (log.createdAt ? new Date(log.createdAt).toLocaleDateString('fr-FR') : '')}
-                      </span>
-                    </div>
-                    <p className="text-slate-600">{log.note || log.observation || log.details || log.resolutionDetails || 'Aucun détail'}</p>
-                    {(log.author || log.createdBy) && (
-                      <p className="text-[9px] text-slate-400 italic">Par : {log.author || log.createdBy}</p>
-                    )}
+            <div className="space-y-3">
+              {(Array.isArray(selectedReclamationHistory) 
+                ? selectedReclamationHistory 
+                : (selectedReclamationHistory.items || [selectedReclamationHistory])
+              ).map((item, idx) => (
+                <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
+                  <div className="flex justify-between items-center font-semibold">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      item.status === 'Fait' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      {item.status || 'En cours'}
+                    </span>
+                    <span className="text-slate-400">
+                      {item.createdAt ? new Date(item.createdAt).toLocaleDateString('fr-FR') : ''}
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
+                  
+                  <p className="text-slate-800 font-semibold pt-1">
+                    {item.observation || item.resolutionDetails || item.title || 'Signalement / Passage'}
+                  </p>
+
+                  {(item.createdBy || item.resolvedBy) && (
+                    <p className="text-[10px] text-slate-400">
+                      Par : {item.resolvedBy || item.createdBy}
+                    </p>
+                  )}
+
+                  {((item.history && item.history.length > 0) || (item.notes && item.notes.length > 0) || (item.suivis && item.suivis.length > 0)) && (
+                    <div className="mt-2 pt-2 border-t border-slate-200 space-y-1.5">
+                      <p className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">
+                        Suivi des passages :
+                      </p>
+                      
+                      {(item.history || item.notes || item.suivis).map((log, lIdx) => (
+                        <div key={lIdx} className="pl-2 border-l-2 border-blue-500 text-[11px] space-y-0.5 bg-white p-2 rounded-lg border border-slate-200">
+                          <div className="flex justify-between items-center font-bold text-slate-700">
+                            <span className="text-blue-700">{log.status || log.type || 'Intervention'}</span>
+                            <span className="text-[9px] text-slate-400">
+                              {log.date ? new Date(log.date).toLocaleDateString('fr-FR') : (log.createdAt ? new Date(log.createdAt).toLocaleDateString('fr-FR') : '')}
+                            </span>
+                          </div>
+                          <p className="text-slate-600">{log.note || log.observation || log.details || log.resolutionDetails || 'Aucun détail'}</p>
+                          {(log.author || log.createdBy) && (
+                            <p className="text-[9px] text-slate-400 italic">Par : {log.author || log.createdBy}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setSelectedReclamationHistory(null)}
+              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
+            >
+              Fermer
+            </button>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
-      <button
-        onClick={() => setSelectedReclamationHistory(null)}
-        className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
-      >
-        Fermer
-      </button>
-
-    </div>
-  </div>
-)}
-
+      {/* MODALE AJOUT PLANNING */}
       {showAddPlanModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleUploadPlan} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
@@ -2251,6 +2135,7 @@ if (!currentUser) {
         </div>
       )}
 
+      {/* MODALE AJOUT MACHINE */}
       {showAddToolModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreateTool} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
@@ -2265,7 +2150,6 @@ if (!currentUser) {
           </form>
         </div>
       )}
-
     </div>
   );
 }
