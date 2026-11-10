@@ -36,7 +36,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   History,
-  Home
+  Home,
+  ShieldCheck
 } from 'lucide-react';
 
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -62,11 +63,28 @@ export default function App() {
   const [authError, setAuthError] = useState('');
 
   const [showUserModal, setShowUserModal] = useState(false);
-  const [userModalData, setUserModalData] = useState({ firestoreId: '', name: '', phone: '', role: 'Employé', password: '' });
+  const [userModalData, setUserModalData] = useState({ 
+    firestoreId: '', 
+    name: '', 
+    phone: '', 
+    role: 'Employé', 
+    customRole: '',
+    password: '', 
+    photoURL: '',
+    canAddReclamation: false,
+    canAddRequest: false,
+    canViewTools: true
+  });
 
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [userToApprove, setUserToApprove] = useState(null);
   const [selectedRoleToAssign, setSelectedRoleToAssign] = useState('Employé');
+  const [customRoleInput, setCustomRoleInput] = useState('');
+  const [approvePermissions, setApprovePermissions] = useState({
+    canAddReclamation: false,
+    canAddRequest: true,
+    canViewTools: true
+  });
 
   const [users, setUsers] = useState([]);
   const [archivedUsers, setArchivedUsers] = useState([]);
@@ -232,6 +250,9 @@ export default function App() {
 
   const approvedUsers = useMemo(() => projectUsers.filter(u => u.status === 'approved'), [projectUsers]);
   const pendingUsers = useMemo(() => projectUsers.filter(u => u.status === 'pending' && u.role !== 'admin'), [projectUsers]);
+
+  const isAdmin = currentUser?.role === 'admin';
+  const canAddReclamation = isAdmin || currentUser?.canAddReclamation === true;
 
   const groupedReclamations = useMemo(() => {
     const groups = {};
@@ -504,21 +525,47 @@ export default function App() {
   }, [approvedUsers, workerSearch, workerRoleFilter]);
 
   const handleOpenUserModal = (userToEdit) => {
-    setUserModalData({ firestoreId: userToEdit.firestoreId, name: userToEdit.name, phone: userToEdit.phone || '', role: userToEdit.role, password: userToEdit.password || '', photoURL: userToEdit.photoURL || '' });
+    const standardRoles = ['Employé', 'Intérimaire', 'Chef d’équipe', 'Apprenti'];
+    const currentRole = userToEdit.role || 'Employé';
+    const isStandard = standardRoles.includes(currentRole);
+
+    setUserModalData({ 
+      firestoreId: userToEdit.firestoreId, 
+      name: userToEdit.name, 
+      phone: userToEdit.phone || '', 
+      role: isStandard ? currentRole : 'Autre',
+      customRole: isStandard ? '' : currentRole,
+      password: userToEdit.password || '', 
+      photoURL: userToEdit.photoURL || '',
+      canAddReclamation: userToEdit.canAddReclamation || false,
+      canAddRequest: userToEdit.canAddRequest ?? true,
+      canViewTools: userToEdit.canViewTools ?? true
+    });
     setShowUserModal(true);
   };
 
   const handleSaveUserModal = async (e) => {
     e.preventDefault();
     if (!userModalData.firestoreId || !currentUser) return;
+
+    const finalRole = userModalData.role === 'Autre' ? (userModalData.customRole.trim() || 'Employé') : userModalData.role;
+
     try {
-      await updateDoc(doc(db, "users", userModalData.firestoreId), {
+      const updatePayload = {
         name: userModalData.name,
         phone: userModalData.phone,
         password: userModalData.password,
         photoURL: userModalData.photoURL || '',
-        ...(currentUser.role === 'admin' ? { role: userModalData.role } : {})
-      });
+      };
+
+      if (currentUser.role === 'admin') {
+        updatePayload.role = finalRole;
+        updatePayload.canAddReclamation = userModalData.canAddReclamation;
+        updatePayload.canAddRequest = userModalData.canAddRequest;
+        updatePayload.canViewTools = userModalData.canViewTools;
+      }
+
+      await updateDoc(doc(db, "users", userModalData.firestoreId), updatePayload);
       setShowUserModal(false);
     } catch (e) { console.error(e); }
   };
@@ -545,16 +592,28 @@ export default function App() {
   const handleOpenApproveModal = (user) => {
     setUserToApprove(user);
     setSelectedRoleToAssign('Employé');
+    setCustomRoleInput('');
+    setApprovePermissions({
+      canAddReclamation: false,
+      canAddRequest: true,
+      canViewTools: true
+    });
     setShowApproveModal(true);
   };
 
   const handleConfirmApprove = async (e) => {
     e.preventDefault();
     if (!userToApprove) return;
+
+    const finalRole = selectedRoleToAssign === 'Autre' ? (customRoleInput.trim() || 'Employé') : selectedRoleToAssign;
+
     try {
       await updateDoc(doc(db, "users", userToApprove.firestoreId), { 
         status: 'approved',
-        role: selectedRoleToAssign 
+        role: finalRole,
+        canAddReclamation: approvePermissions.canAddReclamation,
+        canAddRequest: approvePermissions.canAddRequest,
+        canViewTools: approvePermissions.canViewTools
       });
       setShowApproveModal(false);
       setUserToApprove(null);
@@ -714,7 +773,10 @@ export default function App() {
         team: regIsAdmin ? 'Direction Chantier' : 'Ouvriers',
         status: regIsAdmin ? 'approved' : 'pending',
         projectCode: assignedProjectCode,
-        joinedAt: new Date().toISOString().split('T')[0]
+        joinedAt: new Date().toISOString().split('T')[0],
+        canAddReclamation: regIsAdmin,
+        canAddRequest: true,
+        canViewTools: true
       };
 
       await setDoc(doc(db, "users", authUser.uid), newUser);
@@ -746,8 +808,6 @@ export default function App() {
     setLoginPassword('');
     setResetSent(false);
   };
-
-  const isAdmin = currentUser?.role === 'admin';
 
   if (loadingUser) {
     return (
@@ -877,9 +937,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans">
-      {/* HEADER ULTRA PRO TYPE NIKE / SAAS */}
+      {/* HEADER ULTRA PRO */}
       <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-xs">
-        {/* LOGO & NOM */}
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
           <div className="p-2 bg-blue-600 text-white rounded-xl shadow-md shadow-blue-600/20">
             <Building2 className="w-5 h-5" />
@@ -887,55 +946,18 @@ export default function App() {
           <span className="font-black text-base text-slate-900 tracking-tight">BÂTIR+ <span className="text-blue-600 font-light">PRO</span></span>
         </div>
 
-        {/* LIENS DE NAVIGATION CENTRAUX */}
         <nav className="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200/60">
-          <button 
-            onClick={() => setActiveTab('dashboard')} 
-            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'dashboard' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-          >
-            Accueil
-          </button>
-          <button 
-            onClick={() => setActiveTab('planning')} 
-            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'planning' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-          >
-            Planning
-          </button>
-          <button 
-            onClick={() => setActiveTab('requests')} 
-            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'requests' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-          >
-            Matériel
-          </button>
-          <button 
-            onClick={() => setActiveTab('reclamations')} 
-            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'reclamations' ? 'bg-white text-red-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-          >
-            Réclamations
-          </button>
-          <button 
-            onClick={() => setActiveTab('workers')} 
-            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'workers' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-          >
-            Effectifs
-          </button>
-          <button 
-            onClick={() => setActiveTab('tools')} 
-            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'tools' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-          >
-            Outillage
-          </button>
+          <button onClick={() => setActiveTab('dashboard')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'dashboard' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Accueil</button>
+          <button onClick={() => setActiveTab('planning')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'planning' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Planning</button>
+          <button onClick={() => setActiveTab('requests')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'requests' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Matériel</button>
+          <button onClick={() => setActiveTab('reclamations')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'reclamations' ? 'bg-white text-red-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Réclamations</button>
+          <button onClick={() => setActiveTab('workers')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'workers' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Effectifs</button>
+          <button onClick={() => setActiveTab('tools')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'tools' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Outillage</button>
           {isAdmin && (
-            <button 
-              onClick={() => setActiveTab('accounts')} 
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'accounts' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-            >
-              Validation Comptes
-            </button>
+            <button onClick={() => setActiveTab('accounts')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'accounts' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Validation Comptes</button>
           )}
         </nav>
 
-        {/* PROFIL & ACTIONS DROITE */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-3 pl-2 border-l border-slate-200">
             {currentUser?.photoURL ? (
@@ -973,7 +995,6 @@ export default function App() {
         
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
-            {/* EN-TÊTE COLORÉ ULTRA PRO AVEC BIENVENUE & CODE CHANTIER */}
             <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white px-6 md:px-8 py-6 rounded-3xl shadow-xl border border-blue-800/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative overflow-hidden">
               <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
               
@@ -984,7 +1005,7 @@ export default function App() {
                 <h1 className="text-xl md:text-2xl font-black tracking-tight">
                   Bienvenue sur votre espace chantier, <span className="text-blue-400">{currentUser?.name}</span>.
                 </h1>
-                <p className="text-xs text-slate-300">Pilotez vos effectifs, plannings et réclamations en toute simplicité.</p>
+                <p className="text-xs text-slate-300">Retrouvez ici vos feuilles de route, vos demandes de matériel et le suivi des réserves en un clin d'œil.</p>
               </div>
 
               <div className="flex items-center gap-3 px-4 py-2.5 bg-black/40 border border-white/20 rounded-2xl backdrop-blur-md relative z-10 shadow-inner">
@@ -996,7 +1017,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* GRILLE DES MODULES */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div onClick={() => setActiveTab('planning')} className="group bg-white border border-slate-200/80 hover:border-cyan-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
@@ -1125,7 +1145,7 @@ export default function App() {
                   <option value="Fait" className="bg-slate-900">✅ Toutes résolues</option>
                 </select>
 
-                {isAdmin && (
+                {canAddReclamation && (
                   <button 
                     onClick={() => setShowAddReclamationModal(true)} 
                     className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-red-600/30 transition-all"
@@ -1433,6 +1453,12 @@ export default function App() {
                       </div>
                     </a>
 
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {user.canAddReclamation && (
+                        <span className="px-2 py-0.5 bg-red-50 text-red-700 text-[10px] font-bold rounded-lg border border-red-200">⚠️ Peut ajouter réclamations</span>
+                      )}
+                    </div>
+
                     <div className="mt-2 text-[11px] text-slate-400 font-medium">Inscrit le : {user.joinedAt}</div>
                   </div>
 
@@ -1717,28 +1743,61 @@ export default function App() {
         </div>
       )}
 
+      {/* MODALE APPROBATION AVEC RÔLE DÉROULANT+AUTRE ET PERMISSIONS */}
       {showApproveModal && userToApprove && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleConfirmApprove} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl border border-slate-200">
-            <h3 className="text-lg font-bold text-slate-900">Approuver l'accès pour {userToApprove.name}</h3>
-            <p className="text-xs text-slate-500">Veuillez choisir le rôle à attribuer à ce collaborateur au sein de votre équipe :</p>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleConfirmApprove} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Approuver {userToApprove.name}</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Définissez son rôle et ses permissions d'accès au chantier.</p>
+            </div>
             
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Rôle dans l'équipe</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Rôle principal</label>
               <select 
                 value={selectedRoleToAssign} 
                 onChange={e => setSelectedRoleToAssign(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none font-semibold"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none font-semibold mb-2"
               >
                 <option value="Employé">👷‍♂️ Employé</option>
                 <option value="Intérimaire">⚡ Intérimaire</option>
-                <option value="admin">🛡️ Admin</option>
+                <option value="Chef d’équipe">👑 Chef d’équipe</option>
+                <option value="Apprenti">📘 Apprenti</option>
+                <option value="Autre">✍️ Autre (Saisir un rôle personnalisé)</option>
               </select>
+
+              {selectedRoleToAssign === 'Autre' && (
+                <input 
+                  type="text" 
+                  required
+                  value={customRoleInput} 
+                  onChange={e => setCustomRoleInput(e.target.value)}
+                  placeholder="Tapez le rôle personnalisé..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none font-semibold animate-fadeIn"
+                />
+              )}
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="pt-3 border-t border-slate-100 space-y-2.5">
+              <span className="text-xs font-bold text-slate-800 block">Permissions & Autorisations :</span>
+              
+              <label className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-xl border border-slate-200/60 cursor-pointer">
+                <input 
+                  type="checkbox"
+                  checked={approvePermissions.canAddReclamation}
+                  onChange={e => setApprovePermissions({...approvePermissions, canAddReclamation: e.target.checked})}
+                  className="rounded border-slate-300 text-red-600 focus:ring-red-500 w-4 h-4"
+                />
+                <div className="text-xs">
+                  <strong className="text-slate-900 block">Ajouter des Réclamations / Réserves</strong>
+                  <span className="text-slate-500 text-[10px]">Permet de créer et déclarer des réserves logements.</span>
+                </div>
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
               <button type="button" onClick={() => setShowApproveModal(false)} className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 font-bold rounded-xl transition-colors">Annuler</button>
-              <button type="submit" className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-xs text-white font-bold rounded-xl shadow-md transition-all">Valider l'entrée</button>
+              <button type="submit" className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-xs text-white font-bold rounded-xl shadow-md transition-all">Valider l'accès</button>
             </div>
           </form>
         </div>
@@ -1782,15 +1841,16 @@ export default function App() {
         </div>
       )}
 
+      {/* MODALE MODIFICATION PROFIL UTILISATEUR (AVEC RÔLE ET PERMISSIONS) */}
       {showUserModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
                   ⚙️
                 </div>
-                <h3 className="text-base font-bold text-slate-900">Modifier mon profil</h3>
+                <h3 className="text-base font-bold text-slate-900">Modifier le profil</h3>
               </div>
               <button 
                 type="button" 
@@ -1801,7 +1861,7 @@ export default function App() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveUserModal} className="p-6 space-y-5">
+            <form onSubmit={handleSaveUserModal} className="p-6 space-y-4">
               <div className="flex flex-col items-center justify-center space-y-3 pb-2 border-b border-slate-100">
                 <div className="relative group">
                   {userModalData.photoURL ? (
@@ -1836,7 +1896,6 @@ export default function App() {
                       className="hidden" 
                     />
                   </label>
-                  <span className="text-[10px] text-slate-400 mt-1">Format recommandé : JPG, PNG</span>
                 </div>
               </div>
 
@@ -1861,6 +1920,52 @@ export default function App() {
                   required 
                 />
               </div>
+
+              {isAdmin && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Rôle</label>
+                  <select 
+                    value={userModalData.role} 
+                    onChange={e => setUserModalData({...userModalData, role: e.target.value})}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none font-semibold mb-2"
+                  >
+                    <option value="Employé">👷‍♂️ Employé</option>
+                    <option value="Intérimaire">⚡ Intérimaire</option>
+                    <option value="Chef d’équipe">👑 Chef d’équipe</option>
+                    <option value="Apprenti">📘 Apprenti</option>
+                    <option value="Autre">✍️ Autre (Personnalisé)</option>
+                  </select>
+
+                  {userModalData.role === 'Autre' && (
+                    <input 
+                      type="text" 
+                      required
+                      value={userModalData.customRole} 
+                      onChange={e => setUserModalData({...userModalData, customRole: e.target.value})}
+                      placeholder="Tapez le rôle personnalisé..."
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none font-semibold"
+                    />
+                  )}
+                </div>
+              )}
+
+              {isAdmin && (
+                <div className="pt-3 border-t border-slate-100 space-y-2">
+                  <span className="text-xs font-bold text-slate-800 block">Permissions d'accès :</span>
+                  <label className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-xl border border-slate-200/60 cursor-pointer">
+                    <input 
+                      type="checkbox"
+                      checked={userModalData.canAddReclamation}
+                      onChange={e => setUserModalData({...userModalData, canAddReclamation: e.target.checked})}
+                      className="rounded border-slate-300 text-red-600 focus:ring-red-500 w-4 h-4"
+                    />
+                    <div className="text-xs">
+                      <strong className="text-slate-900 block">Ajouter des Réclamations</strong>
+                      <span className="text-slate-500 text-[10px]">Autorise à créer des fiches réserves.</span>
+                    </div>
+                  </label>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Nouveau mot de passe (optionnel)</label>
