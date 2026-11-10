@@ -37,7 +37,8 @@ import {
   CheckCircle2,
   History,
   Home,
-  ShieldCheck
+  ShieldCheck,
+  Edit3
 } from 'lucide-react';
 
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -122,9 +123,14 @@ export default function App() {
   const [newReclamation, setNewReclamation] = useState({ apartment: '', floor: '', clientName: '', observation: '' });
   const [reclamationStatusFilter, setReclamationStatusFilter] = useState('all');
   const [reclamationSearch, setReclamationSearch] = useState('');
+  
   const [selectedReclamationHistory, setSelectedReclamationHistory] = useState(null);
   const [resolvingReclamation, setResolvingReclamation] = useState(null);
   const [resolutionText, setResolutionText] = useState('');
+  
+  // Modal pour modifier un signalement existant
+  const [editingSignalement, setEditingSignalement] = useState(null);
+  const [editSignalementText, setEditSignalementText] = useState('');
 
   const [workerSearch, setWorkerSearch] = useState('');
   const [workerRoleFilter, setWorkerRoleFilter] = useState('all');
@@ -303,12 +309,11 @@ export default function App() {
 
     const initialObservation = newReclamation.observation ? newReclamation.observation.trim() : "";
     
-    const firstItem = {
+    const firstPassage = {
       status: 'À faire',
-      resolutionDetails: `Signalement : ${initialObservation}`,
-      resolvedBy: currentUser.name,
-      resolvedAt: new Date().toISOString(),
-      interventionType: 'Création'
+      details: `Création du signalement`,
+      author: currentUser.name,
+      date: new Date().toISOString()
     };
 
     try {
@@ -322,8 +327,7 @@ export default function App() {
         status: 'À faire',
         createdBy: currentUser.name,
         createdAt: new Date().toISOString(),
-        resolutionDetails: initialObservation,
-        items: [firstItem]
+        passages: [firstPassage] // Historique des passages et statuts pour ce signalement précis
       });
       setShowAddReclamationModal(false);
       setNewReclamation({ building: '', apartment: '', floor: '', clientName: '', observation: '' });
@@ -342,11 +346,8 @@ export default function App() {
     const resolutionTextElem = document.getElementById('resolutionText');
     const details = resolutionTextElem ? resolutionTextElem.value.trim() : '';
 
-    let updatedItems = [...(resolvingReclamation.items || [resolvingReclamation])];
-
     const nowISO = new Date().toISOString();
     const authorName = currentUser?.name || 'Technicien';
-
     const isDone = (selectedStatus === 'Fait');
 
     const prefix = selectedStatus === 'Occupant absent' 
@@ -355,43 +356,43 @@ export default function App() {
       
     const fullDetails = details ? `${prefix} : ${details}` : prefix;
 
-    const newInterventionNote = {
+    const newPassage = {
       status: isDone ? 'Fait' : 'En cours',
-      observation: fullDetails,
-      resolutionDetails: fullDetails,
-      createdBy: authorName,
-      resolvedBy: isDone ? authorName : null,
-      createdAt: nowISO,
-      resolvedAt: isDone ? nowISO : null,
+      details: fullDetails,
+      author: authorName,
+      date: nowISO
     };
 
-    updatedItems = updatedItems.map((item, idx) => {
-      if (idx === updatedItems.length - 1) {
-        return {
-          ...item,
-          status: isDone ? 'Fait' : item.status,
-          resolutionDetails: isDone ? fullDetails : item.resolutionDetails,
-          resolvedBy: isDone ? authorName : item.resolvedBy,
-          resolvedAt: isDone ? nowISO : item.resolvedAt,
-          items: [...(item.items || []), newInterventionNote]
-        };
-      }
-      return item;
-    });
-
-    const allDone = updatedItems.every(item => item.status === 'Fait');
+    const existingPassages = resolvingReclamation.passages || [];
+    const updatedPassages = [newPassage, ...existingPassages];
 
     await updateDoc(doc(db, 'reclamations', resolvingReclamation.firestoreId), {
-      items: updatedItems,
-      status: allDone ? 'Fait' : 'En cours',
+      passages: updatedPassages,
+      status: isDone ? 'Fait' : 'En cours',
       updatedAt: nowISO
     });
 
     setResolvingReclamation(null);
   };
 
+  const handleSaveEditSignalement = async (e) => {
+    e.preventDefault();
+    if (!editingSignalement || !editSignalementText.trim()) return;
+
+    try {
+      await updateDoc(doc(db, 'reclamations', editingSignalement.firestoreId), {
+        observation: editSignalementText.trim(),
+        updatedAt: new Date().toISOString()
+      });
+      setEditingSignalement(null);
+      setEditSignalementText('');
+    } catch (e) {
+      console.error("Erreur modification signalement:", e);
+    }
+  };
+
   const handleDeleteReclamation = async (firestoreId) => {
-    if (window.confirm("Voulez-vous vraiment supprimer cette réclamation ?")) {
+    if (window.confirm("Voulez-vous vraiment supprimer ce signalement ?")) {
       try {
         await deleteDoc(doc(db, "reclamations", firestoreId));
       } catch (e) {
@@ -1179,44 +1180,55 @@ export default function App() {
                           </span>
                         </div>
 
-                        {/* AFFICHAGE DES 2 DERNIERS SIGNALEMENTS SUR LA CARTE */}
-                        <div className="mt-3 space-y-2.5">
+                        {/* AFFICHAGE DES 2 DERNIERS SIGNALEMENTS SUR LA CARTE PRINCIPALE */}
+                        <div className="mt-3 space-y-3">
                           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Derniers signalements</span>
                           
                           {group.latestTwo && group.latestTwo.map((sig, sIdx) => (
-                            <div key={sig.firestoreId || sIdx} className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2 relative group/item">
+                            <div key={sig.firestoreId || sIdx} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2.5 relative">
                               <div className="flex justify-between items-start gap-2">
-                                <p className="text-xs text-slate-800 font-medium leading-relaxed flex-1">
+                                <p className="text-xs text-slate-800 font-semibold leading-relaxed flex-1">
                                   "{sig.observation}"
                                 </p>
-                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold shrink-0 ${
+                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
                                   sig.status === 'Fait' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                                 }`}>
                                   {sig.status || 'À faire'}
                                 </span>
                               </div>
 
-                              <div className="flex justify-between items-center text-[10px] text-slate-400 pt-1 border-t border-slate-200/60">
+                              <div className="flex flex-wrap justify-between items-center text-[11px] text-slate-500 pt-2 border-t border-slate-200/60 gap-2">
                                 <span>Par : <strong>{sig.createdBy}</strong> ({new Date(sig.createdAt).toLocaleDateString('fr-FR')})</span>
                                 
                                 <div className="flex items-center gap-1.5">
-                                  {/* BOUTON METTRE À JOUR LE STATUT */}
+                                  {/* BOUTON METTRE À JOUR LE STATUT (PROPRE EN LIGNE) */}
                                   <button
                                     onClick={() => { setResolvingReclamation(sig); setResolutionText(''); }}
-                                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all flex items-center gap-1 shadow-xs"
+                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-xs"
                                     title="Mettre à jour le statut ou noter le passage"
                                   >
-                                    <CheckCircle2 className="w-3 h-3" /> Mettre à jour
+                                    <CheckCircle2 className="w-3.5 h-3.5" /> Mettre à jour
                                   </button>
+
+                                  {/* BOUTON EDITER LE SIGNALEMENT (POUR CEUX QUI ONT LE DROIT) */}
+                                  {canAddReclamation && (
+                                    <button
+                                      onClick={() => { setEditingSignalement(sig); setEditSignalementText(sig.observation); }}
+                                      className="p-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl transition-colors"
+                                      title="Modifier le contenu du signalement"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
 
                                   {/* PETITE MONTRE POUR VOIR L'HISTORIQUE DE CE SIGNALEMENT PRÉCIS */}
                                   <button
                                     onClick={() => setSelectedReclamationHistory([sig])}
-                                    className="p-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition-colors flex items-center gap-1"
+                                    className="p-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-xl transition-colors flex items-center gap-1 font-bold"
                                     title="Voir l'historique des passages de ce signalement"
                                   >
-                                    <History className="w-3 h-3" />
-                                    <span>({(sig.items || []).length})</span>
+                                    <History className="w-3.5 h-3.5" />
+                                    <span>({(sig.passages || []).length})</span>
                                   </button>
                                 </div>
                               </div>
@@ -1228,7 +1240,7 @@ export default function App() {
                       <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                         <button
                           onClick={() => setSelectedReclamationHistory(group.items)}
-                          className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                          className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                         >
                           <History className="w-4 h-4" /> Voir tous les signalements du logement ({group.items.length})
                         </button>
@@ -1615,13 +1627,14 @@ export default function App() {
 
       {/* --- MODALES --- */}
 
+      {/* MODALE MISE À JOUR STATUT PASSAGE */}
       {resolvingReclamation && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleConfirmResolveReclamation} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <div>
                 <h3 className="text-base font-bold text-slate-900">Mettre à jour le signalement</h3>
-                <p className="text-xs text-slate-500">"{resolvingReclamation.observation}"</p>
+                <p className="text-xs text-slate-500 truncate max-w-[280px]">"{resolvingReclamation.observation}"</p>
               </div>
               <button type="button" onClick={() => setResolvingReclamation(null)} className="w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">✕</button>
             </div>
@@ -1654,6 +1667,38 @@ export default function App() {
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
                 <button type="button" onClick={() => setResolvingReclamation(null)} className="px-5 py-2.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">Annuler</button>
                 <button type="submit" className="px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-lg shadow-emerald-600/20 transition-all">Enregistrer le passage</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODALE MODIFICATION CONTENU SIGNALEMENT */}
+      {editingSignalement && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleSaveEditSignalement} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Modifier le signalement</h3>
+                <p className="text-xs text-slate-500">Logement {editingSignalement.apartment}</p>
+              </div>
+              <button type="button" onClick={() => setEditingSignalement(null)} className="w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">✕</button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Contenu du signalement / Réserve *</label>
+                <textarea
+                  required
+                  value={editSignalementText}
+                  onChange={e => setEditSignalementText(e.target.value)}
+                  className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 h-28 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button type="button" onClick={() => setEditingSignalement(null)} className="px-5 py-2.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">Annuler</button>
+                <button type="submit" className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl shadow-lg shadow-blue-600/20 transition-all">Enregistrer les modifications</button>
               </div>
             </div>
           </form>
@@ -2096,12 +2141,13 @@ export default function App() {
         </div>
       )}
 
+      {/* MODALE HISTORIQUE DES PASSAGES (VIA LA MONTRE) */}
       {selectedReclamationHistory && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 max-h-[80vh] overflow-y-auto shadow-2xl">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 max-h-[80vh] overflow-y-auto shadow-2xl">
             <div className="flex justify-between items-center pb-3 border-b border-slate-100">
               <h3 className="font-bold text-slate-900 text-base">
-                Historique des interventions et passages
+                Historique des passages et statuts
               </h3>
               <button 
                 onClick={() => setSelectedReclamationHistory(null)}
@@ -2114,59 +2160,45 @@ export default function App() {
             <div className="space-y-3">
               {(Array.isArray(selectedReclamationHistory) 
                 ? selectedReclamationHistory 
-                : (selectedReclamationHistory.items || [selectedReclamationHistory])
-              ).map((item, idx) => (
-                <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
-                  <div className="flex justify-between items-center font-semibold">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      item.status === 'Fait' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                : [selectedReclamationHistory]
+              ).map((sig, idx) => (
+                <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-3">
+                  <div className="flex justify-between items-center font-semibold pb-2 border-b border-slate-200/60">
+                    <span className="text-slate-900 font-bold text-sm">Signalement : "{sig.observation}"</span>
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                      sig.status === 'Fait' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                     }`}>
-                      {item.status || 'En cours'}
-                    </span>
-                    <span className="text-slate-400">
-                      {item.createdAt ? new Date(item.createdAt).toLocaleDateString('fr-FR') : ''}
+                      {sig.status || 'En cours'}
                     </span>
                   </div>
-                  
-                  <p className="text-slate-800 font-semibold pt-1">
-                    {item.observation || item.resolutionDetails || item.title || 'Signalement / Passage'}
-                  </p>
 
-                  {(item.createdBy || item.resolvedBy) && (
-                    <p className="text-[10px] text-slate-400">
-                      Par : {item.resolvedBy || item.createdBy}
+                  <div className="space-y-2 pt-1">
+                    <p className="font-bold text-[11px] text-slate-500 uppercase tracking-wider">
+                      Journal des passages des gars :
                     </p>
-                  )}
-
-                  {((item.history && item.history.length > 0) || (item.notes && item.notes.length > 0) || (item.suivis && item.suivis.length > 0) || (item.items && item.items.length > 1)) && (
-                    <div className="mt-2 pt-2 border-t border-slate-200 space-y-1.5">
-                      <p className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">
-                        Détail des passages des gars :
-                      </p>
-                      
-                      {(item.items || item.history || item.notes || item.suivis).map((log, lIdx) => (
-                        <div key={lIdx} className="pl-2 border-l-2 border-blue-500 text-[11px] space-y-0.5 bg-white p-2 rounded-lg border border-slate-200">
-                          <div className="flex justify-between items-center font-bold text-slate-700">
-                            <span className="text-blue-700">{log.status || log.type || 'Intervention'}</span>
-                            <span className="text-[9px] text-slate-400">
-                              {log.date ? new Date(log.date).toLocaleDateString('fr-FR') : (log.createdAt ? new Date(log.createdAt).toLocaleDateString('fr-FR') : '')}
-                            </span>
-                          </div>
-                          <p className="text-slate-600">{log.note || log.observation || log.details || log.resolutionDetails || 'Aucun détail'}</p>
-                          {(log.author || log.createdBy || log.resolvedBy) && (
-                            <p className="text-[9px] text-slate-400 italic">Par : {log.author || log.createdBy || log.resolvedBy}</p>
-                          )}
+                    
+                    {(sig.passages || []).map((pass, pIdx) => (
+                      <div key={pIdx} className="pl-3 border-l-2 border-blue-600 text-xs space-y-1 bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs">
+                        <div className="flex justify-between items-center font-bold text-slate-800">
+                          <span className="text-blue-700">{pass.status}</span>
+                          <span className="text-[10px] text-slate-400">
+                            {pass.date ? new Date(pass.date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : ''}
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                        <p className="text-slate-700 font-medium">{pass.details}</p>
+                        {pass.author && (
+                          <p className="text-[10px] text-slate-400 italic">Par : {pass.author}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
 
             <button
               onClick={() => setSelectedReclamationHistory(null)}
-              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
+              className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
             >
               Fermer
             </button>
