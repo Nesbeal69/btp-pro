@@ -47,7 +47,7 @@ export default function App() {
   const [authMode, setAuthMode] = useState('login'); 
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  const [loadingUser, setLoadingUser] = useState(false);
+  const [loadingUser, setLoadingUser] = useState(true);
   
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -167,7 +167,7 @@ export default function App() {
     return dateString;
   };
 
-  // Gestion de l'expiration de session après 24h et des abonnements Firestore
+  // Gestion de l'authentification, de l'expiration 24h et des abonnements Firestore
   useEffect(() => {
     setLoadingUser(true);
     
@@ -192,11 +192,6 @@ export default function App() {
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
-
-    return () => {
-      unsubscribeAuth();
-      unsubUsers();
-    };
 
     const unsubArchived = onSnapshot(collection(db, "archivedUsers"), (snapshot) => {
       setArchivedUsers(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
@@ -231,7 +226,7 @@ export default function App() {
 
   useEffect(() => {
     if (currentUser) {
-      const updated = users.find(u => u.firestoreId === currentUser.firestoreId);
+      const updated = users.find(u => u.firestoreId === currentUser.firestoreId || u.uid === currentUser.uid || u.email?.toLowerCase() === currentUser.email?.toLowerCase());
       if (updated) setCurrentUser(updated);
     }
   }, [users]);
@@ -791,6 +786,18 @@ export default function App() {
 
   const isAdmin = currentUser?.role === 'admin';
 
+  // Écran de chargement initial pour éviter le flash du profil vide
+  if (loadingUser) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-xs text-slate-400 font-medium">Chargement de votre session BÂTIR+ PRO...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!currentUser) {
     return (
       <div className="min-h-screen text-slate-100 flex items-center justify-center p-4 relative overflow-hidden">
@@ -905,16 +912,7 @@ export default function App() {
       </div>
     );
   }
-if (loadingUser) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs text-slate-400 font-medium">Chargement de votre session BÂTIR+ PRO...</p>
-        </div>
-      </div>
-    );
-  }
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans">
       <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm sticky top-0 z-20">
