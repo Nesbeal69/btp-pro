@@ -169,12 +169,13 @@ export default function App() {
 
   // Gestion de l'expiration de session après 24h et des abonnements Firestore
   useEffect(() => {
+    setLoadingUser(true);
+    
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
         const loginTimestamp = localStorage.getItem('loginTimestamp');
         const now = Date.now();
 
-        // Si le délai de 24h est dépassé, on déconnecte automatiquement
         if (loginTimestamp && (now - parseInt(loginTimestamp, 10) > ONE_DAY_IN_MS)) {
           localStorage.removeItem('loginTimestamp');
           await signOut(auth);
@@ -185,11 +186,17 @@ export default function App() {
       } else {
         setCurrentUser(null);
       }
+      setLoadingUser(false);
     });
 
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
+
+    return () => {
+      unsubscribeAuth();
+      unsubUsers();
+    };
 
     const unsubArchived = onSnapshot(collection(db, "archivedUsers"), (snapshot) => {
       setArchivedUsers(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
