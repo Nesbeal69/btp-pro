@@ -720,7 +720,7 @@ export default function App() {
     e.preventDefault();
     setAuthError('');
     if (!regName || !regEmail || !regPhone || !regPassword) {
-      setAuthError('Veuillez remplir tous les champs.');
+      setAuthError('Veu remplir tous les champs.');
       return;
     }
 
@@ -1018,25 +1018,74 @@ export default function App() {
         )}
 
         {activeTab === 'dashboard' && (
-          <div className="space-y-8">
-            <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white rounded-3xl p-8 md:p-10 shadow-xl border border-blue-900/50">
-              <div className="relative z-10 flex flex-col items-center text-center">
-                <div className="p-4 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-2xl shadow-lg shadow-blue-500/30 mb-4 border border-blue-400/30">
-                  <Building2 className="w-10 h-10 text-white" />
+          <div className="space-y-6">
+            {/* EN-TÊTE PRO & COMPACT */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white border border-slate-200/80 p-6 rounded-3xl shadow-sm gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black shadow-md shadow-blue-600/20 text-lg">
+                  BP
                 </div>
-                <h1 className="text-2xl md:text-3xl font-black tracking-wide">BÂTIR+ <span className="text-blue-400 font-light">PRO</span></h1>
-                <p className="text-xs md:text-sm text-slate-300 mt-1 max-w-md">Espace de gestion de votre équipe et de votre chantier.</p>
-
-                {isAdmin && (
-                  <div className="mt-4 px-4 py-2 bg-indigo-500/20 border border-indigo-400/30 rounded-2xl text-xs flex items-center gap-2">
-                    <Key className="w-4 h-4 text-indigo-300" />
-                    <span>Votre code de chantier à partager : <strong className="font-mono font-bold text-white tracking-widest">{myProjectCode}</strong></span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl font-black text-slate-900 tracking-tight">Tableau de bord</h1>
+                    <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold rounded-full flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Actif
+                    </span>
                   </div>
-                )}
+                  <p className="text-xs text-slate-500 mt-0.5">Bienvenue sur votre espace chantier, <strong className="text-slate-800">{currentUser.name}</strong>.</p>
+                </div>
+              </div>
 
-                <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md rounded-full border border-white/10 text-xs font-medium">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  Connecté : <strong className="text-white">{currentUser.name}</strong> 
+              {isAdmin && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <Key className="w-4 h-4 text-blue-600" />
+                  <div className="text-xs">
+                    <span className="text-slate-400 block text-[10px] font-bold uppercase">Code Chantier</span>
+                    <strong className="font-mono text-slate-900 tracking-wider">{myProjectCode}</strong>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* STATS / KPIS RAPIDES */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white border border-slate-200/80 p-5 rounded-3xl shadow-sm flex items-center gap-4">
+                <div className="p-3 bg-cyan-50 text-cyan-600 rounded-2xl">
+                  <CalendarIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-xs text-slate-400 font-semibold block">Planning</span>
+                  <span className="text-lg font-black text-slate-900">{projectPlans.length} <span className="text-xs font-normal text-slate-500">tâches</span></span>
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200/80 p-5 rounded-3xl shadow-sm flex items-center gap-4">
+                <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl">
+                  <ClipboardList className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-xs text-slate-400 font-semibold block">Matériel</span>
+                  <span className="text-lg font-black text-slate-900">{visibleRequests.length} <span className="text-xs font-normal text-slate-500">demandes</span></span>
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200/80 p-5 rounded-3xl shadow-sm flex items-center gap-4">
+                <div className="p-3 bg-red-50 text-red-600 rounded-2xl">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-xs text-slate-400 font-semibold block">Réclamations</span>
+                  <span className="text-lg font-black text-slate-900">{projectReclamations.filter(r => r.status === 'À faire').length} <span className="text-xs font-normal text-slate-500">en cours</span></span>
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200/80 p-5 rounded-3xl shadow-sm flex items-center gap-4">
+                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-xs text-slate-400 font-semibold block">Effectifs</span>
+                  <span className="text-lg font-black text-slate-900">{approvedUsers.length} <span className="text-xs font-normal text-slate-500">actifs</span></span>
                 </div>
               </div>
             </div>
