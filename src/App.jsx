@@ -4,15 +4,12 @@ import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc } fro
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  sendPasswordResetEmail 
+  sendPasswordResetEmail,
+  signOut,
+  onAuthStateChanged
 } from 'firebase/auth';
 
 import { 
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
-  signOut,
-  onAuthStateChanged,
   Building2, 
   Users, 
   Wrench, 
@@ -42,46 +39,7 @@ import {
   Home
 } from 'lucide-react';
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { db, auth } from './firebase';
-import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc } from 'firebase/firestore';
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  sendPasswordResetEmail,
-  signOut,
-  onAuthStateChanged
-} from 'firebase/auth';
-
-// 1. Tes icônes Lucide React bien séparées ici :
-import {
-  Building2,
-  Users,
-  Wrench,
-  ClipboardList,
-  UserCheck,
-  Plus,
-  X,
-  Clock,
-  LogOut,
-  ArrowLeft,
-  Calendar as CalendarIcon,
-  FileText,
-  Download,
-  Eye,
-  EyeOff,
-  Phone,
-  Search,
-  Settings,
-  ArrowUpRight,
-  Key,
-  FolderOpen,
-  Archive,
-  Smartphone,
-  AlertTriangle,
-} from 'lucide-react';
-
-// 2. Définition de la durée d'une journée en millisecondes
+// Définition de la durée d'une journée en millisecondes
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 export default function App() {
