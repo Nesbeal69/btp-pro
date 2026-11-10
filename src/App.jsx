@@ -973,22 +973,27 @@ export default function App() {
         
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
-            {/* EN-TÊTE BLANC PUR, ULTRA PRO & DISCRET */}
-            <div className="bg-white border border-slate-200/80 px-6 py-5 rounded-3xl shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <h1 className="text-xl font-black text-slate-900 tracking-tight">Espace Chantier</h1>
-                <p className="text-xs text-slate-400 mt-0.5">Pilotez vos effectifs, plannings et réclamations en toute simplicité.</p>
+            {/* EN-TÊTE COLORÉ ULTRA PRO AVEC BIENVENUE & CODE CHANTIER */}
+            <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white px-6 md:px-8 py-6 rounded-3xl shadow-xl border border-blue-800/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative overflow-hidden">
+              <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
+              
+              <div className="space-y-1 relative z-10">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 border border-blue-400/30 rounded-xl text-blue-300 text-[11px] font-bold uppercase tracking-wider mb-1">
+                  ✨ Tableau de bord • Actif
+                </div>
+                <h1 className="text-xl md:text-2xl font-black tracking-tight">
+                  Bienvenue sur votre espace chantier, <span className="text-blue-400">{currentUser?.name}</span>.
+                </h1>
+                <p className="text-xs text-slate-300">Pilotez vos effectifs, plannings et réclamations en toute simplicité.</p>
               </div>
 
-              {isAdmin && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-2xl">
-                  <Key className="w-4 h-4 text-blue-600" />
-                  <div className="text-xs">
-                    <span className="text-slate-400 block text-[10px] font-bold uppercase">Code Chantier</span>
-                    <strong className="font-mono text-slate-900 tracking-wider">{myProjectCode}</strong>
-                  </div>
+              <div className="flex items-center gap-3 px-4 py-2.5 bg-black/40 border border-white/20 rounded-2xl backdrop-blur-md relative z-10 shadow-inner">
+                <Key className="w-4 h-4 text-blue-400" />
+                <div className="text-xs">
+                  <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">Code Chantier</span>
+                  <strong className="font-mono text-white tracking-widest">{myProjectCode}</strong>
                 </div>
-              )}
+              </div>
             </div>
 
             {/* GRILLE DES MODULES */}
