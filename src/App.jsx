@@ -72,7 +72,7 @@ export default function App() {
     password: '', 
     photoURL: '',
     canAddReclamation: false,
-    canAddRequest: false,
+    canAddRequest: true,
     canViewTools: true
   });
 
@@ -273,7 +273,7 @@ export default function App() {
 
     Object.values(groups).forEach(g => {
       g.items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      g.latest = g.items[0];
+      g.latestTwo = g.items.slice(0, 2); // Les 2 derniers signalements pour la carte principale
       g.pendingCount = g.items.filter(i => i.status === 'À faire').length;
     });
 
@@ -1160,7 +1160,6 @@ export default function App() {
               {[...filteredGroupedReclamations]
                 .sort((a, b) => (b.pendingCount || 0) - (a.pendingCount || 0))
                 .map(group => {
-                  const latest = (group.items && group.items.length > 0) ? group.items[0] : group.latest;
                   const pendingItemsCount = group.items ? group.items.filter(i => i.status !== 'Fait').length : (group.pendingCount || 0);
                   const hasPending = pendingItemsCount > 0;
                   return (
@@ -1180,67 +1179,59 @@ export default function App() {
                           </span>
                         </div>
 
-                        <div className="mt-3 space-y-2">
-                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Dernière Réclamation</span>
-                          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2">
-                            <p className="text-xs text-slate-800 font-medium leading-relaxed">
-                              "{latest.observation}"
-                            </p>
-                            <div className="flex justify-between items-center text-[10px] text-slate-400 pt-1 border-t border-slate-200/60">
-                              <span>Ajouté par : <strong>{latest.createdBy}</strong></span>
-                              <span>{new Date(latest.createdAt).toLocaleDateString('fr-FR')}</span>
-                            </div>
-                          </div>
+                        {/* AFFICHAGE DES 2 DERNIERS SIGNALEMENTS SUR LA CARTE */}
+                        <div className="mt-3 space-y-2.5">
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Derniers signalements</span>
+                          
+                          {group.latestTwo && group.latestTwo.map((sig, sIdx) => (
+                            <div key={sig.firestoreId || sIdx} className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2 relative group/item">
+                              <div className="flex justify-between items-start gap-2">
+                                <p className="text-xs text-slate-800 font-medium leading-relaxed flex-1">
+                                  "{sig.observation}"
+                                </p>
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold shrink-0 ${
+                                  sig.status === 'Fait' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                  {sig.status || 'À faire'}
+                                </span>
+                              </div>
 
-                          {latest.status === 'Fait' && latest.resolutionDetails && (
-                            <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl space-y-1">
-                              <span className="text-[10px] font-bold text-emerald-800 uppercase flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Intervention effectuée
-                              </span>
-                              <p className="text-xs text-emerald-950 font-medium">
-                                "{latest.resolutionDetails}"
-                              </p>
-                              <p className="text-[10px] text-emerald-700">Par : {latest.resolvedBy} le {new Date(latest.resolvedAt).toLocaleDateString('fr-FR')}</p>
+                              <div className="flex justify-between items-center text-[10px] text-slate-400 pt-1 border-t border-slate-200/60">
+                                <span>Par : <strong>{sig.createdBy}</strong> ({new Date(sig.createdAt).toLocaleDateString('fr-FR')})</span>
+                                
+                                <div className="flex items-center gap-1.5">
+                                  {/* BOUTON METTRE À JOUR LE STATUT */}
+                                  <button
+                                    onClick={() => { setResolvingReclamation(sig); setResolutionText(''); }}
+                                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all flex items-center gap-1 shadow-xs"
+                                    title="Mettre à jour le statut ou noter le passage"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3" /> Mettre à jour
+                                  </button>
+
+                                  {/* PETITE MONTRE POUR VOIR L'HISTORIQUE DE CE SIGNALEMENT PRÉCIS */}
+                                  <button
+                                    onClick={() => setSelectedReclamationHistory([sig])}
+                                    className="p-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition-colors flex items-center gap-1"
+                                    title="Voir l'historique des passages de ce signalement"
+                                  >
+                                    <History className="w-3 h-3" />
+                                    <span>({(sig.items || []).length})</span>
+                                  </button>
+                                </div>
+                              </div>
                             </div>
-                          )}
+                          ))}
                         </div>
                       </div>
 
-                      <div className="pt-4 border-t border-slate-100 flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                          {latest.status !== 'Fait' ? (
-                            <button
-                              onClick={() => { setResolvingReclamation(latest); setResolutionText(''); }}
-                              className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-blue-600/20 transition-all flex items-center justify-center gap-2"
-                            >
-                              <CheckCircle2 className="w-4 h-4" /> Suivi d'intervention
-                            </button>
-                          ) : (
-                            <span className="flex-1 py-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl text-center border border-emerald-200">
-                              ✅ Résolu
-                            </span>
-                          )}
-
-                          <button
-                            onClick={() => setSelectedReclamationHistory(group.items)}
-                            className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1"
-                            title="Voir l'historique complet de ce logement"
-                          >
-                            <History className="w-4 h-4" /> 
-                            <span>({group.items ? group.items.length : 0})</span>
-                          </button>
-                        </div>
-
-                        {isAdmin && (
-                          <div className="flex justify-end">
-                            <button
-                              onClick={() => handleDeleteReclamation(latest.firestoreId)}
-                              className="text-[11px] text-red-500 hover:underline font-semibold"
-                            >
-                              Supprimer la dernière fiche
-                            </button>
-                          </div>
-                        )}
+                      <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                        <button
+                          onClick={() => setSelectedReclamationHistory(group.items)}
+                          className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                        >
+                          <History className="w-4 h-4" /> Voir tous les signalements du logement ({group.items.length})
+                        </button>
                       </div>
                     </div>
                   );
@@ -1629,8 +1620,8 @@ export default function App() {
           <form onSubmit={handleConfirmResolveReclamation} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <div>
-                <h3 className="text-base font-bold text-slate-900">Suivi d'intervention</h3>
-                <p className="text-xs text-slate-500">Logement {resolvingReclamation.apartment} (Étage {resolvingReclamation.floor})</p>
+                <h3 className="text-base font-bold text-slate-900">Mettre à jour le signalement</h3>
+                <p className="text-xs text-slate-500">"{resolvingReclamation.observation}"</p>
               </div>
               <button type="button" onClick={() => setResolvingReclamation(null)} className="w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">✕</button>
             </div>
@@ -1649,7 +1640,7 @@ export default function App() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Détails / Motif de l'intervention *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Note / Commentaire des gars *</label>
                 <textarea
                   id="resolutionText"
                   required
@@ -1662,7 +1653,7 @@ export default function App() {
 
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
                 <button type="button" onClick={() => setResolvingReclamation(null)} className="px-5 py-2.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">Annuler</button>
-                <button type="submit" className="px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-lg shadow-emerald-600/20 transition-all">Enregistrer le suivi</button>
+                <button type="submit" className="px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-lg shadow-emerald-600/20 transition-all">Enregistrer le passage</button>
               </div>
             </div>
           </form>
@@ -1743,7 +1734,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALE APPROBATION AVEC RÔLE DÉROULANT+AUTRE ET PERMISSIONS */}
       {showApproveModal && userToApprove && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleConfirmApprove} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
@@ -1841,7 +1831,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALE MODIFICATION PROFIL UTILISATEUR (AVEC RÔLE ET PERMISSIONS) */}
       {showUserModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden max-h-[90vh] overflow-y-auto">
@@ -2112,7 +2101,7 @@ export default function App() {
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 max-h-[80vh] overflow-y-auto shadow-2xl">
             <div className="flex justify-between items-center pb-3 border-b border-slate-100">
               <h3 className="font-bold text-slate-900 text-base">
-                Historique des interventions
+                Historique des interventions et passages
               </h3>
               <button 
                 onClick={() => setSelectedReclamationHistory(null)}
@@ -2149,13 +2138,13 @@ export default function App() {
                     </p>
                   )}
 
-                  {((item.history && item.history.length > 0) || (item.notes && item.notes.length > 0) || (item.suivis && item.suivis.length > 0)) && (
+                  {((item.history && item.history.length > 0) || (item.notes && item.notes.length > 0) || (item.suivis && item.suivis.length > 0) || (item.items && item.items.length > 1)) && (
                     <div className="mt-2 pt-2 border-t border-slate-200 space-y-1.5">
                       <p className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">
-                        Suivi des passages :
+                        Détail des passages des gars :
                       </p>
                       
-                      {(item.history || item.notes || item.suivis).map((log, lIdx) => (
+                      {(item.items || item.history || item.notes || item.suivis).map((log, lIdx) => (
                         <div key={lIdx} className="pl-2 border-l-2 border-blue-500 text-[11px] space-y-0.5 bg-white p-2 rounded-lg border border-slate-200">
                           <div className="flex justify-between items-center font-bold text-slate-700">
                             <span className="text-blue-700">{log.status || log.type || 'Intervention'}</span>
@@ -2164,8 +2153,8 @@ export default function App() {
                             </span>
                           </div>
                           <p className="text-slate-600">{log.note || log.observation || log.details || log.resolutionDetails || 'Aucun détail'}</p>
-                          {(log.author || log.createdBy) && (
-                            <p className="text-[9px] text-slate-400 italic">Par : {log.author || log.createdBy}</p>
+                          {(log.author || log.createdBy || log.resolvedBy) && (
+                            <p className="text-[9px] text-slate-400 italic">Par : {log.author || log.createdBy || log.resolvedBy}</p>
                           )}
                         </div>
                       ))}
