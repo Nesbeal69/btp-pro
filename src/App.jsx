@@ -908,16 +908,16 @@ export default function App() {
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2.5">
-            {currentUser.photoURL ? (
-              <img src={currentUser.photoURL} alt={currentUser.name} className="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-xs" />
+            {currentUser?.photoURL ? (
+              <img src={currentUser.photoURL} alt={currentUser?.name} className="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-xs" />
             ) : (
               <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
-                {currentUser.name.charAt(0).toUpperCase()}
+                {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
               </div>
             )}
             <div className="text-right text-xs">
-              <span className="font-bold text-slate-900 block">{currentUser.name}</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200">{isAdmin ? 'CHEF / ADMIN' : currentUser.role.toUpperCase()}</span>
+              <span className="font-bold text-slate-900 block">{currentUser?.name}</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200">{isAdmin ? 'CHEF / ADMIN' : currentUser?.role?.toUpperCase()}</span>
             </div>
           </div>
           
