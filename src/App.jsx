@@ -75,10 +75,6 @@ export default function App() {
   const [plans, setPlans] = useState([]);
   const [reclamations, setReclamations] = useState([]);
 
-  // PWA
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [isStandalone, setIsStandalone] = useState(false);
-
   const [toolSearch, setToolSearch] = useState('');
   const [toolStatusFilter, setToolStatusFilter] = useState('all');
   const [editingTool, setEditingTool] = useState(null);
@@ -114,31 +110,6 @@ export default function App() {
 
   const [workerSearch, setWorkerSearch] = useState('');
   const [workerRoleFilter, setWorkerRoleFilter] = useState('all');
-
-  useEffect(() => {
-    const checkStandalone = () => {
-      const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-      setIsStandalone(isInStandaloneMode);
-    };
-    checkStandalone();
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    });
-  }, []);
-
-  const handleInstallClick = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setDeferredPrompt(null);
-      }
-    } else {
-      alert("Pour installer l'application sur votre téléphone :\n1. Ouvrez le menu de votre navigateur (Partager ou 3 points).\n2. Sélectionnez 'Ajouter à l'écran d'accueil'.");
-    }
-  };
 
   const formatPhoneFr = (phoneStr) => {
     if (!phoneStr) return 'Non renseigné';
@@ -987,7 +958,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* NAVIGATION MOBILE (AFFICHÉE UNIQUEMENT SUR PETIT ÉCRAN) */}
+      {/* NAVIGATION MOBILE */}
       <div className="lg:hidden bg-white border-b border-slate-200 px-4 py-2.5 overflow-x-auto flex items-center gap-2 shadow-xs">
         <button onClick={() => setActiveTab('dashboard')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>📊 Accueil</button>
         <button onClick={() => setActiveTab('planning')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'planning' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-700'}`}>📅 Planning</button>
@@ -1000,44 +971,13 @@ export default function App() {
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-8">
         
-        {/* BANDEAU D'INSTALLATION PWA */}
-        {!isStandalone && (
-          <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-blue-950 text-white p-4 rounded-3xl shadow-lg border border-blue-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-md">
-                <Smartphone className="w-6 h-6 animate-pulse" />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold">Installez BÂTIR+ PRO sur votre téléphone !</h4>
-                <p className="text-xs text-slate-300 mt-0.5">Accédez à l'application en un clic depuis votre écran d'accueil, sans passer par le navigateur.</p>
-              </div>
-            </div>
-            <button 
-              onClick={handleInstallClick}
-              className="w-full sm:w-auto px-5 py-2.5 bg-blue-500 hover:bg-blue-400 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
-            >
-              📱 Installer l'application
-            </button>
-          </div>
-        )}
-
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
-            {/* EN-TÊTE PRO & COMPACT */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white border border-slate-200/80 p-6 rounded-3xl shadow-sm gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black shadow-md shadow-blue-600/20 text-lg">
-                  BP
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-xl font-black text-slate-900 tracking-tight">Tableau de bord</h1>
-                    <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold rounded-full flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Actif
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">Bienvenue sur votre espace chantier, <strong className="text-slate-800">{currentUser.name}</strong>.</p>
-                </div>
+            {/* EN-TÊTE BLANC PUR, ULTRA PRO & DISCRET */}
+            <div className="bg-white border border-slate-200/80 px-6 py-5 rounded-3xl shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h1 className="text-xl font-black text-slate-900 tracking-tight">Espace Chantier</h1>
+                <p className="text-xs text-slate-400 mt-0.5">Pilotez vos effectifs, plannings et réclamations en toute simplicité.</p>
               </div>
 
               {isAdmin && (
@@ -1049,49 +989,6 @@ export default function App() {
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* STATS / KPIS RAPIDES */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white border border-slate-200/80 p-5 rounded-3xl shadow-sm flex items-center gap-4">
-                <div className="p-3 bg-cyan-50 text-cyan-600 rounded-2xl">
-                  <CalendarIcon className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-xs text-slate-400 font-semibold block">Planning</span>
-                  <span className="text-lg font-black text-slate-900">{projectPlans.length} <span className="text-xs font-normal text-slate-500">tâches</span></span>
-                </div>
-              </div>
-
-              <div className="bg-white border border-slate-200/80 p-5 rounded-3xl shadow-sm flex items-center gap-4">
-                <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl">
-                  <ClipboardList className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-xs text-slate-400 font-semibold block">Matériel</span>
-                  <span className="text-lg font-black text-slate-900">{visibleRequests.length} <span className="text-xs font-normal text-slate-500">demandes</span></span>
-                </div>
-              </div>
-
-              <div className="bg-white border border-slate-200/80 p-5 rounded-3xl shadow-sm flex items-center gap-4">
-                <div className="p-3 bg-red-50 text-red-600 rounded-2xl">
-                  <AlertTriangle className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-xs text-slate-400 font-semibold block">Réclamations</span>
-                  <span className="text-lg font-black text-slate-900">{projectReclamations.filter(r => r.status === 'À faire').length} <span className="text-xs font-normal text-slate-500">en cours</span></span>
-                </div>
-              </div>
-
-              <div className="bg-white border border-slate-200/80 p-5 rounded-3xl shadow-sm flex items-center gap-4">
-                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
-                  <Users className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-xs text-slate-400 font-semibold block">Effectifs</span>
-                  <span className="text-lg font-black text-slate-900">{approvedUsers.length} <span className="text-xs font-normal text-slate-500">actifs</span></span>
-                </div>
-              </div>
             </div>
 
             {/* GRILLE DES MODULES */}
