@@ -39,7 +39,6 @@ import {
   Home
 } from 'lucide-react';
 
-// Définition de la durée d'une journée en millisecondes
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 export default function App() {
@@ -105,7 +104,6 @@ export default function App() {
   const [requestStatusFilter, setRequestStatusFilter] = useState('all');
   const [newRequestData, setNewRequestData] = useState({ items: '', quantity: 1, urgency: 'Normal', description: '', attachmentName: '', attachmentData: '' });
 
-  // Nouveaux états pour les Réclamations Chantier
   const [showAddReclamationModal, setShowAddReclamationModal] = useState(false);
   const [newReclamation, setNewReclamation] = useState({ apartment: '', floor: '', clientName: '', observation: '' });
   const [reclamationStatusFilter, setReclamationStatusFilter] = useState('all');
@@ -117,7 +115,6 @@ export default function App() {
   const [workerSearch, setWorkerSearch] = useState('');
   const [workerRoleFilter, setWorkerRoleFilter] = useState('all');
 
-  // Détection PWA
   useEffect(() => {
     const checkStandalone = () => {
       const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
@@ -167,7 +164,6 @@ export default function App() {
     return dateString;
   };
 
-  // Gestion de l'authentification, de l'expiration 24h et des abonnements Firestore
   useEffect(() => {
     setLoadingUser(true);
     
@@ -266,7 +262,6 @@ export default function App() {
   const approvedUsers = useMemo(() => projectUsers.filter(u => u.status === 'approved'), [projectUsers]);
   const pendingUsers = useMemo(() => projectUsers.filter(u => u.status === 'pending' && u.role !== 'admin'), [projectUsers]);
 
-  // Regroupement des réclamations par logement pour conserver l'historique
   const groupedReclamations = useMemo(() => {
     const groups = {};
     projectReclamations.forEach(rec => {
@@ -664,7 +659,6 @@ export default function App() {
     return projectPlans.filter(p => p.targetUserId === Number(selectedWorkerFilter));
   }, [projectPlans, currentUser, selectedWorkerFilter]);
 
-  // Connexion officielle avec Firebase Auth
   const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -693,7 +687,6 @@ export default function App() {
     }
   };
 
-  // Réinitialisation officielle du mot de passe
   const handleForgotPassword = async () => {
     if (!loginEmail.trim()) {
       setAuthError("Veuillez d'abord saisir votre adresse email dans le champ ci-dessus.");
@@ -715,12 +708,11 @@ export default function App() {
     }
   };
 
-  // Inscription officielle avec Firebase Auth + Firestore
   const handleRegister = async (e) => {
     e.preventDefault();
     setAuthError('');
     if (!regName || !regEmail || !regPhone || !regPassword) {
-      setAuthError('Veu remplir tous les champs.');
+      setAuthError('Veuillez remplir tous les champs.');
       return;
     }
 
@@ -786,7 +778,6 @@ export default function App() {
 
   const isAdmin = currentUser?.role === 'admin';
 
-  // Écran de chargement initial pour éviter le flash du profil vide
   if (loadingUser) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
@@ -915,83 +906,96 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans">
-      <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm sticky top-0 z-20">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
-          <div className="p-1.5 bg-blue-600 text-white rounded-lg shadow-sm">
-            <Building2 className="w-4 h-4" />
+      {/* HEADER ULTRA PRO TYPE NIKE / SAAS */}
+      <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+        {/* LOGO & NOM */}
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
+          <div className="p-2 bg-blue-600 text-white rounded-xl shadow-md shadow-blue-600/20">
+            <Building2 className="w-5 h-5" />
           </div>
-          <span className="font-bold text-sm text-slate-900 tracking-wide">BÂTIR+ <span className="text-blue-600 font-light">PRO</span></span>
+          <span className="font-black text-base text-slate-900 tracking-tight">BÂTIR+ <span className="text-blue-600 font-light">PRO</span></span>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2.5">
-            {currentUser?.photoURL ? (
-              <img src={currentUser.photoURL} alt={currentUser?.name} className="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-xs" />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
-                {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
-              </div>
-            )}
-            <div className="text-right text-xs">
-              <span className="font-bold text-slate-900 block">{currentUser?.name}</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200">{isAdmin ? 'CHEF / ADMIN' : currentUser?.role?.toUpperCase()}</span>
-            </div>
-          </div>
-          
-          <button onClick={() => handleOpenUserModal(currentUser)} className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs px-2.5 font-medium border border-slate-200 flex items-center gap-1">
-            <Settings className="w-3.5 h-3.5 text-slate-500" /> <span className="hidden sm:inline">Mon Profil</span>
-          </button>
-          <button onClick={handleLogout} title="Se déconnecter" className="p-1.5 text-slate-400 hover:text-red-600"><LogOut className="w-4 h-4" /></button>
-        </div>
-      </header>
 
-      {/* BARRE DE NAVIGATION RAPIDE PAR ONGLETS */}
-      <div className="bg-white border-b border-slate-200 px-4 py-2 overflow-x-auto sticky top-[57px] z-10 shadow-xs">
-        <div className="flex items-center gap-2 min-w-max">
+        {/* LIENS DE NAVIGATION CENTRAUX */}
+        <nav className="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200/60">
           <button 
             onClick={() => setActiveTab('dashboard')} 
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
+            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'dashboard' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
           >
-            📊 Accueil
+            Accueil
           </button>
           <button 
             onClick={() => setActiveTab('planning')} 
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'planning' ? 'bg-cyan-600 text-white shadow-sm' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
+            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'planning' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
           >
-            📅 Planning
+            Planning
           </button>
           <button 
             onClick={() => setActiveTab('requests')} 
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'requests' ? 'bg-amber-600 text-white shadow-sm' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
+            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'requests' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
           >
-            📦 Matériel
+            Matériel
           </button>
           <button 
             onClick={() => setActiveTab('reclamations')} 
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'reclamations' ? 'bg-red-600 text-white shadow-sm' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
+            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'reclamations' ? 'bg-white text-red-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
           >
-            ⚠️ Réclamations
+            Réclamations
           </button>
           <button 
             onClick={() => setActiveTab('workers')} 
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'workers' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
+            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'workers' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
           >
-            👥 Effectifs
+            Effectifs
           </button>
           <button 
             onClick={() => setActiveTab('tools')} 
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'tools' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
+            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'tools' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
           >
-            🔧 Outillage
+            Outillage
           </button>
           {isAdmin && (
             <button 
               onClick={() => setActiveTab('accounts')} 
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'accounts' ? 'bg-purple-600 text-white shadow-sm' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
+              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'accounts' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
             >
-              🛡️ Validation Comptes
+              Validation Comptes
             </button>
           )}
+        </nav>
+
+        {/* PROFIL & ACTIONS DROITE */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 pl-2 border-l border-slate-200">
+            {currentUser?.photoURL ? (
+              <img src={currentUser.photoURL} alt={currentUser?.name} className="w-9 h-9 rounded-full object-cover border-2 border-blue-600/30 shadow-xs" />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-md shadow-blue-600/20">
+                {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
+              </div>
+            )}
+            <div className="hidden sm:block text-right text-xs">
+              <span className="font-bold text-slate-900 block">{currentUser?.name}</span>
+              <span className="text-[10px] text-blue-600 font-semibold">{isAdmin ? 'CHEF / ADMIN' : currentUser?.role?.toUpperCase()}</span>
+            </div>
+          </div>
+          
+          <button onClick={() => handleOpenUserModal(currentUser)} className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium border border-slate-200 flex items-center gap-1.5 transition-colors">
+            <Settings className="w-4 h-4 text-slate-500" /> <span className="hidden md:inline">Profil</span>
+          </button>
+          <button onClick={handleLogout} title="Se déconnecter" className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition-colors"><LogOut className="w-4 h-4" /></button>
         </div>
+      </header>
+
+      {/* NAVIGATION MOBILE (AFFICHÉE UNIQUEMENT SUR PETIT ÉCRAN) */}
+      <div className="lg:hidden bg-white border-b border-slate-200 px-4 py-2.5 overflow-x-auto flex items-center gap-2 shadow-xs">
+        <button onClick={() => setActiveTab('dashboard')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>📊 Accueil</button>
+        <button onClick={() => setActiveTab('planning')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'planning' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-700'}`}>📅 Planning</button>
+        <button onClick={() => setActiveTab('requests')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'requests' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-700'}`}>📦 Matériel</button>
+        <button onClick={() => setActiveTab('reclamations')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'reclamations' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700'}`}>⚠️ Réclamations</button>
+        <button onClick={() => setActiveTab('workers')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'workers' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>👥 Effectifs</button>
+        <button onClick={() => setActiveTab('tools')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'tools' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700'}`}>🔧 Outillage</button>
+        {isAdmin && <button onClick={() => setActiveTab('accounts')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'accounts' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-700'}`}>🛡️ Comptes</button>}
       </div>
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-8">
@@ -1692,7 +1696,6 @@ export default function App() {
 
       {/* --- MODALES --- */}
 
-      {/* MODALE DE SUIVI D'INTERVENTION SUR UN LOGEMENT */}
       {resolvingReclamation && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleConfirmResolveReclamation} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
@@ -1738,7 +1741,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALE AJOUT RÉCLAMATION */}
       {showAddReclamationModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreateReclamation} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl">
@@ -1813,7 +1815,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALE APPROBATION COMPTE */}
       {showApproveModal && userToApprove && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleConfirmApprove} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl border border-slate-200">
@@ -1841,7 +1842,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALE NOTES OUTIL */}
       {selectedTool && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white p-6 rounded-2xl w-full max-w-lg space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -1862,7 +1862,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALE EDITION OUTIL */}
       {editingTool && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleSaveToolEdit} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
@@ -1881,7 +1880,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALE MODIFICATION PROFIL UTILISATEUR */}
       {showUserModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
@@ -1993,7 +1991,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALE AJOUT DE MATÉRIEL */}
       {showAddRequestModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden">
@@ -2103,7 +2100,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALE HISTORIQUE DES INTERVENTIONS */}
       {selectedReclamationHistory && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 max-h-[80vh] overflow-y-auto shadow-2xl">
@@ -2182,7 +2178,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALE AJOUT PLANNING */}
       {showAddPlanModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleUploadPlan} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
@@ -2200,7 +2195,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALE AJOUT MACHINE */}
       {showAddToolModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreateTool} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
