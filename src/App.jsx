@@ -46,6 +46,8 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authMode, setAuthMode] = useState('login'); 
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  const [loadingUser, setLoadingUser] = useState(false);
   
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -896,7 +898,16 @@ export default function App() {
       </div>
     );
   }
-
+if (loadingUser) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-xs text-slate-400 font-medium">Chargement de votre session BÂTIR+ PRO...</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans">
       <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm sticky top-0 z-20">
