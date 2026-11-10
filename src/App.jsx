@@ -6,7 +6,13 @@ import {
   createUserWithEmailAndPassword, 
   sendPasswordResetEmail 
 } from 'firebase/auth';
+
 import { 
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signOut,
+  onAuthStateChanged,
   Building2, 
   Users, 
   Wrench, 
@@ -35,6 +41,48 @@ import {
   History,
   Home
 } from 'lucide-react';
+
+import React, { useState, useMemo, useEffect } from 'react';
+import { db, auth } from './firebase';
+import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc } from 'firebase/firestore';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  sendPasswordResetEmail,
+  signOut,
+  onAuthStateChanged
+} from 'firebase/auth';
+
+// 1. Tes icônes Lucide React bien séparées ici :
+import {
+  Building2,
+  Users,
+  Wrench,
+  ClipboardList,
+  UserCheck,
+  Plus,
+  X,
+  Clock,
+  LogOut,
+  ArrowLeft,
+  Calendar as CalendarIcon,
+  FileText,
+  Download,
+  Eye,
+  EyeOff,
+  Phone,
+  Search,
+  Settings,
+  ArrowUpRight,
+  Key,
+  FolderOpen,
+  Archive,
+  Smartphone,
+  AlertTriangle,
+} from 'lucide-react';
+
+// 2. Définition de la durée d'une journée en millisecondes
+const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -163,6 +211,29 @@ export default function App() {
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
+
+    // Gestion de l'expiration de session après 24h
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const loginTimestamp = localStorage.getItem('loginTimestamp');
+        const now = Date.now();
+
+        // Si le délai de 24h est dépassé, on déconnecte automatiquement
+        if (loginTimestamp && (now - parseInt(loginTimestamp, 10) > ONE_DAY_IN_MS)) {
+          localStorage.removeItem('loginTimestamp');
+          await signOut(auth);
+          setCurrentUser(null);
+        } else {
+          setCurrentUser(user);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
     const unsubArchived = onSnapshot(collection(db, "archivedUsers"), (snapshot) => {
       setArchivedUsers(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
@@ -665,6 +736,7 @@ const handleConfirmResolveReclamation = async (e) => {
         setAuthMode('pending');
         return;
       }
+      localStorage.setItem('loginTimestamp', Date.now().toString());
       setCurrentUser(found);
       setActiveTab('dashboard');
     } catch (error) {
