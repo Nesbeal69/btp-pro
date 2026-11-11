@@ -1305,7 +1305,7 @@ export default function App() {
                 </div>
                 <div>
                   <h2 className="text-xl font-black tracking-wide">Planning & Feuilles de Route</h2>
-                  <p className="text-xs text-slate-300 mt-0.5">Suivi des interventions chantier et documents techniques associés.</p>
+                  <p className="text-xs text-slate-300 mt-0.5">Accès direct à vos interventions du jour et documents techniques.</p>
                 </div>
               </div>
               {isAdmin && (
@@ -1315,28 +1315,43 @@ export default function App() {
               )}
             </div>
 
+            {/* Grille de planning optimisée terrain */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {visiblePlans.map(plan => (
                 <div key={plan.firestoreId} className="bg-white border border-slate-200/80 hover:border-cyan-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative overflow-hidden group">
                   <div>
+                    {/* En-tête : Date et Attributaire */}
                     <div className="flex justify-between items-center text-xs mb-3">
-                      <span className="px-3 py-1 rounded-xl font-mono font-bold bg-cyan-50 text-cyan-700 border border-cyan-100">📅 {plan.formattedDate || formatDateFr(plan.date)}</span>
+                      <span className="px-3 py-1 rounded-xl font-mono font-bold bg-cyan-50 text-cyan-700 border border-cyan-100 flex items-center gap-1.5">
+                        <CalendarIcon className="w-3.5 h-3.5" /> {plan.formattedDate || formatDateFr(plan.date)}
+                      </span>
                       <span className="text-slate-500 font-medium">Pour : <strong className="text-slate-800">{plan.targetName}</strong></span>
                     </div>
 
-                    <h3 className="text-base font-bold text-slate-900">{plan.title}</h3>
-                    {plan.description && <p className="text-xs text-slate-600 mt-1 leading-relaxed">{plan.description}</p>}
+                    {/* Titre / Logement mis en valeur */}
+                    <h3 className="text-base font-black text-slate-900 tracking-tight">{plan.title}</h3>
+                    {plan.description && (
+                      <p className="text-xs text-slate-600 mt-1.5 leading-relaxed bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                        {plan.description}
+                      </p>
+                    )}
 
+                    {/* Documents / Feuilles de route en accès direct tactile */}
                     <div className="mt-4 space-y-2 pt-3 border-t border-slate-100">
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Documents ({plan.files ? plan.files.length : 0})</span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Feuille de route / Plan technique</span>
                       {plan.files && plan.files.map((fileObj, fIdx) => (
-                        <div key={fIdx} className="p-2.5 bg-slate-50 hover:bg-cyan-50/50 rounded-2xl border border-slate-200/60 flex items-center justify-between transition-colors">
+                        <div key={fIdx} className="p-3 bg-cyan-50/40 hover:bg-cyan-50 rounded-2xl border border-cyan-100/80 flex items-center justify-between transition-colors">
                           <div className="flex items-center gap-2.5">
-                            <div className="p-2 bg-red-50 text-red-500 rounded-xl"><FileText className="w-4 h-4" /></div>
-                            <span className="text-xs text-slate-800 font-semibold truncate max-w-[130px]">{fileObj.name}</span>
+                            <div className="p-2 bg-red-100 text-red-600 rounded-xl">
+                              <FileText className="w-4 h-4" />
+                            </div>
+                            <span className="text-xs text-slate-800 font-bold truncate max-w-[140px]">{fileObj.name}</span>
                           </div>
-                          <button onClick={() => handleDownloadSinglePdf(fileObj)} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] rounded-xl font-bold flex items-center gap-1 shadow-sm transition-all">
-                            <Download className="w-3 h-3" /> Ouvrir
+                          <button 
+                            onClick={() => handleDownloadSinglePdf(fileObj)} 
+                            className="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Ouvrir
                           </button>
                         </div>
                       ))}
