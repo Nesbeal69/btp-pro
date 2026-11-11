@@ -1809,9 +1809,9 @@ export default function App() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
           
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600 text-white rounded-xl">
-              <Building2 className="w-4 h-4" />
-            </div>
+            <div className="flex items-center">
+           <img src="/logo.png" alt="Bâtir+ Pro" className="w-8 h-8 object-contain" />
+           </div>
             <div>
               <span className="font-black text-slate-900 tracking-tight text-sm">BÂTIR+ <span className="text-blue-600 font-light">PRO</span></span>
               <p className="text-[11px] text-slate-400">© 2026 Bâtir+ Pro. Tous droits réservés.</p>
