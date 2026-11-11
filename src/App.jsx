@@ -1177,6 +1177,11 @@ export default function App() {
                   groupedReqs[authorName].items.push(req);
                 });
 
+                // Tri des demandes par date décroissante
+                Object.values(groupedReqs).forEach(group => {
+                  group.items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+                });
+
                 const reqCards = Object.values(groupedReqs);
 
                 if (reqCards.length === 0) {
@@ -1194,6 +1199,7 @@ export default function App() {
                 return reqCards.map((group, gIdx) => {
                   const pendingCount = group.items.filter(i => i.status !== 'Reçu au dépôt' && i.status !== 'Refusé').length;
                   const hasPending = pendingCount > 0;
+                  const latestTwo = group.items.slice(0, 2);
 
                   return (
                     <div key={gIdx} className="bg-white border border-slate-200/80 hover:border-amber-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
@@ -1212,9 +1218,9 @@ export default function App() {
                         </div>
 
                         <div className="mt-4 space-y-3">
-                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Historique des demandes</span>
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Dernières demandes</span>
                           
-                          {group.items.map((req, iIdx) => (
+                          {latestTwo.map((req, iIdx) => (
                             <div key={req.firestoreId || iIdx} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2.5">
                               <div className="flex justify-between items-start gap-2">
                                 <div className="space-y-1 flex-1">
@@ -1247,13 +1253,6 @@ export default function App() {
                                 </p>
                               )}
 
-                              {req.attachmentData && (
-                                <div className="p-2 bg-white rounded-xl border border-slate-200/60 flex items-center justify-between">
-                                  <span className="text-[11px] text-slate-800 font-medium truncate max-w-[130px]">📎 {req.attachmentName}</span>
-                                  <button onClick={() => handleDownloadSinglePdf({ name: req.attachmentName, data: req.attachmentData })} className="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white text-[10px] rounded-lg font-bold">Ouvrir</button>
-                                </div>
-                              )}
-
                               {isAdmin && (
                                 <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2">
                                   <select 
@@ -1281,10 +1280,14 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="pt-4 border-t border-slate-100 text-center">
-                        <span className="text-[11px] text-slate-400 font-medium">
-                          Total : {group.items.length} demande{group.items.length > 1 ? 's' : ''}
-                        </span>
+                      {/* Bouton pour voir tout l'historique des demandes de ce compagnon */}
+                      <div className="pt-4 border-t border-slate-100">
+                        <button
+                          onClick={() => setSelectedReclamationHistory(group.items)}
+                          className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                        >
+                          <History className="w-4 h-4" /> Voir toutes les demandes ({group.items.length})
+                        </button>
                       </div>
                     </div>
                   );
