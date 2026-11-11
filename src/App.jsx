@@ -1136,36 +1136,38 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE MATERIEL / DEMANDES (STYLE RECLAMATIONS) --- */}
+        {/* --- MODULE DEMANDES DE MATÉRIEL --- */}
         {activeTab === 'requests' && (
           <div className="space-y-6">
-            <div className="bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-cyan-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="bg-gradient-to-r from-slate-900 via-amber-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-amber-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex items-center gap-4">
-                <div className="p-4 bg-cyan-600/20 border border-cyan-400/30 rounded-2xl">
-                  <FolderOpen className="w-7 h-7 text-cyan-400" />
+                <div className="p-4 bg-amber-600/20 border border-amber-400/30 rounded-2xl">
+                  <ClipboardList className="w-7 h-7 text-amber-400" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black tracking-wide">Gestion du Matériel & Demandes</h2>
-                  <p className="text-xs text-slate-300 mt-0.5">Suivi des besoins chantiers par compagnon, historique et validation.</p>
+                  <h2 className="text-xl font-black tracking-wide">Demandes de Matériel & Fournitures</h2>
+                  <p className="text-xs text-slate-300 mt-0.5">Suivi des besoins par compagnon, historique et validation des approvisionnements.</p>
                 </div>
               </div>
-
               <div className="flex items-center gap-3 w-full sm:w-auto">
-                <button onClick={() => setShowAddRequestModal(true)} className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-cyan-500/20 transition-all">
+                <select value={requestStatusFilter} onChange={e => setRequestStatusFilter(e.target.value)} className="px-3.5 py-2.5 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none">
+                  <option value="all" className="bg-slate-900">🔍 Tous les statuts</option>
+                  <option value="En attente" className="bg-slate-900">⏳ En attente</option>
+                  <option value="Validé / Commandé" className="bg-slate-900">✅ Validé</option>
+                  <option value="Reçu au dépôt" className="bg-slate-900">📦 Reçu</option>
+                </select>
+                <button onClick={() => setShowAddRequestModal(true)} className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all">
                   <Plus className="w-4 h-4" /> Nouvelle Demande
                 </button>
               </div>
             </div>
 
-            {/* Grille de cartes par compagnon (exactement comme Réclamations) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {(() => {
                 const groupedReqs = {};
                 
                 (visibleRequests || []).forEach(req => {
-                  // On récupère le vrai nom du compagnon (par ordre de priorité des champs possibles en base)
-                  const authorName = req.createdBy || req.authorName || req.userName || req.targetName || "Ouvrier";
-                  
+                  const authorName = req.requester || req.userName || req.createdBy || "Compagnon";
                   if (!groupedReqs[authorName]) {
                     groupedReqs[authorName] = {
                       authorName,
@@ -1180,26 +1182,25 @@ export default function App() {
                 if (reqCards.length === 0) {
                   return (
                     <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
-                      <div className="w-12 h-12 bg-cyan-50 text-cyan-600 rounded-2xl mx-auto flex items-center justify-center">
-                        <FolderOpen className="w-6 h-6" />
+                      <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl mx-auto flex items-center justify-center">
+                        <ClipboardList className="w-6 h-6" />
                       </div>
                       <h4 className="text-sm font-bold text-slate-800">Aucune demande de matériel</h4>
-                      <p className="text-xs text-slate-400 max-w-xs mx-auto">Il n'y a aucune demande en cours pour ce chantier.</p>
+                      <p className="text-xs text-slate-400 max-w-xs mx-auto">Aucune commande ou besoin matériel n'a été enregistré pour le moment.</p>
                     </div>
                   );
                 }
 
                 return reqCards.map((group, gIdx) => {
-                  const pendingCount = group.items.filter(i => i.status !== 'Reçu au dépôt').length;
+                  const pendingCount = group.items.filter(i => i.status !== 'Reçu au dépôt' && i.status !== 'Refusé').length;
                   const hasPending = pendingCount > 0;
 
                   return (
-                    <div key={gIdx} className="bg-white border border-slate-200/80 hover:border-cyan-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                    <div key={gIdx} className="bg-white border border-slate-200/80 hover:border-amber-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                       <div>
-                        {/* En-tête de la carte du compagnon */}
                         <div className="flex justify-between items-start pb-3 border-b border-slate-100">
                           <div>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Compagnon Chantier</span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Demandeur Chantier</span>
                             <h3 className="text-lg font-black text-slate-900 flex items-center gap-1.5 mt-0.5">
                               👷‍♂️ {group.authorName}
                             </h3>
@@ -1210,81 +1211,79 @@ export default function App() {
                           </span>
                         </div>
 
-                        {/* Liste des demandes / historique sur la carte */}
                         <div className="mt-4 space-y-3">
                           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Historique des demandes</span>
                           
-                          {group.items.map((item, iIdx) => {
-                            const currentStatus = item.status || "En attente";
-                            // On récupère le bon titre (titre, nom du matos, ou texte par défaut)
-                            const itemTitle = item.title || item.materialName || item.observation || "Demande de matériel";
-
-                            return (
-                              <div key={item.firestoreId || iIdx} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2.5">
-                                <div className="flex justify-between items-start gap-2">
-                                  <div className="space-y-1 flex-1">
-                                    <span className="text-[10px] font-mono text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-md font-bold uppercase border border-cyan-100">
-                                      {item.date || "Récemment"}
+                          {group.items.map((req, iIdx) => (
+                            <div key={req.firestoreId || iIdx} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2.5">
+                              <div className="flex justify-between items-start gap-2">
+                                <div className="space-y-1 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-mono text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md font-bold uppercase border border-amber-100">
+                                      Qté : {req.quantity}
                                     </span>
-                                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide mt-1">
-                                      {itemTitle}
-                                    </h4>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${req.urgency === 'Urgent' ? 'bg-amber-100 text-amber-800' : req.urgency === 'Critique' ? 'bg-red-100 text-red-800' : 'bg-slate-200 text-slate-700'}`}>
+                                      {req.urgency || 'Normal'}
+                                    </span>
                                   </div>
-                                  
-                                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
-                                    currentStatus === 'Validé / Commandé' ? 'bg-emerald-100 text-emerald-800' :
-                                    currentStatus === 'Reçu au dépôt' ? 'bg-blue-100 text-blue-800' :
-                                    'bg-amber-100 text-amber-800'
-                                  }`}>
-                                    {currentStatus}
-                                  </span>
+                                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide mt-1">
+                                    {req.items}
+                                  </h4>
                                 </div>
-
-                                {item.description && (
-                                  <p className="text-xs text-slate-600 font-medium bg-white p-2.5 rounded-xl border border-slate-200/60">
-                                    {item.description}
-                                  </p>
-                                )}
-
-                                {/* Actions Admin (Changement de statut + Suppression) */}
-                                {isAdmin && (
-                                  <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2">
-                                    <select 
-                                      value={currentStatus} 
-                                      onChange={async (e) => {
-                                        const newStatus = e.target.value;
-                                        await updateDoc(doc(db, "requests", item.firestoreId), { status: newStatus });
-                                      }}
-                                      className="px-3 py-1.5 bg-white border border-slate-300 text-slate-800 text-xs font-semibold rounded-xl focus:outline-none flex-1"
-                                    >
-                                      <option value="En attente">⏳ En attente</option>
-                                      <option value="Validé / Commandé">✅ Validé / Commandé</option>
-                                      <option value="Reçu au dépôt">📦 Reçu au dépôt</option>
-                                    </select>
-
-                                    <button 
-                                      onClick={async () => {
-                                        if (window.confirm("Supprimer cette demande de l'historique ?")) {
-                                          await deleteDoc(doc(db, "requests", item.firestoreId));
-                                        }
-                                      }}
-                                      className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-colors"
-                                      title="Supprimer la demande"
-                                    >
-                                      🗑️
-                                    </button>
-                                  </div>
-                                )}
+                                
+                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                                  req.status === 'Validé / Commandé' ? 'bg-emerald-100 text-emerald-800' :
+                                  req.status === 'Reçu au dépôt' ? 'bg-blue-100 text-blue-800' :
+                                  req.status === 'Refusé' ? 'bg-red-100 text-red-800' :
+                                  'bg-amber-100 text-amber-800'
+                                }`}>
+                                  {req.status || 'En attente'}
+                                </span>
                               </div>
-                            );
-                          })}
+
+                              {req.description && (
+                                <p className="text-xs text-slate-600 font-medium bg-white p-2.5 rounded-xl border border-slate-200/60">
+                                  {req.description}
+                                </p>
+                              )}
+
+                              {req.attachmentData && (
+                                <div className="p-2 bg-white rounded-xl border border-slate-200/60 flex items-center justify-between">
+                                  <span className="text-[11px] text-slate-800 font-medium truncate max-w-[130px]">📎 {req.attachmentName}</span>
+                                  <button onClick={() => handleDownloadSinglePdf({ name: req.attachmentName, data: req.attachmentData })} className="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white text-[10px] rounded-lg font-bold">Ouvrir</button>
+                                </div>
+                              )}
+
+                              {isAdmin && (
+                                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2">
+                                  <select 
+                                    value={req.status || 'En attente'} 
+                                    onChange={(e) => handleUpdateRequestStatus(req.firestoreId, e.target.value)}
+                                    className="px-3 py-1.5 bg-white border border-slate-300 text-slate-800 text-xs font-semibold rounded-xl focus:outline-none flex-1"
+                                  >
+                                    <option value="En attente">⏳ En attente</option>
+                                    <option value="Validé / Commandé">✅ Validé / Commandé</option>
+                                    <option value="Reçu au dépôt">📦 Reçu au dépôt</option>
+                                    <option value="Refusé">❌ Refusé</option>
+                                  </select>
+
+                                  <button 
+                                    onClick={() => handleDeleteRequest(req.firestoreId)}
+                                    className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-colors"
+                                    title="Supprimer la demande"
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       </div>
 
-                      {/* Pied de carte informatif */}
                       <div className="pt-4 border-t border-slate-100 text-center">
                         <span className="text-[11px] text-slate-400 font-medium">
-                          Total : {group.items.length} demande{group.items.length > 1 ? 's' : ''} enregistrée{group.items.length > 1 ? 's' : ''}
+                          Total : {group.items.length} demande{group.items.length > 1 ? 's' : ''}
                         </span>
                       </div>
                     </div>
