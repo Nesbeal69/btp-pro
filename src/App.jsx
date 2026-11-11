@@ -944,9 +944,9 @@ export default function App() {
       {/* HEADER ULTRA PRO */}
       <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-xs">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
-          <div className="p-2 bg-blue-600 text-white rounded-xl shadow-md shadow-blue-600/20">
-            <img src="/logo.png" alt="Logo" className="w-6 h-6 object-contain" />
-          </div>
+          <div className="flex items-center">
+        <img src="/logo.png" alt="Bâtir+ Pro" className="w-12 h-12 object-contain" />
+         </div>
           <span className="font-black text-base text-slate-900 tracking-tight">BÂTIR+ <span className="text-blue-600 font-light">PRO</span></span>
         </div>
 
