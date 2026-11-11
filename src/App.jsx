@@ -105,6 +105,8 @@ export default function App() {
   const [editToolForm, setEditToolForm] = useState({ assignedTo: '', status: '' });
   const [selectedTool, setSelectedTool] = useState(null);
   const [newNoteText, setNewNoteText] = useState('');
+
+  const [selectedRequestHistory, setSelectedRequestHistory] = useState(null);
   
   const [showAddToolModal, setShowAddToolModal] = useState(false);
   const [newToolData, setNewToolData] = useState({ 
@@ -1280,10 +1282,10 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Bouton pour voir tout l'historique des demandes de ce compagnon */}
+                      {/* Bouton pour voir toutes les demandes du compagnon dans une modale dédiée */}
                       <div className="pt-4 border-t border-slate-100">
                         <button
-                          onClick={() => setSelectedReclamationHistory(group.items)}
+                          onClick={() => setSelectedRequestHistory(group.items)}
                           className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                         >
                           <History className="w-4 h-4" /> Voir toutes les demandes ({group.items.length})
@@ -2442,6 +2444,93 @@ export default function App() {
         </div>
       )}
 
+      {/* MODALE HISTORIQUE COMPLET DES DEMANDES DE MATÉRIEL */}
+      {selectedRequestHistory && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl border border-slate-100">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+              <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
+                📦 Historique complet des demandes
+              </h3>
+              <button 
+                onClick={() => setSelectedRequestHistory(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {selectedRequestHistory.map((req, idx) => (
+                <div key={req.firestoreId || idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2.5">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md font-bold uppercase border border-amber-100">
+                          Qté : {req.quantity}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          {req.createdAt ? new Date(req.createdAt).toLocaleDateString('fr-FR') : 'Récemment'}
+                        </span>
+                      </div>
+                      <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide mt-1">
+                        {req.items}
+                      </h4>
+                    </div>
+
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                      req.status === 'Validé / Commandé' ? 'bg-emerald-100 text-emerald-800' :
+                      req.status === 'Reçu au dépôt' ? 'bg-blue-100 text-blue-800' :
+                      req.status === 'Refusé' ? 'bg-red-100 text-red-800' :
+                      'bg-amber-100 text-amber-800'
+                    }`}>
+                      {req.status || 'En attente'}
+                    </span>
+                  </div>
+
+                  {req.description && (
+                    <p className="text-xs text-slate-600 font-medium bg-white p-2.5 rounded-xl border border-slate-200/60">
+                      {req.description}
+                    </p>
+                  )}
+
+                  {/* Contrôles Admin directement dans la modale */}
+                  {isAdmin && (
+                    <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2">
+                      <select 
+                        value={req.status || 'En attente'} 
+                        onChange={(e) => handleUpdateRequestStatus(req.firestoreId, e.target.value)}
+                        className="px-3 py-1.5 bg-white border border-slate-300 text-slate-800 text-xs font-semibold rounded-xl focus:outline-none flex-1"
+                      >
+                        <option value="En attente">⏳ En attente</option>
+                        <option value="Validé / Commandé">✅ Validé / Commandé</option>
+                        <option value="Reçu au dépôt">📦 Reçu au dépôt</option>
+                        <option value="Refusé">❌ Refusé</option>
+                      </select>
+
+                      <button 
+                        onClick={() => handleDeleteRequest(req.firestoreId)}
+                        className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-colors"
+                        title="Supprimer la demande"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setSelectedRequestHistory(null)}
+              className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-colors shadow-md"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* MODALE HISTORIQUE DES PASSAGES (VIA LA MONTRE) */}
       {selectedReclamationHistory && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -2642,6 +2731,8 @@ export default function App() {
           </form>
         </div>
       )}
+
+
 
       {showAddToolModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
