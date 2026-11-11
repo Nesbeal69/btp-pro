@@ -39,10 +39,12 @@ import {
   Home,
   ShieldCheck,
   Edit3,
-  Trash2
+  Trash2,
+  Info
 } from 'lucide-react';
 
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
+const APP_VERSION = "v1.2.0";
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -131,6 +133,8 @@ export default function App() {
   
   const [editingSignalement, setEditingSignalement] = useState(null);
   const [editSignalementText, setEditSignalementText] = useState('');
+
+  const [showLegalModal, setShowLegalModal] = useState(false);
 
   const [workerSearch, setWorkerSearch] = useState('');
   const [workerRoleFilter, setWorkerRoleFilter] = useState('all');
@@ -391,7 +395,6 @@ export default function App() {
     }
   };
 
-  // FONCTION POUR SUPPRIMER TOUTE LA CARTE / LOGEMENT (TOUTES LES FICHES ASSOCIÉES)
   const handleDeleteGroupCard = async (groupItems) => {
     if (window.confirm("Voulez-vous vraiment supprimer toute cette fiche logement et tous ses signalements ?")) {
       try {
@@ -1171,7 +1174,6 @@ export default function App() {
                   return (
                     <div key={group.key} className="bg-white border border-slate-200/80 hover:border-red-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative group/card">
                       
-                      {/* CROIX DE SUPPRESSION DE LA FICHE LOGEMENT (VISIBLE UNIQUEMENT POUR L'ADMIN) */}
                       {isAdmin && (
                         <button
                           onClick={() => handleDeleteGroupCard(group.items)}
@@ -1197,7 +1199,6 @@ export default function App() {
                           </span>
                         </div>
 
-                        {/* AFFICHAGE DES 2 DERNIERS SIGNALEMENTS SUR LA CARTE PRINCIPALE */}
                         <div className="mt-3 space-y-3">
                           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Derniers signalements</span>
                           
@@ -1218,7 +1219,6 @@ export default function App() {
                                 <span>Par : <strong>{sig.createdBy}</strong> ({new Date(sig.createdAt).toLocaleDateString('fr-FR')})</span>
                                 
                                 <div className="flex items-center gap-1.5">
-                                  {/* BOUTON METTRE À JOUR LE STATUT */}
                                   <button
                                     onClick={() => { setResolvingReclamation(sig); setResolutionText(''); }}
                                     className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-xs"
@@ -1227,7 +1227,6 @@ export default function App() {
                                     <CheckCircle2 className="w-3.5 h-3.5" /> Mettre à jour
                                   </button>
 
-                                  {/* BOUTON EDITER LE SIGNALEMENT */}
                                   {canAddReclamation && (
                                     <button
                                       onClick={() => { setEditingSignalement(sig); setEditSignalementText(sig.observation); }}
@@ -1238,7 +1237,6 @@ export default function App() {
                                     </button>
                                   )}
 
-                                  {/* PETITE MONTRE POUR VOIR L'HISTORIQUE DE CE SIGNALEMENT PRÉCIS */}
                                   <button
                                     onClick={() => setSelectedReclamationHistory([sig])}
                                     className="p-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-xl transition-colors flex items-center gap-1 font-bold"
@@ -1642,7 +1640,100 @@ export default function App() {
         )}
       </main>
 
+      {/* --- FOOTER PRO DE QUALITÉ --- */}
+      <footer className="mt-auto bg-white border-t border-slate-200 py-6 px-6 text-slate-600 text-xs">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+          
+          {/* IDENTITÉ ET COPYRIGHT */}
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-600 text-white rounded-xl">
+              <Building2 className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="font-black text-slate-900 tracking-tight text-sm">BÂTIR+ <span className="text-blue-600 font-light">PRO</span></span>
+              <p className="text-[11px] text-slate-400">© 2026 Bâtir+ Pro. Tous droits réservés.</p>
+            </div>
+          </div>
+
+          {/* STATUT SYSTÈME ET VERSION */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-full font-semibold text-[11px]">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>Serveurs Firebase Opérationnels</span>
+            </div>
+
+            <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg font-mono font-bold text-[11px] border border-slate-200">
+              {APP_VERSION}
+            </span>
+          </div>
+
+          {/* LIEN MENTIONS LÉGALES */}
+          <div>
+            <button 
+              onClick={() => setShowLegalModal(true)}
+              className="text-slate-500 hover:text-blue-600 font-semibold transition-colors text-xs flex items-center gap-1.5"
+            >
+              <ShieldCheck className="w-4 h-4 text-slate-400" />
+              <span>Mentions Légales & RGPD</span>
+            </button>
+          </div>
+        </div>
+      </footer>
+
       {/* --- MODALES --- */}
+
+      {/* MODALE MENTIONS LÉGALES */}
+      {showLegalModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden max-h-[85vh] flex flex-col">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <ShieldCheck className="w-5 h-5 text-blue-600" />
+                <h3 className="text-base font-bold text-slate-900">Mentions Légales & Sécurité</h3>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowLegalModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors text-xs font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-4 text-xs text-slate-600 leading-relaxed">
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm mb-1">1. Éditeur de l'application</h4>
+                <p>L'application <strong>Bâtir+ Pro</strong> est développée et exploitée pour le suivi et la gestion interne des chantiers de réhabilitation du bâtiment.</p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm mb-1">2. Hébergement & Infrastructure</h4>
+                <p><strong>Hébergement Frontend :</strong> Vercel Inc. (San Francisco, USA)</p>
+                <p><strong>Base de données & Authentification :</strong> Google Firebase (Serveurs sécurisés SSL/TLS)</p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm mb-1">3. Protection des Données (RGPD)</h4>
+                <p>Les données collectées (nom, prénom, téléphone, réclamations chantier) sont exclusivement destinées à l'organisation technique du chantier et à la coordination des effectifs. Aucun transfert commercial n'est effectué.</p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm mb-1">4. Sécurité des accès</h4>
+                <p>Chaque espace chantier est strictement isolé via un code projet unique. La session utilisateur est automatiquement expirée après 24 heures d'inactivité.</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button 
+                onClick={() => setShowLegalModal(false)} 
+                className="px-5 py-2 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODALE MISE À JOUR STATUT PASSAGE */}
       {resolvingReclamation && (
