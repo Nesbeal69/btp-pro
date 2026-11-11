@@ -1136,7 +1136,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE MATERIEL  --- */}
+        {/* --- MODULE MATERIEL / DEMANDES (STYLE RECLAMATIONS) --- */}
         {activeTab === 'requests' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-cyan-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1146,7 +1146,7 @@ export default function App() {
                 </div>
                 <div>
                   <h2 className="text-xl font-black tracking-wide">Gestion du Matériel & Demandes</h2>
-                  <p className="text-xs text-slate-300 mt-0.5">Suivi des besoins par compagnon, historique et validation des approvisionnements.</p>
+                  <p className="text-xs text-slate-300 mt-0.5">Suivi des besoins chantiers par compagnon, historique et validation.</p>
                 </div>
               </div>
 
@@ -1157,14 +1157,15 @@ export default function App() {
               </div>
             </div>
 
-            {/* Cartes individuelles par Compagnon avec historique des demandes */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto">
+            {/* Grille de cartes par compagnon (exactement comme Réclamations) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {(() => {
                 const groupedReqs = {};
                 
                 (visibleRequests || []).forEach(req => {
-                  // Récupération fiable du nom du demandeur
-                  const authorName = req.authorName || req.userName || req.targetName || "Compagnon";
+                  // On récupère le vrai nom du compagnon (par ordre de priorité des champs possibles en base)
+                  const authorName = req.createdBy || req.authorName || req.userName || req.targetName || "Ouvrier";
+                  
                   if (!groupedReqs[authorName]) {
                     groupedReqs[authorName] = {
                       authorName,
@@ -1183,93 +1184,112 @@ export default function App() {
                         <FolderOpen className="w-6 h-6" />
                       </div>
                       <h4 className="text-sm font-bold text-slate-800">Aucune demande de matériel</h4>
-                      <p className="text-xs text-slate-400 max-w-xs mx-auto">Il n'y a aucune demande enregistrée pour l'instant.</p>
+                      <p className="text-xs text-slate-400 max-w-xs mx-auto">Il n'y a aucune demande en cours pour ce chantier.</p>
                     </div>
                   );
                 }
 
-                return reqCards.map((group, gIdx) => (
-                  <div key={gIdx} className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4">
-                    {/* En-tête de la carte du compagnon */}
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-cyan-50 text-cyan-600 rounded-2xl flex items-center justify-center font-black text-sm border border-cyan-100">
-                          👷‍♂️
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-black text-slate-900">{group.authorName}</h3>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            {group.items.length} demande{group.items.length > 1 ? 's' : ''} au total
+                return reqCards.map((group, gIdx) => {
+                  const pendingCount = group.items.filter(i => i.status !== 'Reçu au dépôt').length;
+                  const hasPending = pendingCount > 0;
+
+                  return (
+                    <div key={gIdx} className="bg-white border border-slate-200/80 hover:border-cyan-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                      <div>
+                        {/* En-tête de la carte du compagnon */}
+                        <div className="flex justify-between items-start pb-3 border-b border-slate-100">
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Compagnon Chantier</span>
+                            <h3 className="text-lg font-black text-slate-900 flex items-center gap-1.5 mt-0.5">
+                              👷‍♂️ {group.authorName}
+                            </h3>
+                          </div>
+
+                          <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full ${hasPending ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700'}`}>
+                            {hasPending ? `⏳ ${pendingCount} en cours` : '📦 Tout reçu'}
                           </span>
                         </div>
+
+                        {/* Liste des demandes / historique sur la carte */}
+                        <div className="mt-4 space-y-3">
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Historique des demandes</span>
+                          
+                          {group.items.map((item, iIdx) => {
+                            const currentStatus = item.status || "En attente";
+                            // On récupère le bon titre (titre, nom du matos, ou texte par défaut)
+                            const itemTitle = item.title || item.materialName || item.observation || "Demande de matériel";
+
+                            return (
+                              <div key={item.firestoreId || iIdx} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2.5">
+                                <div className="flex justify-between items-start gap-2">
+                                  <div className="space-y-1 flex-1">
+                                    <span className="text-[10px] font-mono text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-md font-bold uppercase border border-cyan-100">
+                                      {item.date || "Récemment"}
+                                    </span>
+                                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide mt-1">
+                                      {itemTitle}
+                                    </h4>
+                                  </div>
+                                  
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                                    currentStatus === 'Validé / Commandé' ? 'bg-emerald-100 text-emerald-800' :
+                                    currentStatus === 'Reçu au dépôt' ? 'bg-blue-100 text-blue-800' :
+                                    'bg-amber-100 text-amber-800'
+                                  }`}>
+                                    {currentStatus}
+                                  </span>
+                                </div>
+
+                                {item.description && (
+                                  <p className="text-xs text-slate-600 font-medium bg-white p-2.5 rounded-xl border border-slate-200/60">
+                                    {item.description}
+                                  </p>
+                                )}
+
+                                {/* Actions Admin (Changement de statut + Suppression) */}
+                                {isAdmin && (
+                                  <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2">
+                                    <select 
+                                      value={currentStatus} 
+                                      onChange={async (e) => {
+                                        const newStatus = e.target.value;
+                                        await updateDoc(doc(db, "requests", item.firestoreId), { status: newStatus });
+                                      }}
+                                      className="px-3 py-1.5 bg-white border border-slate-300 text-slate-800 text-xs font-semibold rounded-xl focus:outline-none flex-1"
+                                    >
+                                      <option value="En attente">⏳ En attente</option>
+                                      <option value="Validé / Commandé">✅ Validé / Commandé</option>
+                                      <option value="Reçu au dépôt">📦 Reçu au dépôt</option>
+                                    </select>
+
+                                    <button 
+                                      onClick={async () => {
+                                        if (window.confirm("Supprimer cette demande de l'historique ?")) {
+                                          await deleteDoc(doc(db, "requests", item.firestoreId));
+                                        }
+                                      }}
+                                      className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-colors"
+                                      title="Supprimer la demande"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Pied de carte informatif */}
+                      <div className="pt-4 border-t border-slate-100 text-center">
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          Total : {group.items.length} demande{group.items.length > 1 ? 's' : ''} enregistrée{group.items.length > 1 ? 's' : ''}
+                        </span>
                       </div>
                     </div>
-
-                    {/* Historique des demandes de ce compagnon */}
-                    <div className="space-y-3 flex-1">
-                      {group.items.map((item, iIdx) => {
-                        const currentStatus = item.status || "En attente";
-                        return (
-                          <div key={item.firestoreId || iIdx} className="bg-slate-50 border border-slate-200/70 p-4 rounded-2xl space-y-2">
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <span className="text-[10px] font-mono text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-md font-bold uppercase border border-cyan-100">
-                                  {item.date || "Récemment"}
-                                </span>
-                                <h4 className="text-xs font-black text-slate-900 mt-1 uppercase tracking-wide">
-                                  {item.title || item.materialName || "Demande de matériel"}
-                                </h4>
-                              </div>
-                              <span className={`px-2.5 py-1 rounded-xl text-[10px] font-bold shrink-0 ${
-                                currentStatus === 'Validé / Commandé' ? 'bg-emerald-100 text-emerald-700' :
-                                currentStatus === 'Reçu au dépôt' ? 'bg-blue-100 text-blue-700' :
-                                'bg-amber-100 text-amber-700'
-                              }`}>
-                                {currentStatus}
-                              </span>
-                            </div>
-
-                            {item.description && (
-                              <p className="text-xs text-slate-600 font-medium bg-white p-2.5 rounded-xl border border-slate-200/60">
-                                {item.description}
-                              </p>
-                            )}
-
-                            {/* Actions Admin (Statut + Suppression) */}
-                            {isAdmin && (
-                              <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2">
-                                <select 
-                                  value={currentStatus} 
-                                  onChange={async (e) => {
-                                    const newStatus = e.target.value;
-                                    await updateDoc(doc(db, "requests", item.firestoreId), { status: newStatus });
-                                  }}
-                                  className="px-3 py-1.5 bg-white border border-slate-300 text-slate-800 text-xs font-semibold rounded-xl focus:outline-none flex-1"
-                                >
-                                  <option value="En attente">⏳ En attente</option>
-                                  <option value="Validé / Commandé">✅ Validé / Commandé</option>
-                                  <option value="Reçu au dépôt">📦 Reçu au dépôt</option>
-                                </select>
-
-                                <button 
-                                  onClick={async () => {
-                                    if (window.confirm("Supprimer cette demande de l'historique ?")) {
-                                      await deleteDoc(doc(db, "requests", item.firestoreId));
-                                    }
-                                  }}
-                                  className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-colors"
-                                  title="Supprimer la demande"
-                                >
-                                  🗑️
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ));
+                  );
+                });
               })()}
             </div>
           </div>
