@@ -120,7 +120,7 @@ export default function App() {
 
   const [showAddPlanModal, setShowAddPlanModal] = useState(false);
   const [selectedWorkerFilter, setSelectedWorkerFilter] = useState('all');
-  const [newPlanData, setNewPlanData] = useState({ title: '', targetUserId: 'all', date: new Date().toISOString().split('T')[0], description: '', files: [] });
+  const [newPlanData, setNewPlanData] = useState({ title: '', targetUserId: 'all', targetUserIds: ['all'], date: new Date().toISOString().split('T')[0], description: '', files: [] });
 
   const [showAddRequestModal, setShowAddRequestModal] = useState(false);
   const [requestStatusFilter, setRequestStatusFilter] = useState('all');
@@ -657,31 +657,6 @@ export default function App() {
     });
   };
 
-  const handleUploadPlan = async (e) => {
-    e.preventDefault();
-    if (!newPlanData.title || !myProjectCode) return;
-    let targetName = 'Toute l’équipe';
-    if (newPlanData.targetUserId !== 'all') {
-      const foundUser = users.find(u => (u.userIdNum || u.id) === Number(newPlanData.targetUserId));
-      if (foundUser) targetName = foundUser.name;
-    }
-    try {
-      await addDoc(collection(db, "plans"), {
-        ...newPlanData,
-        projectCode: myProjectCode,
-        targetUserId: newPlanData.targetUserId === 'all' ? 'all' : Number(newPlanData.targetUserId),
-        targetName,
-        formattedDate: formatDateFr(newPlanData.date)
-      });
-      setShowAddPlanModal(false);
-      setNewPlanData({ title: '', targetUserId: 'all', date: new Date().toISOString().split('T')[0], description: '', files: [] });
-    } catch (e) { console.error(e); }
-  };
-
-  const handleDeletePlan = async (firestoreId) => {
-    try { if (firestoreId) await deleteDoc(doc(db, "plans", firestoreId)); } catch (e) { console.error(e); }
-  };
-
   const handleDownloadSinglePdf = (fileObj) => {
     if (!fileObj.data) return;
     const link = document.createElement('a');
@@ -696,10 +671,10 @@ export default function App() {
     if (!currentUser) return [];
     const myId = currentUser.userIdNum || currentUser.id;
     if (currentUser.role !== 'admin') {
-      return projectPlans.filter(p => p.targetUserId === 'all' || p.targetUserId === myId);
+      return projectPlans.filter(p => p.targetUserId === 'all' || p.targetUserId === myId || (p.targetUserIds && p.targetUserIds.includes(myId)));
     }
     if (selectedWorkerFilter === 'all') return projectPlans;
-    return projectPlans.filter(p => p.targetUserId === Number(selectedWorkerFilter));
+    return projectPlans.filter(p => p.targetUserId === Number(selectedWorkerFilter) || (p.targetUserIds && p.targetUserIds.includes(Number(selectedWorkerFilter))));
   }, [projectPlans, currentUser, selectedWorkerFilter]);
 
   const handleLogin = async (e) => {
@@ -1497,7 +1472,6 @@ export default function App() {
             {/* Liste verticale ergonomique regroupée par Date + Personne */}
             <div className="space-y-4 max-w-4xl mx-auto">
               {(() => {
-                // Étape de regroupement intelligent (Même jour + Même attributaire ou 'all')
                 const groupedMap = {};
                 
                 visiblePlans.forEach(plan => {
@@ -1511,9 +1485,7 @@ export default function App() {
                       files: [...(plan.files || [])]
                     };
                   } else {
-                    // On fusionne les tâches et les fichiers s'il y en a plusieurs le même jour
                     groupedMap[key].tasks.push({ title: plan.title, description: plan.description, firestoreId: plan.firestoreId });
-                    // Évite les doublons de fichiers
                     plan.files?.forEach(f => {
                       if (!groupedMap[key].files.some(existing => existing.name === f.name)) {
                         groupedMap[key].files.push(f);
@@ -1546,7 +1518,6 @@ export default function App() {
                       }`}
                     >
                       <div className="space-y-3 flex-1">
-                        {/* Badge Date & Attributaires multiples */}
                         <div className="flex flex-wrap items-center gap-2">
                           <span className={`px-3 py-1 rounded-xl font-mono font-bold text-xs flex items-center gap-1.5 ${
                             isToday ? 'bg-cyan-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 border border-slate-200'
@@ -1559,7 +1530,6 @@ export default function App() {
                           </span>
                         </div>
 
-                        {/* Liste des tâches de la journée regroupées sur la carte */}
                         <div className="space-y-3 pt-1">
                           {plan.tasks.map((t, tIdx) => (
                             <div key={t.firestoreId || tIdx} className="space-y-1">
@@ -1576,7 +1546,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Bloc documents / Action rapide tactile */}
                       <div className="w-full md:w-72 shrink-0 space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-200/70">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Feuille de route technique</span>
                         
@@ -1839,7 +1808,6 @@ export default function App() {
       <footer className="mt-auto bg-white border-t border-slate-200 py-6 px-6 text-slate-600 text-xs">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
           
-          {/* IDENTITÉ ET COPYRIGHT */}
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-600 text-white rounded-xl">
               <Building2 className="w-4 h-4" />
@@ -1850,7 +1818,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* STATUT SYSTÈME ET VERSION */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-full font-semibold text-[11px]">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -1862,7 +1829,6 @@ export default function App() {
             </span>
           </div>
 
-          {/* LIEN MENTIONS LÉGALES */}
           <div>
             <button 
               onClick={() => setShowLegalModal(true)}
@@ -1877,7 +1843,6 @@ export default function App() {
 
       {/* --- MODALES --- */}
 
-      {/* MODALE MENTIONS LÉGALES */}
       {showLegalModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden max-h-[85vh] flex flex-col">
@@ -1930,7 +1895,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALE MISE À JOUR STATUT PASSAGE */}
       {resolvingReclamation && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleConfirmResolveReclamation} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
@@ -1976,7 +1940,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALE MODIFICATION CONTENU SIGNALEMENT */}
       {editingSignalement && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleSaveEditSignalement} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
@@ -2494,7 +2457,6 @@ export default function App() {
                     </p>
                   )}
 
-                  {/* Contrôles Admin directement dans la modale */}
                   {isAdmin && (
                     <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2">
                       <select 
@@ -2531,7 +2493,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALE HISTORIQUE DES PASSAGES (VIA LA MONTRE) */}
+      {/* MODALE HISTORIQUE DES PASSAGES */}
       {selectedReclamationHistory && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 max-h-[80vh] overflow-y-auto shadow-2xl">
@@ -2602,11 +2564,9 @@ export default function App() {
             e.preventDefault();
             if (!newPlanData.title || !myProjectCode) return;
 
-            // Gestion multi-utilisateurs cochés
             const selectedIds = newPlanData.targetUserIds || ['all'];
             
             if (selectedIds.includes('all')) {
-              // Si "Toute l'équipe" est sélectionné
               await addDoc(collection(db, "plans"), {
                 title: newPlanData.title,
                 description: newPlanData.description,
@@ -2619,7 +2579,6 @@ export default function App() {
                 targetName: "Toute l'équipe"
               });
             } else {
-              // On crée une entrée pour chaque compagnon sélectionné pour qu'il ait sa propre carte liée
               const names = selectedIds.map(id => {
                 const found = approvedUsers.find(u => (u.userIdNum || u.id) === Number(id));
                 return found ? found.name : '';
@@ -2732,14 +2691,12 @@ export default function App() {
         </div>
       )}
 
-
-
       {showAddToolModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreateTool} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
             <h3 className="text-lg font-bold text-slate-900">Ajouter une machine</h3>
             <input type="text" placeholder="ID (ex: REM-04)" value={newToolData.id} onChange={e => setNewToolData({...newToolData, id: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
-            <input type="text" placeholder="Nom de la machine" value={newToolData.name} onChange={e => setNewToolData({...newToolData, name: e.target.value})} required className="w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs" />
+            <input type="text" placeholder="Nom de la machine" value={newToolData.name} onChange={e => setNewToolData({...newToolData, name: e.target.value})} required className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs" />
             <select value={newToolData.assignedTo} onChange={e => setNewToolData({...newToolData, assignedTo: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
               <option value="Dépôt">📦 Dépôt</option>
               {approvedUsers.map(u => <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name}</option>)}
