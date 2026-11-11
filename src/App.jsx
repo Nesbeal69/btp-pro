@@ -56,13 +56,14 @@ export default function App() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
-  const [showRegPassword, setShowRegPassword] = useState(false);
+  
   const [resetSent, setResetSent] = useState(false);
   
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regPassword, setRegPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
   const [regIsAdmin, setRegIsAdmin] = useState(false);
   const [regProjectCode, setRegProjectCode] = useState('');
   const [authError, setAuthError] = useState('');
@@ -845,7 +846,7 @@ export default function App() {
               <Building2 className="w-9 h-9 text-blue-400" />
             </div>
             <h1 className="text-2xl font-black text-white tracking-wider">BÂTIR+ <span className="text-blue-400 font-light">PRO</span></h1>
-            <p className="text-xs text-slate-300 mt-1 font-medium tracking-wide">La solution globale pour le suivi de vos chantiers, matériels et équipes.</p>
+            <p className="text-xs text-slate-300 mt-1 font-medium tracking-wide">La plateforme opérationnelle dédiée à vos chantiers de réhabilitation.</p>
           </div>
 
           {authMode === 'pending' ? (
@@ -905,15 +906,10 @@ export default function App() {
               ) : (
                 <form onSubmit={handleRegister} className="space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Nom </label>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">Nom</label>
                     <input type="text" required value={regName} onChange={e => setRegName(e.target.value)} placeholder="Martin" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
                   </div>
                   <div>
-                    <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Prénom</label>
-                    <input type="text" required value={regName} onChange={e => setRegName(e.target.value)} placeholder="Jean" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
-                  </div>
-                  <div></div>
                     <label className="block text-xs font-medium text-slate-300 mb-1">Email</label>
                     <input type="email" required value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="jean@batirpluspro.fr" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
                   </div>
@@ -922,25 +918,25 @@ export default function App() {
                     <input type="tel" required value={regPhone} onChange={e => setRegPhone(e.target.value)} placeholder="06 12 34 56 78" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
                   </div>
                   <div>
-  <label className="block text-xs font-medium text-slate-300 mb-1">Mot de passe</label>
-  <div className="relative">
-    <input 
-      type={showRegPassword ? "text" : "password"} 
-      required 
-      value={regPassword} 
-      onChange={e => setRegPassword(e.target.value)} 
-      placeholder="••••••••" 
-      className="w-full px-4 py-2 pr-10 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" 
-    />
-    <button
-      type="button"
-      onClick={() => setShowRegPassword(!showRegPassword)}
-      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white focus:outline-none"
-    >
-      {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-    </button>
-  </div>
-</div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">Mot de passe</label>
+                    <div className="relative">
+                      <input 
+                        type={showRegPassword ? "text" : "password"} 
+                        required 
+                        value={regPassword} 
+                        onChange={e => setRegPassword(e.target.value)} 
+                        placeholder="••••••••" 
+                        className="w-full px-4 py-2 pr-10 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegPassword(!showRegPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white focus:outline-none"
+                      >
+                        {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
 
                   <div className="pt-2 border-t border-white/10 space-y-2">
                     <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-200">
@@ -2358,7 +2354,7 @@ export default function App() {
           <form onSubmit={handleCreateTool} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
             <h3 className="text-lg font-bold text-slate-900">Ajouter une machine</h3>
             <input type="text" placeholder="ID (ex: REM-04)" value={newToolData.id} onChange={e => setNewToolData({...newToolData, id: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
-            <input type="text" placeholder="Nom de la machine" value={newToolData.name} onChange={e => setNewToolData({...newToolData, name: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
+            <input type="text" placeholder="Nom de la machine" value={newToolData.name} onChange={e => setNewToolData({...newToolData, name: e.target.value})} required className="w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs" />
             <select value={newToolData.assignedTo} onChange={e => setNewToolData({...newToolData, assignedTo: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
               <option value="Dépôt">📦 Dépôt</option>
               {approvedUsers.map(u => <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name}</option>)}
