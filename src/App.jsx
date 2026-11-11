@@ -1296,7 +1296,6 @@ export default function App() {
         )}
 
         {/* --- MODULE PLANNING --- */}
-        {/* --- MODULE PLANNING ULTRA-TERRAIN --- */}
         {activeTab === 'planning' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-cyan-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1306,7 +1305,7 @@ export default function App() {
                 </div>
                 <div>
                   <h2 className="text-xl font-black tracking-wide">Planning & Feuilles de Route</h2>
-                  <p className="text-xs text-slate-300 mt-0.5">Vue terrain simplifiée : intervention du jour, localisation et documents.</p>
+                  <p className="text-xs text-slate-300 mt-0.5">Vue terrain : regroupement par jour et multi-affectations.</p>
                 </div>
               </div>
 
@@ -1332,11 +1331,49 @@ export default function App() {
               </div>
             </div>
 
-            {/* Liste verticale ergonomique triée par date */}
+            {/* Liste verticale ergonomique regroupée par Date + Personne */}
             <div className="space-y-4 max-w-4xl mx-auto">
-              {[...visiblePlans]
-                .sort((a, b) => new Date(a.date) - new Date(b.date))
-                .map(plan => {
+              {(() => {
+                // Étape de regroupement intelligent (Même jour + Même attributaire ou 'all')
+                const groupedMap = {};
+                
+                visiblePlans.forEach(plan => {
+                  const targetKey = Array.isArray(plan.targetUserIds) ? plan.targetUserIds.sort().join('-') : (plan.targetUserId || 'all');
+                  const key = `${plan.date}_${targetKey}`;
+                  
+                  if (!groupedMap[key]) {
+                    groupedMap[key] = {
+                      ...plan,
+                      tasks: [{ title: plan.title, description: plan.description, firestoreId: plan.firestoreId }],
+                      files: [...(plan.files || [])]
+                    };
+                  } else {
+                    // On fusionne les tâches et les fichiers s'il y en a plusieurs le même jour
+                    groupedMap[key].tasks.push({ title: plan.title, description: plan.description, firestoreId: plan.firestoreId });
+                    // Évite les doublons de fichiers
+                    plan.files?.forEach(f => {
+                      if (!groupedMap[key].files.some(existing => existing.name === f.name)) {
+                        groupedMap[key].files.push(f);
+                      }
+                    });
+                  }
+                });
+
+                const mergedPlans = Object.values(groupedMap).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                if (mergedPlans.length === 0) {
+                  return (
+                    <div className="py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                      <div className="w-12 h-12 bg-cyan-50 text-cyan-600 rounded-2xl mx-auto flex items-center justify-center">
+                        <FolderOpen className="w-6 h-6" />
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-800">Aucune tâche assignée</h4>
+                      <p className="text-xs text-slate-400 max-w-xs mx-auto">Il n'y a actuellement aucun planning ou feuille de route à afficher pour cette période.</p>
+                    </div>
+                  );
+                }
+
+                return mergedPlans.map(plan => {
                   const isToday = plan.date === new Date().toISOString().split('T')[0];
                   return (
                     <div 
@@ -1346,7 +1383,7 @@ export default function App() {
                       }`}
                     >
                       <div className="space-y-3 flex-1">
-                        {/* Badge Date & Attributaire */}
+                        {/* Badge Date & Attributaires multiples */}
                         <div className="flex flex-wrap items-center gap-2">
                           <span className={`px-3 py-1 rounded-xl font-mono font-bold text-xs flex items-center gap-1.5 ${
                             isToday ? 'bg-cyan-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 border border-slate-200'
@@ -1354,21 +1391,25 @@ export default function App() {
                             <CalendarIcon className="w-3.5 h-3.5" /> {isToday ? "AUJOURD'HUI" : (plan.formattedDate || formatDateFr(plan.date))}
                           </span>
 
-                          <span className="px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200">
-                            👤 Pour : {plan.targetName}
+                          <span className="px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 flex items-center gap-1">
+                            👥 Pour : <strong className="text-slate-900">{plan.targetName}</strong>
                           </span>
                         </div>
 
-                        {/* Logement / Titre en très gros caractères */}
-                        <div>
-                          <h3 className="text-lg md:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                            <Home className="w-5 h-5 text-cyan-600" /> {plan.title}
-                          </h3>
-                          {plan.description && (
-                            <p className="text-xs text-slate-600 mt-1.5 leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-100 font-medium">
-                              {plan.description}
-                            </p>
-                          )}
+                        {/* Liste des tâches de la journée regroupées sur la carte */}
+                        <div className="space-y-3 pt-1">
+                          {plan.tasks.map((t, tIdx) => (
+                            <div key={t.firestoreId || tIdx} className="space-y-1">
+                              <h3 className="text-lg md:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                                <Home className="w-5 h-5 text-cyan-600 shrink-0" /> {t.title}
+                              </h3>
+                              {t.description && (
+                                <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-100 font-medium">
+                                  {t.description}
+                                </p>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       </div>
 
@@ -1394,32 +1435,32 @@ export default function App() {
                             </div>
                           ))
                         ) : (
-                          <p className="text-xs text-slate-400 italic">Aucun document joint à cette tâche.</p>
+                          <p className="text-xs text-slate-400 italic">Aucun document joint.</p>
                         )}
 
                         {isAdmin && (
-                          <div className="pt-2 border-t border-slate-200/60 flex justify-end">
-                            <button onClick={() => handleDeletePlan(plan.firestoreId)} className="text-xs text-red-600 hover:text-red-700 font-bold">Supprimer la tâche</button>
+                          <div className="pt-2 border-t border-slate-200/60 flex justify-end gap-2">
+                            {plan.tasks.map(t => (
+                              <button 
+                                key={t.firestoreId} 
+                                onClick={() => handleDeletePlan(t.firestoreId)} 
+                                className="text-[10px] bg-red-50 hover:bg-red-100 text-red-600 px-2 py-1 rounded-lg font-bold transition-colors"
+                                title="Supprimer cette tâche spécifique"
+                              >
+                                🗑️ Supprimer tâche
+                              </button>
+                            ))}
                           </div>
                         )}
                       </div>
                     </div>
                   );
-                })}
-
-              {visiblePlans.length === 0 && (
-                <div className="py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
-                  <div className="w-12 h-12 bg-cyan-50 text-cyan-600 rounded-2xl mx-auto flex items-center justify-center">
-                    <FolderOpen className="w-6 h-6" />
-                  </div>
-                  <h4 className="text-sm font-bold text-slate-800">Aucune tâche assignée</h4>
-                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Il n'y a actuellement aucun planning ou feuille de route à afficher pour cette période.</p>
-                </div>
-              )}
+                });
+              })()}
             </div>
           </div>
         )}
-        
+
         {/* --- MODULE EFFECTIFS --- */}
         {activeTab === 'workers' && (
           <div className="space-y-6">
@@ -2307,17 +2348,136 @@ export default function App() {
 
       {showAddPlanModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleUploadPlan} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-900">Assigner une Tâche</h3>
-            <input type="text" placeholder="Titre intervention" value={newPlanData.title} onChange={e => setNewPlanData({...newPlanData, title: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
-            <select value={newPlanData.targetUserId} onChange={e => setNewPlanData({...newPlanData, targetUserId: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
-              <option value="all">Toute l'équipe</option>
-              {approvedUsers.map(u => <option key={u.firestoreId} value={u.userIdNum || u.id}>{u.name}</option>)}
-            </select>
-            <input type="date" value={newPlanData.date} onChange={e => setNewPlanData({...newPlanData, date: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
-            <input type="file" accept=".pdf" multiple onChange={handleMultipleFilesChange} className="w-full text-xs" />
-            <textarea placeholder="Consignes..." value={newPlanData.description} onChange={e => setNewPlanData({...newPlanData, description: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs h-20" />
-            <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowAddPlanModal(false)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl">Annuler</button><button type="submit" className="px-4 py-2 bg-cyan-600 text-white text-xs rounded-xl font-semibold">Publier</button></div>
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            if (!newPlanData.title || !myProjectCode) return;
+
+            // Gestion multi-utilisateurs cochés
+            const selectedIds = newPlanData.targetUserIds || ['all'];
+            
+            if (selectedIds.includes('all')) {
+              // Si "Toute l'équipe" est sélectionné
+              await addDoc(collection(db, "plans"), {
+                title: newPlanData.title,
+                description: newPlanData.description,
+                date: newPlanData.date,
+                formattedDate: formatDateFr(newPlanData.date),
+                files: newPlanData.files,
+                projectCode: myProjectCode,
+                targetUserId: 'all',
+                targetUserIds: ['all'],
+                targetName: "Toute l'équipe"
+              });
+            } else {
+              // On crée une entrée pour chaque compagnon sélectionné pour qu'il ait sa propre carte liée
+              const names = selectedIds.map(id => {
+                const found = approvedUsers.find(u => (u.userIdNum || u.id) === Number(id));
+                return found ? found.name : '';
+              }).filter(Boolean);
+
+              await addDoc(collection(db, "plans"), {
+                title: newPlanData.title,
+                description: newPlanData.description,
+                date: newPlanData.date,
+                formattedDate: formatDateFr(newPlanData.date),
+                files: newPlanData.files,
+                projectCode: myProjectCode,
+                targetUserId: Number(selectedIds[0]),
+                targetUserIds: selectedIds.map(Number),
+                targetName: names.join(', ')
+              });
+            }
+
+            setShowAddPlanModal(false);
+            setNewPlanData({ title: '', targetUserId: 'all', targetUserIds: ['all'], date: new Date().toISOString().split('T')[0], description: '', files: [] });
+          }} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900">Assigner une Tâche</h3>
+              <button type="button" onClick={() => setShowAddPlanModal(false)}>✕</button>
+            </div>
+
+            <input 
+              type="text" 
+              placeholder="Titre intervention (ex: Bat. 15 LGT 361)" 
+              value={newPlanData.title} 
+              onChange={e => setNewPlanData({...newPlanData, title: e.target.value})} 
+              required 
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs" 
+            />
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Assigner à (1 ou plusieurs compagnons) :</label>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                <label className="flex items-center gap-2 font-bold text-slate-800 cursor-pointer pb-2 border-b border-slate-200">
+                  <input 
+                    type="checkbox" 
+                    checked={!newPlanData.targetUserIds || newPlanData.targetUserIds.includes('all')}
+                    onChange={e => {
+                      if (e.target.checked) {
+                        setNewPlanData({...newPlanData, targetUserIds: ['all']});
+                      } else {
+                        setNewPlanData({...newPlanData, targetUserIds: []});
+                      }
+                    }}
+                    className="rounded text-cyan-600 w-4 h-4"
+                  />
+                  <span>🌐 Toute l'équipe</span>
+                </label>
+                
+                {approvedUsers.map(u => {
+                  const uid = u.userIdNum || u.id;
+                  const isChecked = newPlanData.targetUserIds?.includes(uid);
+                  return (
+                    <label key={u.firestoreId} className="flex items-center gap-2 cursor-pointer text-slate-700 py-1">
+                      <input 
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={e => {
+                          let current = newPlanData.targetUserIds || [];
+                          if (current.includes('all')) current = [];
+                          if (e.target.checked) {
+                            current.push(uid);
+                          } else {
+                            current = current.filter(id => id !== uid);
+                          }
+                          setNewPlanData({...newPlanData, targetUserIds: current});
+                        }}
+                        className="rounded text-cyan-600 w-4 h-4"
+                      />
+                      <span>👷‍♂️ {u.name} ({u.role})</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <input 
+              type="date" 
+              value={newPlanData.date} 
+              onChange={e => setNewPlanData({...newPlanData, date: e.target.value})} 
+              required 
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs" 
+            />
+
+            <input 
+              type="file" 
+              accept=".pdf" 
+              multiple 
+              onChange={handleMultipleFilesChange} 
+              className="w-full text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100" 
+            />
+
+            <textarea 
+              placeholder="Consignes particulières..." 
+              value={newPlanData.description} 
+              onChange={e => setNewPlanData({...newPlanData, description: e.target.value})} 
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs h-20" 
+            />
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setShowAddPlanModal(false)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl font-semibold">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-cyan-600 text-white text-xs rounded-xl font-bold shadow-md shadow-cyan-600/20">Publier</button>
+            </div>
           </form>
         </div>
       )}
