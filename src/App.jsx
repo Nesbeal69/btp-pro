@@ -1296,6 +1296,7 @@ export default function App() {
         )}
 
         {/* --- MODULE PLANNING --- */}
+        {/* --- MODULE PLANNING ULTRA-TERRAIN --- */}
         {activeTab === 'planning' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-cyan-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1331,78 +1332,80 @@ export default function App() {
               </div>
             </div>
 
-            {/* Liste verticale ergonomique pour le terrain */}
+            {/* Liste verticale ergonomique triée par date */}
             <div className="space-y-4 max-w-4xl mx-auto">
-              {visiblePlans.map(plan => {
-                const isToday = plan.date === new Date().toISOString().split('T')[0];
-                return (
-                  <div 
-                    key={plan.firestoreId} 
-                    className={`bg-white border rounded-3xl p-6 shadow-sm hover:shadow-md transition-all relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 ${
-                      isToday ? 'border-cyan-500 ring-2 ring-cyan-500/20 bg-gradient-to-r from-cyan-50/30 to-white' : 'border-slate-200/80'
-                    }`}
-                  >
-                    <div className="space-y-3 flex-1">
-                      {/* Badge Date & Attributaire */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`px-3 py-1 rounded-xl font-mono font-bold text-xs flex items-center gap-1.5 ${
-                          isToday ? 'bg-cyan-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 border border-slate-200'
-                        }`}>
-                          <CalendarIcon className="w-3.5 h-3.5" /> {isToday ? "AUJOURD'HUI" : (plan.formattedDate || formatDateFr(plan.date))}
-                        </span>
+              {[...visiblePlans]
+                .sort((a, b) => new Date(a.date) - new Date(b.date))
+                .map(plan => {
+                  const isToday = plan.date === new Date().toISOString().split('T')[0];
+                  return (
+                    <div 
+                      key={plan.firestoreId} 
+                      className={`bg-white border rounded-3xl p-6 shadow-sm hover:shadow-md transition-all relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 ${
+                        isToday ? 'border-cyan-500 ring-2 ring-cyan-500/20 bg-gradient-to-r from-cyan-50/30 to-white' : 'border-slate-200/80'
+                      }`}
+                    >
+                      <div className="space-y-3 flex-1">
+                        {/* Badge Date & Attributaire */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`px-3 py-1 rounded-xl font-mono font-bold text-xs flex items-center gap-1.5 ${
+                            isToday ? 'bg-cyan-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}>
+                            <CalendarIcon className="w-3.5 h-3.5" /> {isToday ? "AUJOURD'HUI" : (plan.formattedDate || formatDateFr(plan.date))}
+                          </span>
 
-                        <span className="px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200">
-                          👤 Pour : {plan.targetName}
-                        </span>
+                          <span className="px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200">
+                            👤 Pour : {plan.targetName}
+                          </span>
+                        </div>
+
+                        {/* Logement / Titre en très gros caractères */}
+                        <div>
+                          <h3 className="text-lg md:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                            <Home className="w-5 h-5 text-cyan-600" /> {plan.title}
+                          </h3>
+                          {plan.description && (
+                            <p className="text-xs text-slate-600 mt-1.5 leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-100 font-medium">
+                              {plan.description}
+                            </p>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Logement / Titre en très gros caractères */}
-                      <div>
-                        <h3 className="text-lg md:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                          <Home className="w-5 h-5 text-cyan-600" /> {plan.title}
-                        </h3>
-                        {plan.description && (
-                          <p className="text-xs text-slate-600 mt-1.5 leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-100 font-medium">
-                            {plan.description}
-                          </p>
+                      {/* Bloc documents / Action rapide tactile */}
+                      <div className="w-full md:w-72 shrink-0 space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-200/70">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Feuille de route technique</span>
+                        
+                        {plan.files && plan.files.length > 0 ? (
+                          plan.files.map((fileObj, fIdx) => (
+                            <div key={fIdx} className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 truncate">
+                                <div className="p-2 bg-red-100 text-red-600 rounded-xl shrink-0">
+                                  <FileText className="w-4 h-4" />
+                                </div>
+                                <span className="text-xs text-slate-800 font-bold truncate">{fileObj.name}</span>
+                              </div>
+                              <button 
+                                onClick={() => handleDownloadSinglePdf(fileObj)} 
+                                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95 shrink-0"
+                              >
+                                <Download className="w-3.5 h-3.5" /> Ouvrir PDF
+                              </button>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-xs text-slate-400 italic">Aucun document joint à cette tâche.</p>
+                        )}
+
+                        {isAdmin && (
+                          <div className="pt-2 border-t border-slate-200/60 flex justify-end">
+                            <button onClick={() => handleDeletePlan(plan.firestoreId)} className="text-xs text-red-600 hover:text-red-700 font-bold">Supprimer la tâche</button>
+                          </div>
                         )}
                       </div>
                     </div>
-
-                    {/* Bloc documents / Action rapide tactile */}
-                    <div className="w-full md:w-72 shrink-0 space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-200/70">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Feuille de route technique</span>
-                      
-                      {plan.files && plan.files.length > 0 ? (
-                        plan.files.map((fileObj, fIdx) => (
-                          <div key={fIdx} className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 truncate">
-                              <div className="p-2 bg-red-100 text-red-600 rounded-xl shrink-0">
-                                <FileText className="w-4 h-4" />
-                              </div>
-                              <span className="text-xs text-slate-800 font-bold truncate">{fileObj.name}</span>
-                            </div>
-                            <button 
-                              onClick={() => handleDownloadSinglePdf(fileObj)} 
-                              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95 shrink-0"
-                            >
-                              <Download className="w-3.5 h-3.5" /> Ouvrir PDF
-                            </button>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-xs text-slate-400 italic">Aucun document joint à cette tâche.</p>
-                      )}
-
-                      {isAdmin && (
-                        <div className="pt-2 border-t border-slate-200/60 flex justify-end">
-                          <button onClick={() => handleDeletePlan(plan.firestoreId)} className="text-xs text-red-600 hover:text-red-700 font-bold">Supprimer la tâche</button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
 
               {visiblePlans.length === 0 && (
                 <div className="py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
@@ -1416,6 +1419,7 @@ export default function App() {
             </div>
           </div>
         )}
+        
         {/* --- MODULE EFFECTIFS --- */}
         {activeTab === 'workers' && (
           <div className="space-y-6">
