@@ -38,7 +38,8 @@ import {
   History,
   Home,
   ShieldCheck,
-  Edit3
+  Edit3,
+  Trash2
 } from 'lucide-react';
 
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -128,7 +129,6 @@ export default function App() {
   const [resolvingReclamation, setResolvingReclamation] = useState(null);
   const [resolutionText, setResolutionText] = useState('');
   
-  // Modal pour modifier un signalement existant
   const [editingSignalement, setEditingSignalement] = useState(null);
   const [editSignalementText, setEditSignalementText] = useState('');
 
@@ -279,7 +279,7 @@ export default function App() {
 
     Object.values(groups).forEach(g => {
       g.items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      g.latestTwo = g.items.slice(0, 2); // Les 2 derniers signalements pour la carte principale
+      g.latestTwo = g.items.slice(0, 2);
       g.pendingCount = g.items.filter(i => i.status === 'À faire').length;
     });
 
@@ -327,7 +327,7 @@ export default function App() {
         status: 'À faire',
         createdBy: currentUser.name,
         createdAt: new Date().toISOString(),
-        passages: [firstPassage] // Historique des passages et statuts pour ce signalement précis
+        passages: [firstPassage]
       });
       setShowAddReclamationModal(false);
       setNewReclamation({ building: '', apartment: '', floor: '', clientName: '', observation: '' });
@@ -391,12 +391,17 @@ export default function App() {
     }
   };
 
-  const handleDeleteReclamation = async (firestoreId) => {
-    if (window.confirm("Voulez-vous vraiment supprimer ce signalement ?")) {
+  // FONCTION POUR SUPPRIMER TOUTE LA CARTE / LOGEMENT (TOUTES LES FICHES ASSOCIÉES)
+  const handleDeleteGroupCard = async (groupItems) => {
+    if (window.confirm("Voulez-vous vraiment supprimer toute cette fiche logement et tous ses signalements ?")) {
       try {
-        await deleteDoc(doc(db, "reclamations", firestoreId));
+        for (const item of groupItems) {
+          if (item.firestoreId) {
+            await deleteDoc(doc(db, "reclamations", item.firestoreId));
+          }
+        }
       } catch (e) {
-        console.error(e);
+        console.error("Erreur suppression groupe :", e);
       }
     }
   };
@@ -1164,9 +1169,21 @@ export default function App() {
                   const pendingItemsCount = group.items ? group.items.filter(i => i.status !== 'Fait').length : (group.pendingCount || 0);
                   const hasPending = pendingItemsCount > 0;
                   return (
-                    <div key={group.key} className="bg-white border border-slate-200/80 hover:border-red-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative">
+                    <div key={group.key} className="bg-white border border-slate-200/80 hover:border-red-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative group/card">
+                      
+                      {/* CROIX DE SUPPRESSION DE LA FICHE LOGEMENT (VISIBLE UNIQUEMENT POUR L'ADMIN) */}
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDeleteGroupCard(group.items)}
+                          className="absolute right-4 top-4 w-7 h-7 bg-red-50 hover:bg-red-600 text-red-500 hover:text-white rounded-full flex items-center justify-center transition-colors shadow-xs z-10"
+                          title="Supprimer toute cette fiche logement"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+
                       <div>
-                        <div className="flex justify-between items-start pb-3 border-b border-slate-100">
+                        <div className="flex justify-between items-start pb-3 border-b border-slate-100 pr-8">
                           <div>
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Localisation {group.building && `(${group.building})`}</span>
                             <h3 className="text-lg font-black text-slate-900 flex items-center gap-1.5">
@@ -1201,7 +1218,7 @@ export default function App() {
                                 <span>Par : <strong>{sig.createdBy}</strong> ({new Date(sig.createdAt).toLocaleDateString('fr-FR')})</span>
                                 
                                 <div className="flex items-center gap-1.5">
-                                  {/* BOUTON METTRE À JOUR LE STATUT (PROPRE EN LIGNE) */}
+                                  {/* BOUTON METTRE À JOUR LE STATUT */}
                                   <button
                                     onClick={() => { setResolvingReclamation(sig); setResolutionText(''); }}
                                     className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-xs"
@@ -1210,7 +1227,7 @@ export default function App() {
                                     <CheckCircle2 className="w-3.5 h-3.5" /> Mettre à jour
                                   </button>
 
-                                  {/* BOUTON EDITER LE SIGNALEMENT (POUR CEUX QUI ONT LE DROIT) */}
+                                  {/* BOUTON EDITER LE SIGNALEMENT */}
                                   {canAddReclamation && (
                                     <button
                                       onClick={() => { setEditingSignalement(sig); setEditSignalementText(sig.observation); }}
