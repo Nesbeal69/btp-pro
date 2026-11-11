@@ -1136,7 +1136,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE MATERIEL / DEMANDES ULTRA-PRO --- */}
+        {/* --- MODULE MATERIEL  --- */}
         {activeTab === 'requests' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-cyan-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1146,7 +1146,7 @@ export default function App() {
                 </div>
                 <div>
                   <h2 className="text-xl font-black tracking-wide">Gestion du Matériel & Demandes</h2>
-                  <p className="text-xs text-slate-300 mt-0.5">Suivi des besoins chantiers, outillage et approvisionnements par compagnon.</p>
+                  <p className="text-xs text-slate-300 mt-0.5">Suivi des besoins par compagnon, historique et validation des approvisionnements.</p>
                 </div>
               </div>
 
@@ -1157,86 +1157,94 @@ export default function App() {
               </div>
             </div>
 
-            {/* Liste des demandes regroupées par Compagnon */}
-            <div className="space-y-4 max-w-4xl mx-auto">
+            {/* Cartes individuelles par Compagnon avec historique des demandes */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto">
               {(() => {
                 const groupedReqs = {};
                 
                 (visibleRequests || []).forEach(req => {
-                  const authorKey = req.authorName || req.userName || "Équipe Chantier";
-                  if (!groupedReqs[authorKey]) {
-                    groupedReqs[authorKey] = {
-                      authorName: authorKey,
+                  // Récupération fiable du nom du demandeur
+                  const authorName = req.authorName || req.userName || req.targetName || "Compagnon";
+                  if (!groupedReqs[authorName]) {
+                    groupedReqs[authorName] = {
+                      authorName,
                       items: []
                     };
                   }
-                  groupedReqs[authorKey].items.push(req);
+                  groupedReqs[authorName].items.push(req);
                 });
 
                 const reqCards = Object.values(groupedReqs);
 
                 if (reqCards.length === 0) {
                   return (
-                    <div className="py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                    <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
                       <div className="w-12 h-12 bg-cyan-50 text-cyan-600 rounded-2xl mx-auto flex items-center justify-center">
                         <FolderOpen className="w-6 h-6" />
                       </div>
                       <h4 className="text-sm font-bold text-slate-800">Aucune demande de matériel</h4>
-                      <p className="text-xs text-slate-400 max-w-xs mx-auto">Il n'y a aucune demande en cours pour ce chantier.</p>
+                      <p className="text-xs text-slate-400 max-w-xs mx-auto">Il n'y a aucune demande enregistrée pour l'instant.</p>
                     </div>
                   );
                 }
 
                 return reqCards.map((group, gIdx) => (
-                  <div key={gIdx} className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all space-y-4">
-                    {/* En-tête de la carte avec le nom du gars */}
-                    <div className="flex flex-wrap justify-between items-center pb-3 border-b border-slate-100 gap-2">
-                      <div className="flex items-center gap-2">
-                        <div className="p-2.5 bg-cyan-50 text-cyan-600 rounded-xl font-bold text-xs">
+                  <div key={gIdx} className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4">
+                    {/* En-tête de la carte du compagnon */}
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-cyan-50 text-cyan-600 rounded-2xl flex items-center justify-center font-black text-sm border border-cyan-100">
                           👷‍♂️
                         </div>
                         <div>
-                          <h3 className="text-sm font-black text-slate-900">Demandeur : {group.authorName}</h3>
+                          <h3 className="text-sm font-black text-slate-900">{group.authorName}</h3>
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            {group.items.length} article{group.items.length > 1 ? 's' : ''} demandé{group.items.length > 1 ? 's' : ''}
+                            {group.items.length} demande{group.items.length > 1 ? 's' : ''} au total
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Liste des articles demandés par ce compagnon */}
-                    <div className="space-y-3">
+                    {/* Historique des demandes de ce compagnon */}
+                    <div className="space-y-3 flex-1">
                       {group.items.map((item, iIdx) => {
                         const currentStatus = item.status || "En attente";
                         return (
-                          <div key={item.firestoreId || iIdx} className="bg-slate-50 border border-slate-200/70 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                            <div className="space-y-1 flex-1">
-                              <div className="flex items-center gap-2">
-                                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">{item.title || item.materialName || "Matériel"}</h4>
-                                <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold ${
-                                  currentStatus === 'Validé / Commandé' ? 'bg-emerald-100 text-emerald-700' :
-                                  currentStatus === 'Reçu au dépôt' ? 'bg-blue-100 text-blue-700' :
-                                  'bg-amber-100 text-amber-700'
-                                }`}>
-                                  {currentStatus}
+                          <div key={item.firestoreId || iIdx} className="bg-slate-50 border border-slate-200/70 p-4 rounded-2xl space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <span className="text-[10px] font-mono text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-md font-bold uppercase border border-cyan-100">
+                                  {item.date || "Récemment"}
                                 </span>
+                                <h4 className="text-xs font-black text-slate-900 mt-1 uppercase tracking-wide">
+                                  {item.title || item.materialName || "Demande de matériel"}
+                                </h4>
                               </div>
-                              {item.description && (
-                                <p className="text-xs text-slate-600 font-medium">{item.description}</p>
-                              )}
-                              <span className="text-[10px] text-slate-400 block">Demandé le : {item.date || "Récemment"}</span>
+                              <span className={`px-2.5 py-1 rounded-xl text-[10px] font-bold shrink-0 ${
+                                currentStatus === 'Validé / Commandé' ? 'bg-emerald-100 text-emerald-700' :
+                                currentStatus === 'Reçu au dépôt' ? 'bg-blue-100 text-blue-700' :
+                                'bg-amber-100 text-amber-700'
+                              }`}>
+                                {currentStatus}
+                              </span>
                             </div>
 
-                            {/* Actions Admin : Changer le statut ou supprimer */}
+                            {item.description && (
+                              <p className="text-xs text-slate-600 font-medium bg-white p-2.5 rounded-xl border border-slate-200/60">
+                                {item.description}
+                              </p>
+                            )}
+
+                            {/* Actions Admin (Statut + Suppression) */}
                             {isAdmin && (
-                              <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60">
+                              <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2">
                                 <select 
                                   value={currentStatus} 
                                   onChange={async (e) => {
                                     const newStatus = e.target.value;
                                     await updateDoc(doc(db, "requests", item.firestoreId), { status: newStatus });
                                   }}
-                                  className="px-3 py-1.5 bg-white border border-slate-300 text-slate-800 text-xs font-semibold rounded-xl focus:outline-none"
+                                  className="px-3 py-1.5 bg-white border border-slate-300 text-slate-800 text-xs font-semibold rounded-xl focus:outline-none flex-1"
                                 >
                                   <option value="En attente">⏳ En attente</option>
                                   <option value="Validé / Commandé">✅ Validé / Commandé</option>
@@ -1245,7 +1253,7 @@ export default function App() {
 
                                 <button 
                                   onClick={async () => {
-                                    if (window.confirm("Supprimer cette demande ?")) {
+                                    if (window.confirm("Supprimer cette demande de l'historique ?")) {
                                       await deleteDoc(doc(db, "requests", item.firestoreId));
                                     }
                                   }}
@@ -1266,7 +1274,7 @@ export default function App() {
             </div>
           </div>
         )}
-        
+
         {/* --- MODULE RÉCLAMATIONS --- */}
         {activeTab === 'reclamations' && (
           <div className="space-y-6">
