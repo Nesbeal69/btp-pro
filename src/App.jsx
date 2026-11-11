@@ -820,7 +820,7 @@ export default function App() {
         <div className="relative z-10 w-full max-w-md bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl shadow-2xl p-8 overflow-hidden">
           <div className="text-center mb-6">
             <div className="inline-flex p-3.5 bg-blue-600/20 border border-blue-400/30 rounded-2xl mb-3 shadow-inner">
-              <Building2 className="w-9 h-9 text-blue-400" />
+              <img src="/logo-off.png" alt="Logo Bâtir+ Pro" className="w-9 h-9 object-contain" />
             </div>
             <h1 className="text-2xl font-black text-white tracking-wider">BÂTIR+ <span className="text-blue-400 font-light">PRO</span></h1>
             <p className="text-xs text-slate-300 mt-1 font-medium tracking-wide">La plateforme opérationnelle dédiée à vos chantiers de réhabilitation.</p>
@@ -945,7 +945,7 @@ export default function App() {
       <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-xs">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
           <div className="p-2 bg-blue-600 text-white rounded-xl shadow-md shadow-blue-600/20">
-            <Building2 className="w-5 h-5" />
+            <img src="/logo.png" alt="Logo" className="w-6 h-6 object-contain" />
           </div>
           <span className="font-black text-base text-slate-900 tracking-tight">BÂTIR+ <span className="text-blue-600 font-light">PRO</span></span>
         </div>
