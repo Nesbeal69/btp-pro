@@ -1136,6 +1136,54 @@ export default function App() {
           </div>
         )}
 
+        {/* --- MODULE MATERIEL / DEMANDES --- */}
+        {activeTab === 'requests' && (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-cyan-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-cyan-600/20 border border-cyan-400/30 rounded-2xl">
+                  <FolderOpen className="w-7 h-7 text-cyan-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black tracking-wide">Gestion du Matériel & Demandes</h2>
+                  <p className="text-xs text-slate-300 mt-0.5">Suivi des besoins chantiers, outillage et approvisionnements.</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <button onClick={() => setShowAddRequestModal(true)} className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-cyan-500/20 transition-all">
+                  <Plus className="w-4 h-4" /> Nouvelle Demande
+                </button>
+              </div>
+            </div>
+
+            {/* Liste des demandes */}
+            <div className="space-y-4 max-w-4xl mx-auto">
+              {visibleRequests && visibleRequests.length > 0 ? (
+                visibleRequests.map((req, idx) => (
+                  <div key={req.firestoreId || idx} className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                      <h3 className="text-base font-black text-slate-900">{req.title || "Demande de matériel"}</h3>
+                      <p className="text-xs text-slate-600 mt-1">{req.description || req.details}</p>
+                      <span className="inline-block mt-2 px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl">
+                        Statut : {req.status || "En attente"}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                  <div className="w-12 h-12 bg-cyan-50 text-cyan-600 rounded-2xl mx-auto flex items-center justify-center">
+                    <FolderOpen className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">Aucune demande de matériel</h4>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Il n'y a aucune demande enregistrée pour ce chantier pour le moment.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* --- MODULE RÉCLAMATIONS --- */}
         {activeTab === 'reclamations' && (
           <div className="space-y-6">
