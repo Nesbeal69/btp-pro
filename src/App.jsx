@@ -1136,7 +1136,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE MATERIEL / DEMANDES --- */}
+        {/* --- MODULE MATERIEL / DEMANDES ULTRA-PRO --- */}
         {activeTab === 'requests' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-cyan-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1146,7 +1146,7 @@ export default function App() {
                 </div>
                 <div>
                   <h2 className="text-xl font-black tracking-wide">Gestion du Matériel & Demandes</h2>
-                  <p className="text-xs text-slate-300 mt-0.5">Suivi des besoins chantiers, outillage et approvisionnements.</p>
+                  <p className="text-xs text-slate-300 mt-0.5">Suivi des besoins chantiers, outillage et approvisionnements par compagnon.</p>
                 </div>
               </div>
 
@@ -1157,33 +1157,116 @@ export default function App() {
               </div>
             </div>
 
-            {/* Liste des demandes */}
+            {/* Liste des demandes regroupées par Compagnon */}
             <div className="space-y-4 max-w-4xl mx-auto">
-              {visibleRequests && visibleRequests.length > 0 ? (
-                visibleRequests.map((req, idx) => (
-                  <div key={req.firestoreId || idx} className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div>
-                      <h3 className="text-base font-black text-slate-900">{req.title || "Demande de matériel"}</h3>
-                      <p className="text-xs text-slate-600 mt-1">{req.description || req.details}</p>
-                      <span className="inline-block mt-2 px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl">
-                        Statut : {req.status || "En attente"}
-                      </span>
+              {(() => {
+                const groupedReqs = {};
+                
+                (visibleRequests || []).forEach(req => {
+                  const authorKey = req.authorName || req.userName || "Équipe Chantier";
+                  if (!groupedReqs[authorKey]) {
+                    groupedReqs[authorKey] = {
+                      authorName: authorKey,
+                      items: []
+                    };
+                  }
+                  groupedReqs[authorKey].items.push(req);
+                });
+
+                const reqCards = Object.values(groupedReqs);
+
+                if (reqCards.length === 0) {
+                  return (
+                    <div className="py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                      <div className="w-12 h-12 bg-cyan-50 text-cyan-600 rounded-2xl mx-auto flex items-center justify-center">
+                        <FolderOpen className="w-6 h-6" />
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-800">Aucune demande de matériel</h4>
+                      <p className="text-xs text-slate-400 max-w-xs mx-auto">Il n'y a aucune demande en cours pour ce chantier.</p>
+                    </div>
+                  );
+                }
+
+                return reqCards.map((group, gIdx) => (
+                  <div key={gIdx} className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all space-y-4">
+                    {/* En-tête de la carte avec le nom du gars */}
+                    <div className="flex flex-wrap justify-between items-center pb-3 border-b border-slate-100 gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2.5 bg-cyan-50 text-cyan-600 rounded-xl font-bold text-xs">
+                          👷‍♂️
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-black text-slate-900">Demandeur : {group.authorName}</h3>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            {group.items.length} article{group.items.length > 1 ? 's' : ''} demandé{group.items.length > 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Liste des articles demandés par ce compagnon */}
+                    <div className="space-y-3">
+                      {group.items.map((item, iIdx) => {
+                        const currentStatus = item.status || "En attente";
+                        return (
+                          <div key={item.firestoreId || iIdx} className="bg-slate-50 border border-slate-200/70 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div className="space-y-1 flex-1">
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">{item.title || item.materialName || "Matériel"}</h4>
+                                <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold ${
+                                  currentStatus === 'Validé / Commandé' ? 'bg-emerald-100 text-emerald-700' :
+                                  currentStatus === 'Reçu au dépôt' ? 'bg-blue-100 text-blue-700' :
+                                  'bg-amber-100 text-amber-700'
+                                }`}>
+                                  {currentStatus}
+                                </span>
+                              </div>
+                              {item.description && (
+                                <p className="text-xs text-slate-600 font-medium">{item.description}</p>
+                              )}
+                              <span className="text-[10px] text-slate-400 block">Demandé le : {item.date || "Récemment"}</span>
+                            </div>
+
+                            {/* Actions Admin : Changer le statut ou supprimer */}
+                            {isAdmin && (
+                              <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60">
+                                <select 
+                                  value={currentStatus} 
+                                  onChange={async (e) => {
+                                    const newStatus = e.target.value;
+                                    await updateDoc(doc(db, "requests", item.firestoreId), { status: newStatus });
+                                  }}
+                                  className="px-3 py-1.5 bg-white border border-slate-300 text-slate-800 text-xs font-semibold rounded-xl focus:outline-none"
+                                >
+                                  <option value="En attente">⏳ En attente</option>
+                                  <option value="Validé / Commandé">✅ Validé / Commandé</option>
+                                  <option value="Reçu au dépôt">📦 Reçu au dépôt</option>
+                                </select>
+
+                                <button 
+                                  onClick={async () => {
+                                    if (window.confirm("Supprimer cette demande ?")) {
+                                      await deleteDoc(doc(db, "requests", item.firestoreId));
+                                    }
+                                  }}
+                                  className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-colors"
+                                  title="Supprimer la demande"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
-                  <div className="w-12 h-12 bg-cyan-50 text-cyan-600 rounded-2xl mx-auto flex items-center justify-center">
-                    <FolderOpen className="w-6 h-6" />
-                  </div>
-                  <h4 className="text-sm font-bold text-slate-800">Aucune demande de matériel</h4>
-                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Il n'y a aucune demande enregistrée pour ce chantier pour le moment.</p>
-                </div>
-              )}
+                ));
+              })()}
             </div>
           </div>
         )}
-
+        
         {/* --- MODULE RÉCLAMATIONS --- */}
         {activeTab === 'reclamations' && (
           <div className="space-y-6">
