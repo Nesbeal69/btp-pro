@@ -1305,69 +1305,107 @@ export default function App() {
                 </div>
                 <div>
                   <h2 className="text-xl font-black tracking-wide">Planning & Feuilles de Route</h2>
-                  <p className="text-xs text-slate-300 mt-0.5">Accès direct à vos interventions du jour et documents techniques.</p>
+                  <p className="text-xs text-slate-300 mt-0.5">Vue terrain simplifiée : intervention du jour, localisation et documents.</p>
                 </div>
               </div>
-              {isAdmin && (
-                <button onClick={() => setShowAddPlanModal(true)} className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-cyan-500/20 transition-all">
-                  <Plus className="w-4 h-4" /> Assigner une Tâche 
-                </button>
-              )}
+
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <select 
+                  value={selectedWorkerFilter} 
+                  onChange={e => setSelectedWorkerFilter(e.target.value)}
+                  className="px-3.5 py-2.5 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none font-semibold"
+                >
+                  <option value="all" className="bg-slate-900">👥 Tout le planning</option>
+                  {approvedUsers.map(u => (
+                    <option key={u.firestoreId} value={u.userIdNum || u.id} className="bg-slate-900">
+                      👷‍♂️ {u.name}
+                    </option>
+                  ))}
+                </select>
+
+                {isAdmin && (
+                  <button onClick={() => setShowAddPlanModal(true)} className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-cyan-500/20 transition-all">
+                    <Plus className="w-4 h-4" /> Assigner une Tâche 
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* Grille de planning optimisée terrain */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {visiblePlans.map(plan => (
-                <div key={plan.firestoreId} className="bg-white border border-slate-200/80 hover:border-cyan-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative overflow-hidden group">
-                  <div>
-                    {/* En-tête : Date et Attributaire */}
-                    <div className="flex justify-between items-center text-xs mb-3">
-                      <span className="px-3 py-1 rounded-xl font-mono font-bold bg-cyan-50 text-cyan-700 border border-cyan-100 flex items-center gap-1.5">
-                        <CalendarIcon className="w-3.5 h-3.5" /> {plan.formattedDate || formatDateFr(plan.date)}
-                      </span>
-                      <span className="text-slate-500 font-medium">Pour : <strong className="text-slate-800">{plan.targetName}</strong></span>
+            {/* Liste verticale ergonomique pour le terrain */}
+            <div className="space-y-4 max-w-4xl mx-auto">
+              {visiblePlans.map(plan => {
+                const isToday = plan.date === new Date().toISOString().split('T')[0];
+                return (
+                  <div 
+                    key={plan.firestoreId} 
+                    className={`bg-white border rounded-3xl p-6 shadow-sm hover:shadow-md transition-all relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 ${
+                      isToday ? 'border-cyan-500 ring-2 ring-cyan-500/20 bg-gradient-to-r from-cyan-50/30 to-white' : 'border-slate-200/80'
+                    }`}
+                  >
+                    <div className="space-y-3 flex-1">
+                      {/* Badge Date & Attributaire */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`px-3 py-1 rounded-xl font-mono font-bold text-xs flex items-center gap-1.5 ${
+                          isToday ? 'bg-cyan-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                        }`}>
+                          <CalendarIcon className="w-3.5 h-3.5" /> {isToday ? "AUJOURD'HUI" : (plan.formattedDate || formatDateFr(plan.date))}
+                        </span>
+
+                        <span className="px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200">
+                          👤 Pour : {plan.targetName}
+                        </span>
+                      </div>
+
+                      {/* Logement / Titre en très gros caractères */}
+                      <div>
+                        <h3 className="text-lg md:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                          <Home className="w-5 h-5 text-cyan-600" /> {plan.title}
+                        </h3>
+                        {plan.description && (
+                          <p className="text-xs text-slate-600 mt-1.5 leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-100 font-medium">
+                            {plan.description}
+                          </p>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Titre / Logement mis en valeur */}
-                    <h3 className="text-base font-black text-slate-900 tracking-tight">{plan.title}</h3>
-                    {plan.description && (
-                      <p className="text-xs text-slate-600 mt-1.5 leading-relaxed bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                        {plan.description}
-                      </p>
-                    )}
-
-                    {/* Documents / Feuilles de route en accès direct tactile */}
-                    <div className="mt-4 space-y-2 pt-3 border-t border-slate-100">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Feuille de route / Plan technique</span>
-                      {plan.files && plan.files.map((fileObj, fIdx) => (
-                        <div key={fIdx} className="p-3 bg-cyan-50/40 hover:bg-cyan-50 rounded-2xl border border-cyan-100/80 flex items-center justify-between transition-colors">
-                          <div className="flex items-center gap-2.5">
-                            <div className="p-2 bg-red-100 text-red-600 rounded-xl">
-                              <FileText className="w-4 h-4" />
+                    {/* Bloc documents / Action rapide tactile */}
+                    <div className="w-full md:w-72 shrink-0 space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-200/70">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Feuille de route technique</span>
+                      
+                      {plan.files && plan.files.length > 0 ? (
+                        plan.files.map((fileObj, fIdx) => (
+                          <div key={fIdx} className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 truncate">
+                              <div className="p-2 bg-red-100 text-red-600 rounded-xl shrink-0">
+                                <FileText className="w-4 h-4" />
+                              </div>
+                              <span className="text-xs text-slate-800 font-bold truncate">{fileObj.name}</span>
                             </div>
-                            <span className="text-xs text-slate-800 font-bold truncate max-w-[140px]">{fileObj.name}</span>
+                            <button 
+                              onClick={() => handleDownloadSinglePdf(fileObj)} 
+                              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95 shrink-0"
+                            >
+                              <Download className="w-3.5 h-3.5" /> Ouvrir PDF
+                            </button>
                           </div>
-                          <button 
-                            onClick={() => handleDownloadSinglePdf(fileObj)} 
-                            className="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
-                          >
-                            <Download className="w-3.5 h-3.5" /> Ouvrir
-                          </button>
+                        ))
+                      ) : (
+                        <p className="text-xs text-slate-400 italic">Aucun document joint à cette tâche.</p>
+                      )}
+
+                      {isAdmin && (
+                        <div className="pt-2 border-t border-slate-200/60 flex justify-end">
+                          <button onClick={() => handleDeletePlan(plan.firestoreId)} className="text-xs text-red-600 hover:text-red-700 font-bold">Supprimer la tâche</button>
                         </div>
-                      ))}
+                      )}
                     </div>
                   </div>
-
-                  {isAdmin && (
-                    <div className="pt-3 border-t border-slate-100 flex justify-end">
-                      <button onClick={() => handleDeletePlan(plan.firestoreId)} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded-xl font-semibold transition-colors">Supprimer</button>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
 
               {visiblePlans.length === 0 && (
-                <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                <div className="py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
                   <div className="w-12 h-12 bg-cyan-50 text-cyan-600 rounded-2xl mx-auto flex items-center justify-center">
                     <FolderOpen className="w-6 h-6" />
                   </div>
@@ -1378,90 +1416,6 @@ export default function App() {
             </div>
           </div>
         )}
-
-        {/* --- MODULE DEMANDES DE MATÉRIEL --- */}
-        {activeTab === 'requests' && (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-r from-slate-900 via-amber-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-amber-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div className="flex items-center gap-4">
-                <div className="p-4 bg-amber-600/20 border border-amber-400/30 rounded-2xl">
-                  <ClipboardList className="w-7 h-7 text-amber-400" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-black tracking-wide">Demandes de Matériel & Fournitures</h2>
-                  <p className="text-xs text-slate-300 mt-0.5">Suivi des besoins en raccords, tubes et équipements pour les chantiers.</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <select value={requestStatusFilter} onChange={e => setRequestStatusFilter(e.target.value)} className="px-3.5 py-2.5 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none">
-                  <option value="all" className="bg-slate-900">🔍 Tous les statuts</option>
-                  <option value="En attente" className="bg-slate-900">⏳ En attente</option>
-                  <option value="Validé / Commandé" className="bg-slate-900">✅ Validé</option>
-                  <option value="Reçu au dépôt" className="bg-slate-900">📦 Reçu</option>
-                </select>
-                <button onClick={() => setShowAddRequestModal(true)} className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all">
-                  <Plus className="w-4 h-4" /> Nouvelle Demande
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {visibleRequests.map(req => (
-                <div key={req.firestoreId} className="bg-white border border-slate-200/80 hover:border-amber-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative overflow-hidden group">
-                  <div>
-                    <div className="flex justify-between items-center text-xs mb-3">
-                      <span className="text-slate-500 font-medium">Par : <strong className="text-slate-800">{req.requester}</strong></span>
-                      <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full ${req.urgency === 'Urgent' ? 'bg-amber-50 text-amber-700 border border-amber-200' : req.urgency === 'Critique' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>{req.urgency}</span>
-                    </div>
-                    
-                    <h3 className="text-base font-bold text-slate-900">{req.items}</h3>
-                    <div className="inline-block mt-1.5 px-2.5 py-0.5 bg-slate-100 text-slate-700 font-mono text-xs font-bold rounded-lg border border-slate-200">Qté : {req.quantity}</div>
-
-                    {req.description && <p className="text-xs text-slate-600 mt-2 leading-relaxed">{req.description}</p>}
-
-                    {req.attachmentData && (
-                      <div className="mt-3 p-2.5 bg-slate-50 rounded-2xl border border-slate-200/60 flex items-center justify-between">
-                        <span className="text-xs text-slate-800 font-medium truncate max-w-[130px]">📎 {req.attachmentName}</span>
-                        <button onClick={() => handleDownloadSinglePdf({ name: req.attachmentName, data: req.attachmentData })} className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-[11px] rounded-xl font-bold">Ouvrir</button>
-                      </div>
-                    )}
-
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-slate-400">STATUT</span>
-                      {isAdmin ? (
-                        <select value={req.status} onChange={(e) => handleUpdateRequestStatus(req.firestoreId, e.target.value)} className="px-3 py-1.5 text-xs font-semibold rounded-xl border bg-slate-50 border-slate-200 focus:outline-none">
-                          <option value="En attente">⏳ En attente</option>
-                          <option value="Validé / Commandé">✅ Validé</option>
-                          <option value="Reçu au dépôt">📦 Reçu</option>
-                          <option value="Refusé">❌ Refusé</option>
-                        </select>
-                      ) : (
-                        <span className="px-3 py-1 text-xs font-bold rounded-xl bg-amber-50 text-amber-800 border border-amber-200">{req.status}</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {isAdmin && (
-                    <div className="pt-3 border-t border-slate-100 flex justify-end">
-                      <button onClick={() => handleDeleteRequest(req.firestoreId)} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold rounded-xl transition-colors">Supprimer</button>
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {visibleRequests.length === 0 && (
-                <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
-                  <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl mx-auto flex items-center justify-center">
-                    <ClipboardList className="w-6 h-6" />
-                  </div>
-                  <h4 className="text-sm font-bold text-slate-800">Aucune demande de matériel</h4>
-                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Aucune commande ou besoin matériel n'a été enregistré pour le moment.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* --- MODULE EFFECTIFS --- */}
         {activeTab === 'workers' && (
           <div className="space-y-6">
