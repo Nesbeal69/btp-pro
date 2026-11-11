@@ -1012,7 +1012,7 @@ export default function App() {
                   ✨ Tableau de bord • Actif
                 </div>
                 <h1 className="text-xl md:text-2xl font-black tracking-tight">
-                  Bienvenue sur votre espace chantier, <span className="text-blue-400">{currentUser?.name}</span>.
+                  Bienvenue sur votre espace, <span className="text-blue-400">{currentUser?.name}</span>.
                 </h1>
                 <p className="text-xs text-slate-300">Retrouvez ici vos feuilles de route, vos demandes de matériel et le suivi des réserves en un clin d'œil.</p>
               </div>
@@ -1020,7 +1020,7 @@ export default function App() {
               <div className="flex items-center gap-3 px-4 py-2.5 bg-black/40 border border-white/20 rounded-2xl backdrop-blur-md relative z-10 shadow-inner">
                 <Key className="w-4 h-4 text-blue-400" />
                 <div className="text-xs">
-                  <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">Code Chantier</span>
+                  <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">Code Projet</span>
                   <strong className="font-mono text-white tracking-widest">{myProjectCode}</strong>
                 </div>
               </div>
