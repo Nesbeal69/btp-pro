@@ -823,7 +823,7 @@ export default function App() {
               <img src="/logo-off.png" alt="Logo Bâtir+ Pro" className="w-9 h-9 object-contain" />
             </div>
             <h1 className="text-2xl font-black text-white tracking-wider">BÂTIR+ <span className="text-blue-400 font-light">PRO</span></h1>
-            <p className="text-xs text-slate-300 mt-1 font-medium tracking-wide">La plateforme opérationnelle dédiée à vos chantiers de réhabilitation.</p>
+            <p className="text-xs text-slate-300 mt-1 font-medium tracking-wide">La plateforme opérationnelle dédiée à l'orgnisation de vos chantier. </p>
           </div>
 
           {authMode === 'pending' ? (
