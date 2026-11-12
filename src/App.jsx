@@ -38,7 +38,8 @@ import {
   Home,
   Edit3,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Image as ImageIcon
 } from 'lucide-react';
 
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -110,21 +111,23 @@ export default function App() {
 
   const [toolSearch, setToolSearch] = useState('');
   const [toolStatusFilter, setToolStatusFilter] = useState('all');
+  const [toolWorkerFilter, setToolWorkerFilter] = useState('all');
+  const [toolUnassignedFilter, setToolUnassignedFilter] = useState(false);
+
   const [editingTool, setEditingTool] = useState(null);
-  const [editToolForm, setEditToolForm] = useState({ assignedTo: '', status: '' });
+  const [editToolForm, setEditToolForm] = useState({ assignedTo: '', status: '', imageURL: '' });
   const [selectedTool, setSelectedTool] = useState(null);
   const [newNoteText, setNewNoteText] = useState('');
+  const [selectedToolImage, setSelectedToolImage] = useState(null);
 
-  const [selectedRequestHistory, setSelectedRequestHistory] = useState(null);
-  
   const [showAddToolModal, setShowAddToolModal] = useState(false);
   const [newToolData, setNewToolData] = useState({ 
     id: '', 
     name: '', 
     brand: 'REMS', 
-    category: 'Sertissage', 
     status: 'Disponible',
-    assignedTo: 'Dépôt Central' 
+    assignedTo: 'Dépôt Central',
+    imageURL: ''
   });
 
   const [showAddPlanModal, setShowAddPlanModal] = useState(false);
@@ -275,151 +278,6 @@ export default function App() {
   const isAdmin = currentUser?.role === 'admin';
   const canAddReclamation = isAdmin || currentUser?.canAddReclamation === true;
 
-  const groupedReclamations = useMemo(() => {
-    const groups = {};
-    projectReclamations.forEach(rec => {
-      const key = `${rec.apartment?.trim().toUpperCase()}_E${rec.floor}`;
-      if (!groups[key]) {
-        groups[key] = {
-          key,
-          building: rec.building,
-          apartment: rec.apartment,
-          floor: rec.floor,
-          clientName: rec.clientName,
-          items: []
-        };
-      }
-      groups[key].items.push(rec);
-    });
-
-    Object.values(groups).forEach(g => {
-      g.items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      g.latestTwo = g.items.slice(0, 2);
-      g.pendingCount = g.items.filter(i => i.status === 'À faire').length;
-    });
-
-    return Object.values(groups);
-  }, [projectReclamations]);
-
-  const filteredGroupedReclamations = useMemo(() => {
-    return groupedReclamations.filter(group => {
-      const q = reclamationSearch.toLowerCase().trim();
-      const matchesSearch = (
-        group.apartment?.toLowerCase().includes(q) ||
-        group.clientName?.toLowerCase().includes(q) ||
-        group.floor?.toString().includes(q) ||
-        group.items.some(i => i.observation?.toLowerCase().includes(q))
-      );
-      const matchesStatus = reclamationStatusFilter === 'all' || 
-        (reclamationStatusFilter === 'À faire' && group.pendingCount > 0) ||
-        (reclamationStatusFilter === 'Fait' && group.pendingCount === 0);
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [groupedReclamations, reclamationSearch, reclamationStatusFilter]);
-
-  const handleCreateReclamation = async (e) => {
-    e.preventDefault();
-    if (!newReclamation.apartment || !myProjectCode || !currentUser) return;
-
-    const initialObservation = newReclamation.observation ? newReclamation.observation.trim() : "";
-    
-    const firstPassage = {
-      status: 'À faire',
-      details: `Création du signalement`,
-      author: currentUser.name,
-      date: new Date().toISOString()
-    };
-
-    try {
-      await addDoc(collection(db, "reclamations"), {
-        projectCode: myProjectCode,
-        building: newReclamation.building ? newReclamation.building.trim().toUpperCase() : '',
-        apartment: newReclamation.apartment.trim(),
-        floor: newReclamation.floor.trim(),
-        clientName: newReclamation.clientName.trim(),
-        observation: initialObservation,
-        status: 'À faire',
-        createdBy: currentUser.name,
-        createdAt: new Date().toISOString(),
-        passages: [firstPassage]
-      });
-      setShowAddReclamationModal(false);
-      setNewReclamation({ building: '', apartment: '', floor: '', clientName: '', observation: '' });
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleConfirmResolveReclamation = async (e) => {
-    e.preventDefault();
-    if (!resolvingReclamation) return;
-
-    const statusSelect = document.getElementById('interventionStatus');
-    const selectedStatus = statusSelect ? statusSelect.value : 'Fait'; 
-
-    const resolutionTextElem = document.getElementById('resolutionText');
-    const details = resolutionTextElem ? resolutionTextElem.value.trim() : '';
-
-    const nowISO = new Date().toISOString();
-    const authorName = currentUser?.name || 'Technicien';
-    const isDone = (selectedStatus === 'Fait');
-
-    const prefix = selectedStatus === 'Occupant absent' 
-      ? 'Occupant absent' 
-      : (selectedStatus === 'Réintervenir' ? 'À réintervenir' : 'Travaux effectués');
-      
-    const fullDetails = details ? `${prefix} : ${details}` : prefix;
-
-    const newPassage = {
-      status: isDone ? 'Fait' : 'En cours',
-      details: fullDetails,
-      author: authorName,
-      date: nowISO
-    };
-
-    const existingPassages = resolvingReclamation.passages || [];
-    const updatedPassages = [newPassage, ...existingPassages];
-
-    await updateDoc(doc(db, 'reclamations', resolvingReclamation.firestoreId), {
-      passages: updatedPassages,
-      status: isDone ? 'Fait' : 'En cours',
-      updatedAt: nowISO
-    });
-
-    setResolvingReclamation(null);
-  };
-
-  const handleSaveEditSignalement = async (e) => {
-    e.preventDefault();
-    if (!editingSignalement || !editSignalementText.trim()) return;
-
-    try {
-      await updateDoc(doc(db, 'reclamations', editingSignalement.firestoreId), {
-        observation: editSignalementText.trim(),
-        updatedAt: new Date().toISOString()
-      });
-      setEditingSignalement(null);
-      setEditSignalementText('');
-    } catch (e) {
-      console.error("Erreur modification signalement:", e);
-    }
-  };
-
-  const handleDeleteGroupCard = async (groupItems) => {
-    if (window.confirm("Voulez-vous vraiment supprimer toute cette fiche logement et tous ses signalements ?")) {
-      try {
-        for (const item of groupItems) {
-          if (item.firestoreId) {
-            await deleteDoc(doc(db, "reclamations", item.firestoreId));
-          }
-        }
-      } catch (e) {
-        console.error("Erreur suppression groupe :", e);
-      }
-    }
-  };
-
   const filteredEquipment = useMemo(() => {
     return projectEquipment.filter(tool => {
       const query = toolSearch.toLowerCase().trim();
@@ -429,10 +287,23 @@ export default function App() {
         tool.brand?.toLowerCase().includes(query) ||
         (tool.assignedTo && tool.assignedTo.toLowerCase().includes(query))
       );
+      
       const matchesStatus = toolStatusFilter === 'all' || tool.status === toolStatusFilter;
-      return matchesSearch && matchesStatus;
+      
+      let matchesWorker = true;
+      if (toolWorkerFilter !== 'all') {
+        matchesWorker = (tool.assignedTo === toolWorkerFilter);
+      }
+
+      let matchesUnassigned = true;
+      if (toolUnassignedFilter) {
+        const isFree = !tool.assignedTo || tool.assignedTo === 'Dépôt Central' || tool.assignedTo === 'Dépôt' || tool.assignedTo === 'Libre';
+        matchesUnassigned = isFree;
+      }
+
+      return matchesSearch && matchesStatus && matchesWorker && matchesUnassigned;
     });
-  }, [projectEquipment, toolSearch, toolStatusFilter]);
+  }, [projectEquipment, toolSearch, toolStatusFilter, toolWorkerFilter, toolUnassignedFilter]);
 
   const handleCreateTool = async (e) => {
     e.preventDefault();
@@ -442,15 +313,16 @@ export default function App() {
         id: Date.now(),
         author: currentUser.name,
         date: new Date().toISOString().split('T')[0],
-        text: `Création de la machine et affectation initiale à : ${newToolData.assignedTo}`
+        text: `Création de la machine et affectation initiale à : ${newToolData.assignedTo || 'Dépôt Central'}`
       };
       await addDoc(collection(db, "equipment"), {
         ...newToolData,
+        assignedTo: newToolData.assignedTo || 'Dépôt Central',
         projectCode: myProjectCode,
         notes: [initialNote]
       });
       setShowAddToolModal(false);
-      setNewToolData({ id: '', name: '', brand: 'REMS', category: 'Sertissage', status: 'Disponible', assignedTo: 'Dépôt Central' });
+      setNewToolData({ id: '', name: '', brand: 'REMS', status: 'Disponible', assignedTo: 'Dépôt Central', imageURL: '' });
     } catch (error) {
       console.error(error);
     }
@@ -462,7 +334,11 @@ export default function App() {
 
   const handleOpenEditModal = (tool) => {
     setEditingTool(tool);
-    setEditToolForm({ assignedTo: tool.assignedTo || 'Dépôt Central', status: tool.status || 'Disponible' });
+    setEditToolForm({ 
+      assignedTo: tool.assignedTo || 'Dépôt Central', 
+      status: tool.status || 'Disponible',
+      imageURL: tool.imageURL || '' 
+    });
   };
 
   const handleSaveToolEdit = async (e) => {
@@ -470,15 +346,26 @@ export default function App() {
     if (!editingTool || !editingTool.firestoreId || !currentUser) return;
     try {
       const toolRef = doc(db, "equipment", editingTool.firestoreId);
+      
+      const oldAssign = editingTool.assignedTo || 'Dépôt Central';
+      const newAssign = editToolForm.assignedTo;
+      
+      let transferNoteText = `Mise à jour statut / affectation`;
+      if (oldAssign !== newAssign) {
+        transferNoteText = `🔄 Transfert d'affectation : Passé de [${oldAssign}] à [${newAssign}] (par ${currentUser.name})`;
+      }
+
       const newHistoryNote = {
         id: Date.now(),
         author: currentUser.name,
         date: new Date().toISOString().split('T')[0],
-        text: `Mise à jour statut/affectation`
+        text: transferNoteText
       };
+
       await updateDoc(toolRef, {
-        assignedTo: editToolForm.assignedTo,
+        assignedTo: newAssign,
         status: editToolForm.status,
+        imageURL: editToolForm.imageURL,
         notes: [newHistoryNote, ...(editingTool.notes || [])]
       });
       setEditingTool(null);
@@ -649,15 +536,26 @@ export default function App() {
   const handleMultipleFilesChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
     if (selectedFiles.length === 0) return;
+
     let processedFiles = [];
     let loadedCount = 0;
+    let hasError = false;
+
     selectedFiles.forEach((file) => {
+      if (file.size > 600 * 1024) {
+        alert(`❌ Le fichier "${file.name}" est trop lourd (${Math.round(file.size / 1024)} Ko).\n\nLa taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre !`);
+        hasError = true;
+        return;
+      }
+
       const reader = new FileReader();
       reader.onloadend = () => {
-        processedFiles.push({ name: file.name, data: reader.result });
-        loadedCount++;
-        if (loadedCount === selectedFiles.length) {
-          setNewPlanData(prev => ({ ...prev, files: [...prev.files, ...processedFiles] }));
+        if (!hasError) {
+          processedFiles.push({ name: file.name, data: reader.result });
+          loadedCount++;
+          if (loadedCount === selectedFiles.length) {
+            setNewPlanData(prev => ({ ...prev, files: [...prev.files, ...processedFiles] }));
+          }
         }
       };
       reader.readAsDataURL(file);
@@ -1527,7 +1425,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* BARRE DE NAVIGATION PAR SEMAINE */}
             <div className="bg-white border border-slate-200/80 p-4 rounded-3xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="flex items-center gap-3">
                 <button
@@ -1565,7 +1462,6 @@ export default function App() {
                 </button>
               </div>
 
-              {/* BOUTONS DES JOURS DE LA SEMAINE */}
               <div className="flex flex-wrap items-center gap-1.5">
                 <button
                   onClick={() => setSelectedDayOfWeek(null)}
@@ -1599,7 +1495,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* LISTE DES TÂCHES / PLANNING */}
             <div className="space-y-4 max-w-4xl mx-auto">
               {(() => {
                 const groupedMap = {};
@@ -1608,7 +1503,6 @@ export default function App() {
                   const targetKey = Array.isArray(plan.targetUserIds) ? plan.targetUserIds.sort().join('-') : (plan.targetUserId || 'all');
                   const key = `${plan.date || 'no-date'}_${targetKey}`;
                   
-                  // S'assurer que files est bien un tableau valide
                   const planFiles = Array.isArray(plan.files) ? plan.files.filter(f => f && f.data) : [];
 
                   if (!groupedMap[key]) {
@@ -1831,49 +1725,117 @@ export default function App() {
                   <Wrench className="w-7 h-7 text-indigo-400" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black tracking-wide">Parc Outillage</h2>
-                  <p className="text-xs text-slate-300 mt-0.5">Suivi du parc, des maintenances et de leur affectation.</p>
+                  <h2 className="text-xl font-black tracking-wide">Parc Outillage & Équipements</h2>
+                  <p className="text-xs text-slate-300 mt-0.5">Suivi des machines, des transferts et de leur affectation par compagnon.</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <select value={toolStatusFilter} onChange={e => setToolStatusFilter(e.target.value)} className="px-3.5 py-2.5 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none">
-                  <option value="all" className="bg-slate-900">🔍 Tous les statuts</option>
-                  <option value="Disponible" className="bg-slate-900">🟢 Disponible</option>
-                  <option value="En service" className="bg-slate-900">⚡ Attribué</option>
-                  <option value="En révision" className="bg-slate-900">🛠️ En révision</option>
-                </select>
-                {isAdmin && (
-                  <button onClick={() => setShowAddToolModal(true)} className="px-4 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all">
-                    <Plus className="w-4 h-4" /> Ajouter une Machine
-                  </button>
-                )}
-              </div>
+
+              {isAdmin && (
+                <button onClick={() => setShowAddToolModal(true)} className="px-4 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all">
+                  <Plus className="w-4 h-4" /> Ajouter une Machine
+                </button>
+              )}
             </div>
 
+            {/* BARRE DE FILTRES OUTILLAGE */}
+            <div className="bg-white border border-slate-200/80 p-4 rounded-3xl shadow-sm flex flex-wrap items-center gap-3">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  value={toolSearch}
+                  onChange={e => setToolSearch(e.target.value)}
+                  placeholder="Rechercher par nom, marque, numéro de série..."
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white outline-none"
+                />
+              </div>
+
+              <select
+                value={toolStatusFilter}
+                onChange={e => setToolStatusFilter(e.target.value)}
+                className="px-3.5 py-2 bg-slate-50 border border-slate-200 text-xs text-slate-800 font-semibold rounded-xl focus:bg-white outline-none"
+              >
+                <option value="all">🔍 Tous les statuts</option>
+                <option value="Disponible">🟢 Disponible</option>
+                <option value="En service">⚡ En service</option>
+                <option value="En révision">🛠️ En révision</option>
+              </select>
+
+              <select
+                value={toolWorkerFilter}
+                onChange={e => {
+                  setToolWorkerFilter(e.target.value);
+                  if (e.target.value !== 'all') setToolUnassignedFilter(false);
+                }}
+                className="px-3.5 py-2 bg-slate-50 border border-slate-200 text-xs text-slate-800 font-semibold rounded-xl focus:bg-white outline-none"
+              >
+                <option value="all">👷‍♂️ Tous les compagnons</option>
+                <option value="Dépôt Central">📦 Dépôt Central</option>
+                {approvedUsers.map(u => (
+                  <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name}</option>
+                ))}
+              </select>
+
+              <label className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer border transition-colors ${
+                toolUnassignedFilter ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={toolUnassignedFilter}
+                  onChange={e => {
+                    setToolUnassignedFilter(e.target.checked);
+                    if (e.target.checked) setToolWorkerFilter('all');
+                  }}
+                  className="rounded border-slate-300 text-indigo-600 w-3.5 h-3.5 hidden"
+                />
+                <span>✨ Non affectées / Libres</span>
+              </label>
+            </div>
+
+            {/* GRILLE DES MACHINES */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredEquipment.map(tool => (
                 <div key={tool.firestoreId} className="bg-white border border-slate-200/80 hover:border-indigo-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-mono text-xs font-bold rounded-xl border border-indigo-100">{tool.id}</span>
-                      <span className="text-xs text-slate-500 font-medium">{tool.brand || 'REMS'}</span>
+                      <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-mono text-xs font-bold rounded-xl border border-indigo-100">
+                        {tool.id || 'N/S'}
+                      </span>
+                      <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">{tool.brand || 'REMS'}</span>
                     </div>
 
-                    <h3 className="text-base font-bold text-slate-900">{tool.name}</h3>
+                    <h3 className="text-base font-black text-slate-900">{tool.name}</h3>
 
-                    <div className="mt-4 space-y-2 text-xs bg-slate-50 p-3 rounded-2xl border border-slate-200/60">
-                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Statut :</span><span className="font-bold text-emerald-600">{tool.status}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Affecté à :</span><span className="font-bold text-slate-800">{tool.assignedTo}</span></div>
+                    <div className="mt-4 space-y-2 text-xs bg-slate-50 p-3.5 rounded-2xl border border-slate-200/60">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500 font-medium">Statut :</span>
+                        <span className="font-bold text-emerald-600">{tool.status || 'Disponible'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500 font-medium">Affecté à :</span>
+                        <span className="font-bold text-slate-800">{tool.assignedTo || 'Dépôt Central'}</span>
+                      </div>
                     </div>
+
+                    {tool.imageURL && (
+                      <div className="mt-3">
+                        <button
+                          onClick={() => setSelectedToolImage(tool.imageURL)}
+                          className="w-full py-2 bg-slate-100 hover:bg-indigo-50 text-indigo-700 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2 border border-slate-200/80"
+                        >
+                          <ImageIcon className="w-4 h-4 text-indigo-600" /> Voir la photo de la machine
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-4 border-t border-slate-100 flex items-center gap-2">
                     <button onClick={() => setSelectedTool(tool)} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 font-bold rounded-xl transition-colors">
-                      💬 Notes ({tool.notes?.length || 0})
+                      💬 Historique ({tool.notes?.length || 0})
                     </button>
                     {isAdmin && (
                       <>
-                        <button onClick={() => handleOpenEditModal(tool)} className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold rounded-xl transition-colors">Modifier</button>
+                        <button onClick={() => handleOpenEditModal(tool)} className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold rounded-xl transition-colors font-bold">Modifier</button>
                         <button onClick={() => handleDeleteTool(tool.firestoreId)} className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-colors">🗑️</button>
                       </>
                     )}
@@ -1887,7 +1849,7 @@ export default function App() {
                     <Wrench className="w-6 h-6" />
                   </div>
                   <h4 className="text-sm font-bold text-slate-800">Aucune machine trouvée</h4>
-                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Aucun outil ne correspond à votre recherche ou le parc est vide.</p>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Aucun outil ne correspond à vos filtres ou le parc est vide.</p>
                 </div>
               )}
             </div>
@@ -2147,38 +2109,94 @@ export default function App() {
 
       {selectedTool && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white p-6 rounded-2xl w-full max-w-lg space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center">
-              <h3 className="text-base font-bold text-slate-900">{selectedTool.name}</h3>
-              <button onClick={() => setSelectedTool(null)}>✕</button>
+          <div className="bg-white p-6 rounded-3xl w-full max-w-lg space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">{selectedTool.name}</h3>
+                <p className="text-xs text-slate-500">Marque : {selectedTool.brand || 'REMS'} | ID : {selectedTool.id}</p>
+              </div>
+              <button onClick={() => setSelectedTool(null)} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-xs font-bold">✕</button>
             </div>
+
             <div className="flex gap-2">
-              <input type="text" value={newNoteText} onChange={e => setNewNoteText(e.target.value)} placeholder="Ajouter une note..." className="flex-1 px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
-              <button onClick={() => handleAddNote(selectedTool)} className="px-3 py-2 bg-indigo-600 text-white text-xs rounded-xl">Ajouter</button>
+              <input type="text" value={newNoteText} onChange={e => setNewNoteText(e.target.value)} placeholder="Ajouter une note ou remarque..." className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none" />
+              <button onClick={() => handleAddNote(selectedTool)} className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-sm">Ajouter</button>
             </div>
+
             <div className="space-y-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Historique & Transferts</span>
               {selectedTool.notes?.map(note => (
-                <div key={note.id} className="p-2 bg-slate-50 rounded-lg text-xs"><span className="text-slate-400 font-bold">{note.date} : </span>{note.text}</div>
+                <div key={note.id} className="p-3 bg-slate-50 rounded-xl text-xs border border-slate-200/60 space-y-1">
+                  <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
+                    <span>Par : {note.author || 'Admin'}</span>
+                    <span>{note.date}</span>
+                  </div>
+                  <p className="text-slate-800 font-medium">{note.text}</p>
+                </div>
               ))}
             </div>
+
+            <button onClick={() => setSelectedTool(null)} className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-colors">Fermer</button>
+          </div>
+        </div>
+      )}
+
+      {selectedToolImage && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white p-4 rounded-3xl max-w-lg w-full space-y-4 shadow-2xl relative">
+            <button onClick={() => setSelectedToolImage(null)} className="absolute right-4 top-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-xs z-10">✕</button>
+            <h3 className="text-sm font-bold text-slate-900 px-2">Aperçu photo machine</h3>
+            <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 flex items-center justify-center max-h-[70vh]">
+              <img src={selectedToolImage} alt="Machine" className="w-full h-auto object-contain max-h-[70vh]" />
+            </div>
+            <button onClick={() => setSelectedToolImage(null)} className="w-full py-2.5 bg-slate-900 text-white font-bold text-xs rounded-xl">Fermer</button>
           </div>
         </div>
       )}
 
       {editingTool && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleSaveToolEdit} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-900">Modifier l'outil</h3>
-            <select value={editToolForm.assignedTo} onChange={e => setEditToolForm({...editToolForm, assignedTo: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
-              <option value="Dépôt">📦 Dépôt</option>
-              {approvedUsers.map(u => <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name}</option>)}
-            </select>
-            <select value={editToolForm.status} onChange={e => setEditToolForm({...editToolForm, status: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
-              <option value="Disponible">🟢 Disponible</option>
-              <option value="Attribué">⚡ Attribué</option>
-              <option value="En révision">🛠️ En révision</option>
-            </select>
-            <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditingTool(null)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl">Annuler</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white text-xs rounded-xl">Enregistrer</button></div>
+          <form onSubmit={handleSaveToolEdit} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900">Modifier / Réaffecter l'outil</h3>
+            
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Affecter à :</label>
+              <select value={editToolForm.assignedTo} onChange={e => setEditToolForm({...editToolForm, assignedTo: e.target.value})} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold">
+                <option value="Dépôt Central">📦 Dépôt Central (Libre)</option>
+                {approvedUsers.map(u => <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Statut :</label>
+              <select value={editToolForm.status} onChange={e => setEditToolForm({...editToolForm, status: e.target.value})} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold">
+                <option value="Disponible">🟢 Disponible</option>
+                <option value="En service">⚡ En service</option>
+                <option value="En révision">🛠️ En révision</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Photo (optionnel) :</label>
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => setEditToolForm({...editToolForm, imageURL: reader.result});
+                    reader.readAsDataURL(file);
+                  }
+                }} 
+                className="w-full text-xs file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700" 
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setEditingTool(null)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl font-semibold">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-indigo-600 text-white text-xs rounded-xl font-bold">Enregistrer le transfert</button>
+            </div>
           </form>
         </div>
       )}
@@ -2636,7 +2654,6 @@ export default function App() {
               });
             }
 
-            // Mettre à jour automatiquement la vue planning sur la semaine et l'année de la date sélectionnée pour voir la tâche tout de suite !
             const targetDateObj = new Date(newPlanData.date);
             setSelectedWeek(getWeekNumber(targetDateObj));
             setSelectedYear(targetDateObj.getFullYear());
@@ -2738,15 +2755,53 @@ export default function App() {
 
       {showAddToolModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleCreateTool} className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl">
+          <form onSubmit={handleCreateTool} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl">
             <h3 className="text-lg font-bold text-slate-900">Ajouter une machine</h3>
-            <input type="text" placeholder="ID (ex: REM-04)" value={newToolData.id} onChange={e => setNewToolData({...newToolData, id: e.target.value})} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" />
-            <input type="text" placeholder="Nom de la machine" value={newToolData.name} onChange={e => setNewToolData({...newToolData, name: e.target.value})} required className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs" />
-            <select value={newToolData.assignedTo} onChange={e => setNewToolData({...newToolData, assignedTo: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
-              <option value="Dépôt">📦 Dépôt</option>
-              {approvedUsers.map(u => <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name}</option>)}
-            </select>
-            <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowAddToolModal(false)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl">Annuler</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white text-xs rounded-xl font-semibold">Ajouter</button></div>
+            
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Marque *</label>
+              <input type="text" placeholder="ex: REMS, Hilti, Makita..." value={newToolData.brand} onChange={e => setNewToolData({...newToolData, brand: e.target.value})} required className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Numéro de série / ID *</label>
+              <input type="text" placeholder="ex: REM-04" value={newToolData.id} onChange={e => setNewToolData({...newToolData, id: e.target.value})} required className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Objet / Type d'outil (Nom) *</label>
+              <input type="text" placeholder="ex: Serti-veille, Visseuse, Perforateur..." value={newToolData.name} onChange={e => setNewToolData({...newToolData, name: e.target.value})} required className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Affectation initiale :</label>
+              <select value={newToolData.assignedTo} onChange={e => setNewToolData({...newToolData, assignedTo: e.target.value})} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold">
+                <option value="Dépôt Central">📦 Dépôt Central (Libre)</option>
+                {approvedUsers.map(u => <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Photo (optionnel) :</label>
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => setNewToolData({...newToolData, imageURL: reader.result});
+                    reader.readAsDataURL(file);
+                  }
+                }} 
+                className="w-full text-xs file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700" 
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setShowAddToolModal(false)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl font-semibold">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-indigo-600 text-white text-xs rounded-xl font-bold">Enregistrer la machine</button>
+            </div>
           </form>
         </div>
       )}
