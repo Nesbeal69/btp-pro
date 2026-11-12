@@ -120,6 +120,9 @@ export default function App() {
   const [newNoteText, setNewNoteText] = useState('');
   const [selectedToolImage, setSelectedToolImage] = useState(null);
 
+  // 🛠️ AJOUT DE LA VARIABLE QUI MANQUAIT ICI :
+  const [selectedRequestHistory, setSelectedRequestHistory] = useState(null);
+
   const [showAddToolModal, setShowAddToolModal] = useState(false);
   const [newToolData, setNewToolData] = useState({ 
     id: '', 
@@ -1737,7 +1740,6 @@ export default function App() {
               )}
             </div>
 
-            {/* BARRE DE FILTRES OUTILLAGE */}
             <div className="bg-white border border-slate-200/80 p-4 rounded-3xl shadow-sm flex flex-wrap items-center gap-3">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -1792,7 +1794,6 @@ export default function App() {
               </label>
             </div>
 
-            {/* GRILLE DES MACHINES */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredEquipment.map(tool => (
                 <div key={tool.firestoreId} className="bg-white border border-slate-200/80 hover:border-indigo-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
