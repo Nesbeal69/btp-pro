@@ -1604,19 +1604,22 @@ export default function App() {
               {(() => {
                 const groupedMap = {};
                 
-                visiblePlans.forEach(plan => {
+                (visiblePlans || []).forEach(plan => {
                   const targetKey = Array.isArray(plan.targetUserIds) ? plan.targetUserIds.sort().join('-') : (plan.targetUserId || 'all');
-                  const key = `${plan.date}_${targetKey}`;
+                  const key = `${plan.date || 'no-date'}_${targetKey}`;
                   
+                  // S'assurer que files est bien un tableau valide
+                  const planFiles = Array.isArray(plan.files) ? plan.files.filter(f => f && f.data) : [];
+
                   if (!groupedMap[key]) {
                     groupedMap[key] = {
                       ...plan,
                       tasks: [{ title: plan.title, description: plan.description, firestoreId: plan.firestoreId }],
-                      files: [...(plan.files || [])]
+                      files: [...planFiles]
                     };
                   } else {
                     groupedMap[key].tasks.push({ title: plan.title, description: plan.description, firestoreId: plan.firestoreId });
-                    plan.files?.forEach(f => {
+                    planFiles.forEach(f => {
                       if (!groupedMap[key].files.some(existing => existing.name === f.name)) {
                         groupedMap[key].files.push(f);
                       }
@@ -1624,7 +1627,7 @@ export default function App() {
                   }
                 });
 
-                const mergedPlans = Object.values(groupedMap).sort((a, b) => new Date(a.date) - new Date(b.date));
+                const mergedPlans = Object.values(groupedMap).sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
 
                 if (mergedPlans.length === 0) {
                   return (
@@ -1642,7 +1645,7 @@ export default function App() {
                   const isToday = plan.date === new Date().toISOString().split('T')[0];
                   return (
                     <div 
-                      key={plan.firestoreId} 
+                      key={plan.firestoreId || Math.random()} 
                       className={`bg-white border rounded-3xl p-6 shadow-sm hover:shadow-md transition-all relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 ${
                         isToday ? 'border-cyan-500 ring-2 ring-cyan-500/20 bg-gradient-to-r from-cyan-50/30 to-white' : 'border-slate-200/80'
                       }`}
@@ -1656,12 +1659,12 @@ export default function App() {
                           </span>
 
                           <span className="px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 flex items-center gap-1">
-                            👥 Pour : <strong className="text-slate-900">{plan.targetName}</strong>
+                            👥 Pour : <strong className="text-slate-900">{plan.targetName || 'Équipe'}</strong>
                           </span>
                         </div>
 
                         <div className="space-y-3 pt-1">
-                          {plan.tasks.map((t, tIdx) => (
+                          {(plan.tasks || []).map((t, tIdx) => (
                             <div key={t.firestoreId || tIdx} className="space-y-1">
                               <h3 className="text-lg md:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
                                 <Home className="w-5 h-5 text-cyan-600 shrink-0" /> {t.title}
@@ -1686,7 +1689,7 @@ export default function App() {
                                 <div className="p-2 bg-red-100 text-red-600 rounded-xl shrink-0">
                                   <FileText className="w-4 h-4" />
                                 </div>
-                                <span className="text-xs text-slate-800 font-bold truncate">{fileObj.name}</span>
+                                <span className="text-xs text-slate-800 font-bold truncate">{fileObj.name || 'Document.pdf'}</span>
                               </div>
                               <button 
                                 onClick={() => handleDownloadSinglePdf(fileObj)} 
@@ -1702,7 +1705,7 @@ export default function App() {
 
                         {isAdmin && (
                           <div className="pt-2 border-t border-slate-200/60 flex justify-end gap-2">
-                            {plan.tasks.map(t => (
+                            {(plan.tasks || []).map(t => (
                               <button 
                                 key={t.firestoreId} 
                                 onClick={() => handleDeletePlan(t.firestoreId)} 
