@@ -2324,7 +2324,7 @@ export default function App() {
                   <option value="Présent">🟢 Présent</option>
                   <option value="Congés">🏖️ Congés</option>
                   <option value="Maladie">🤒 Maladie</option>
-                  <option value="Intempéries">🌧️ Intempéries</option>
+                  <option value="Intempéries">🎉 Férié </option>
                   <option value="Absence injustifiée">❌ Absence injustifiée</option>
                 </select>
               </div>
