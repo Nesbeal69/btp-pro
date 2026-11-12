@@ -34,6 +34,7 @@ import {
   Archive,
   AlertTriangle,
   CheckCircle2,
+  CheckCircle,
   History,
   Home,
   Edit3,
@@ -104,10 +105,15 @@ export default function App() {
   const [requests, setRequests] = useState([]);
   const [plans, setPlans] = useState([]);
   const [reclamations, setReclamations] = useState([]);
+  const [pointages, setPointages] = useState([]);
 
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedWeek, setSelectedWeek] = useState(getWeekNumber(new Date()));
   const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(null);
+
+  const [pointageUserFilter, setPointageUserFilter] = useState('all');
+  const [showPointageEditModal, setShowPointageEditModal] = useState(false);
+  const [editingPointageData, setEditingPointageData] = useState(null);
 
   const [toolSearch, setToolSearch] = useState('');
   const [toolStatusFilter, setToolStatusFilter] = useState('all');
@@ -224,6 +230,10 @@ export default function App() {
       setReclamations(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
 
+    const unsubPointages = onSnapshot(collection(db, "pointages"), (snapshot) => {
+      setPointages(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
+    });
+
     return () => {
       unsubscribeAuth();
       unsubUsers();
@@ -232,6 +242,7 @@ export default function App() {
       unsubRequests();
       unsubPlans();
       unsubReclamations();
+      unsubPointages();
     };
   }, []);
 
@@ -274,13 +285,95 @@ export default function App() {
     return reclamations.filter(r => r.projectCode === myProjectCode);
   }, [reclamations, myProjectCode]);
 
+  const projectPointages = useMemo(() => {
+    if (!myProjectCode) return [];
+    return pointages.filter(p => p.projectCode === myProjectCode);
+  }, [pointages, myProjectCode]);
+
   const approvedUsers = useMemo(() => projectUsers.filter(u => u.status === 'approved'), [projectUsers]);
   const pendingUsers = useMemo(() => projectUsers.filter(u => u.status === 'pending' && u.role !== 'admin'), [projectUsers]);
 
   const isAdmin = currentUser?.role === 'admin';
   const canAddReclamation = isAdmin || currentUser?.canAddReclamation === true;
 
-  // 🛠️ AJOUT DU CALCUL DE filteredGroupedReclamations :
+  const currentWeekDays = useMemo(() => {
+    const simple = new Date(selectedYear, 0, 1 + (selectedWeek - 1) * 7);
+    const dow = simple.getDay();
+    const ISOweekStart = new Date(simple);
+    if (dow <= 4) {
+      ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+    } else {
+      ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+    }
+
+    const days = [];
+    const dayNames = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+    for (let i = 0; i < 7; i++) {
+      const nextDate = new Date(ISOweekStart);
+      nextDate.setDate(ISOweekStart.getDate() + i);
+      const dateStr = nextDate.toISOString().split('T')[0];
+      const isWeekend = i >= 5;
+      const isFriday = i === 4;
+      days.push({
+        dayIndex: i + 1,
+        name: dayNames[i],
+        dateStr,
+        isWeekend,
+        isFriday,
+        formattedShort: nextDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+      });
+    }
+    return days;
+  }, [selectedWeek, selectedYear]);
+
+  const handleQuickPointDay = async (day, status, hours, reason = '', startTime = '08:00', endTime = day.isFriday ? '13:00' : '17:00') => {
+    if (!currentUser || !myProjectCode) return;
+    const myId = currentUser.userIdNum || currentUser.id;
+    const docId = `${myProjectCode}_${myId}_${day.dateStr}`;
+
+    try {
+      await setDoc(doc(db, "pointages", docId), {
+        userId: myId,
+        userName: currentUser.name,
+        projectCode: myProjectCode,
+        date: day.dateStr,
+        status,
+        hours,
+        absenceReason: reason,
+        startTime,
+        endTime,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleAdminSavePointage = async (e) => {
+    e.preventDefault();
+    if (!editingPointageData || !myProjectCode) return;
+
+    const docId = `${myProjectCode}_${editingPointageData.userId}_${editingPointageData.date}`;
+    try {
+      await setDoc(doc(db, "pointages", docId), {
+        userId: editingPointageData.userId,
+        userName: editingPointageData.userName,
+        projectCode: myProjectCode,
+        date: editingPointageData.date,
+        status: editingPointageData.status,
+        hours: Number(editingPointageData.hours),
+        absenceReason: editingPointageData.reason || '',
+        startTime: editingPointageData.startTime || '08:00',
+        endTime: editingPointageData.endTime || '17:00',
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      setShowPointageEditModal(false);
+      setEditingPointageData(null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const filteredGroupedReclamations = useMemo(() => {
     const grouped = {};
     projectReclamations.forEach(rec => {
@@ -719,32 +812,6 @@ export default function App() {
     return list;
   }, [projectPlans, currentUser, selectedWorkerFilter, selectedWeek, selectedYear, selectedDayOfWeek]);
 
-  const currentWeekDays = useMemo(() => {
-    const simple = new Date(selectedYear, 0, 1 + (selectedWeek - 1) * 7);
-    const dow = simple.getDay();
-    const ISOweekStart = new Date(simple);
-    if (dow <= 4) {
-      ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
-    } else {
-      ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
-    }
-
-    const days = [];
-    const dayNames = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
-    for (let i = 0; i < 7; i++) {
-      const nextDate = new Date(ISOweekStart);
-      nextDate.setDate(ISOweekStart.getDate() + i);
-      const dateStr = nextDate.toISOString().split('T')[0];
-      days.push({
-        dayIndex: i + 1,
-        name: dayNames[i],
-        dateStr,
-        formattedShort: nextDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
-      });
-    }
-    return days;
-  }, [selectedWeek, selectedYear]);
-
   const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -1026,6 +1093,7 @@ export default function App() {
         <nav className="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200/60">
           <button onClick={() => setActiveTab('dashboard')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'dashboard' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Accueil</button>
           <button onClick={() => { setSelectedDayOfWeek(null); setActiveTab('planning'); }} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'planning' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Planning</button>
+          <button onClick={() => setActiveTab('pointage')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'pointage' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Pointage</button>
           <button onClick={() => setActiveTab('requests')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'requests' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Matériel</button>
           <button onClick={() => setActiveTab('reclamations')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'reclamations' ? 'bg-white text-red-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Réclamations</button>
           <button onClick={() => setActiveTab('workers')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'workers' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Effectifs</button>
@@ -1060,6 +1128,7 @@ export default function App() {
       <div className="lg:hidden bg-white border-b border-slate-200 px-4 py-2.5 overflow-x-auto flex items-center gap-2 shadow-xs">
         <button onClick={() => setActiveTab('dashboard')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>📊 Accueil</button>
         <button onClick={() => { setSelectedDayOfWeek(null); setActiveTab('planning'); }} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'planning' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-700'}`}>📅 Planning</button>
+        <button onClick={() => setActiveTab('pointage')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'pointage' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>⏱️ Pointage</button>
         <button onClick={() => setActiveTab('requests')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'requests' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-700'}`}>📦 Matériel</button>
         <button onClick={() => setActiveTab('reclamations')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'reclamations' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700'}`}>⚠️ Réclamations</button>
         <button onClick={() => setActiveTab('workers')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'workers' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>👥 Effectifs</button>
@@ -1081,7 +1150,7 @@ export default function App() {
                 <h1 className="text-xl md:text-2xl font-black tracking-tight">
                   Bienvenue sur votre espace, <span className="text-blue-400">{currentUser?.name}</span>.
                 </h1>
-                <p className="text-xs text-slate-300">Retrouvez ici vos feuilles de route, vos demandes de matériel et le suivi des réserves en un clin d'œil.</p>
+                <p className="text-xs text-slate-300">Retrouvez ici vos feuilles de route, vos pointages et le suivi de vos chantiers.</p>
               </div>
 
               <div className="flex items-center gap-3 px-4 py-2.5 bg-black/40 border border-white/20 rounded-2xl backdrop-blur-md relative z-10 shadow-inner">
@@ -1104,6 +1173,20 @@ export default function App() {
                   <p className="text-xs text-slate-500 mt-1">Retrouvez vos tâches programmées par semaine</p>
                 </div>
                 <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-cyan-600">
+                  <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
+                </div>
+              </div>
+
+              <div onClick={() => setActiveTab('pointage')} className="group bg-white border border-slate-200/80 hover:border-blue-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl"><Clock className="w-6 h-6" /></div>
+                    <span className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full">Heures</span>
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600">Pointage & Absences</h3>
+                  <p className="text-xs text-slate-500 mt-1">Validez vos heures de la semaine en 1 clic.</p>
+                </div>
+                <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-blue-600">
                   <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
                 </div>
               </div>
@@ -1182,6 +1265,223 @@ export default function App() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ⏱️ ONGLET POINTAGE */}
+        {activeTab === 'pointage' && (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-blue-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-blue-600/20 border border-blue-400/30 rounded-2xl">
+                  <Clock className="w-7 h-7 text-blue-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black tracking-wide">Pointage & Suivi des Heures</h2>
+                  <p className="text-xs text-slate-300 mt-0.5">Semaine type de 37h (Lun-Jeu : 8h / Ven : 5h). Validation rapide ou gestion admin.</p>
+                </div>
+              </div>
+
+              {isAdmin && (
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <select 
+                    value={pointageUserFilter} 
+                    onChange={e => setPointageUserFilter(e.target.value)}
+                    className="px-3.5 py-2.5 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none font-semibold"
+                  >
+                    <option value="all" className="bg-slate-900">👥 Tous les compagnons</option>
+                    {approvedUsers.map(u => (
+                      <option key={u.firestoreId} value={u.userIdNum || u.id} className="bg-slate-900">
+                        👷‍♂️ {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white border border-slate-200/80 p-4 rounded-3xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    if (selectedWeek > 1) setSelectedWeek(selectedWeek - 1);
+                    else { setSelectedWeek(52); setSelectedYear(selectedYear - 1); }
+                  }}
+                  className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl transition-colors font-bold flex items-center gap-1 text-xs"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Semaine préc.
+                </button>
+
+                <div className="px-4 py-2 bg-blue-50 text-blue-800 border border-blue-200 rounded-2xl text-xs font-black uppercase tracking-wider">
+                  📅 Semaine {selectedWeek} ({selectedYear})
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (selectedWeek < 52) setSelectedWeek(selectedWeek + 1);
+                    else { setSelectedWeek(1); setSelectedYear(selectedYear + 1); }
+                  }}
+                  className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl transition-colors font-bold flex items-center gap-1 text-xs"
+                >
+                  Semaine suiv. <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="text-xs font-bold text-slate-500">
+                Total heures semaine : <span className="text-blue-600 font-black text-sm">
+                  {(() => {
+                    const targetId = isAdmin && pointageUserFilter !== 'all' ? Number(pointageUserFilter) : (currentUser?.userIdNum || currentUser?.id);
+                    const weekDates = currentWeekDays.map(d => d.dateStr);
+                    const records = projectPointages.filter(p => p.userId === targetId && weekDates.includes(p.date));
+                    const total = records.reduce((acc, curr) => acc + (Number(curr.hours) || 0), 0);
+                    return total;
+                  })()}h / 37h
+                </span>
+              </div>
+            </div>
+
+            {!isAdmin ? (
+              <div className="space-y-4 max-w-3xl mx-auto">
+                {currentWeekDays.filter(d => !d.isWeekend).map(day => {
+                  const myId = currentUser.userIdNum || currentUser.id;
+                  const record = projectPointages.find(p => p.userId === myId && p.date === day.dateStr);
+                  const isToday = day.dateStr === new Date().toISOString().split('T')[0];
+                  const defaultHours = day.isFriday ? 5 : 8;
+
+                  return (
+                    <div key={day.dateStr} className={`bg-white border rounded-3xl p-5 shadow-sm transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${isToday ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10' : 'border-slate-200/80'}`}>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2.5 py-0.5 rounded-lg text-xs font-bold ${isToday ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                            {day.name}
+                          </span>
+                          <span className="text-xs text-slate-400 font-medium">{day.formattedShort}</span>
+                        </div>
+                        <div className="text-xs text-slate-600 font-semibold pt-1">
+                          {record ? (
+                            <span className={record.status === 'Présent' ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold'}>
+                              {record.status === 'Présent' ? `✅ Travaillé : ${record.hours}h (${record.startTime} - ${record.endTime})` : `⚠️ ${record.status} (${record.absenceReason || 'Absence'})`}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic">Non pointé (Standard : {defaultHours}h)</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                        <button
+                          onClick={() => handleQuickPointDay(day, 'Présent', defaultHours)}
+                          className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5" /> Valider ({defaultHours}h)
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            const customH = prompt("Nombre d'heures travaillées ce jour ?", defaultHours);
+                            if (customH !== null) {
+                              handleQuickPointDay(day, 'Présent', Number(customH));
+                            }
+                          }}
+                          className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
+                          title="Modifier les heures"
+                        >
+                          ⏱️ Heures sup
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            const reason = prompt("Motif de l'absence (Congés, Maladie, Intempéries, Injustifiée) :", "Congés");
+                            if (reason !== null) {
+                              handleQuickPointDay(day, 'Absent', 0, reason, '00:00', '00:00');
+                            }
+                          }}
+                          className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-colors"
+                          title="Signaler une absence"
+                        >
+                          🚫 Absent
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden shadow-sm">
+                <div className="p-4 bg-slate-50 border-b border-slate-200/80 flex justify-between items-center text-xs font-bold text-slate-700">
+                  <span>Tableau de contrôle des heures de l'équipe</span>
+                  <span>Semaine {selectedWeek}</span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-100/80 text-slate-600 border-b border-slate-200">
+                        <th className="p-3.5 font-bold">Compagnon</th>
+                        {currentWeekDays.filter(d => !d.isWeekend).map(d => (
+                          <th key={d.dateStr} className="p-3.5 font-bold text-center">
+                            {d.name.substring(0, 3)}<br/><span className="text-[9px] text-slate-400 font-normal">{d.formattedShort}</span>
+                          </th>
+                        ))}
+                        <th className="p-3.5 font-bold text-center">Total Semaine</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {approvedUsers.filter(u => pointageUserFilter === 'all' || (u.userIdNum || u.id) === Number(pointageUserFilter)).map(worker => {
+                        const wId = worker.userIdNum || worker.id;
+                        const weekDates = currentWeekDays.filter(d => !d.isWeekend).map(d => d.dateStr);
+                        const workerRecords = projectPointages.filter(p => p.userId === wId && weekDates.includes(p.date));
+                        const totalW = workerRecords.reduce((acc, curr) => acc + (Number(curr.hours) || 0), 0);
+
+                        return (
+                          <tr key={worker.firestoreId} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="p-3.5 font-bold text-slate-900 flex items-center gap-2">
+                              👷‍♂️ {worker.name}
+                            </td>
+                            {currentWeekDays.filter(d => !d.isWeekend).map(day => {
+                              const rec = workerRecords.find(r => r.date === day.dateStr);
+                              const isPresent = rec && rec.status === 'Présent';
+                              const isAbsent = rec && rec.status !== 'Présent';
+
+                              return (
+                                <td key={day.dateStr} className="p-3 text-center">
+                                  <button
+                                    onClick={() => {
+                                      setEditingPointageData({
+                                        userId: wId,
+                                        userName: worker.name,
+                                        date: day.dateStr,
+                                        status: rec ? rec.status : 'Présent',
+                                        hours: rec ? rec.hours : (day.isFriday ? 5 : 8),
+                                        reason: rec ? rec.absenceReason : '',
+                                        startTime: rec ? rec.startTime : '08:00',
+                                        endTime: rec ? rec.endTime : (day.isFriday ? '13:00' : '17:00')
+                                      });
+                                      setShowPointageEditModal(true);
+                                    }}
+                                    className={`px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition-all ${
+                                      isPresent ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' :
+                                      isAbsent ? 'bg-red-100 text-red-800 hover:bg-red-200' :
+                                      'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                                    }`}
+                                    title="Cliquer pour modifier"
+                                  >
+                                    {rec ? `${rec.hours}h` : '-'}
+                                  </button>
+                                </td>
+                              );
+                            })}
+                            <td className="p-3.5 text-center font-black text-blue-600 text-sm">
+                              {totalW}h
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1540,12 +1840,8 @@ export default function App() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
-                    if (selectedWeek > 1) {
-                      setSelectedWeek(selectedWeek - 1);
-                    } else {
-                      setSelectedWeek(52);
-                      setSelectedYear(selectedYear - 1);
-                    }
+                    if (selectedWeek > 1) setSelectedWeek(selectedWeek - 1);
+                    else { setSelectedWeek(52); setSelectedYear(selectedYear - 1); }
                     setSelectedDayOfWeek(null);
                   }}
                   className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl transition-colors font-bold flex items-center gap-1 text-xs"
@@ -1559,12 +1855,8 @@ export default function App() {
 
                 <button
                   onClick={() => {
-                    if (selectedWeek < 52) {
-                      setSelectedWeek(selectedWeek + 1);
-                    } else {
-                      setSelectedWeek(1);
-                      setSelectedYear(selectedYear + 1);
-                    }
+                    if (selectedWeek < 52) setSelectedWeek(selectedWeek + 1);
+                    else { setSelectedWeek(1); setSelectedYear(selectedYear + 1); }
                     setSelectedDayOfWeek(null);
                   }}
                   className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl transition-colors font-bold flex items-center gap-1 text-xs"
@@ -2006,6 +2298,75 @@ export default function App() {
       </main>
 
       <PrivacyFooter />
+
+      {/* MODAL MODIFICATION POINTAGE ADMIN */}
+      {showPointageEditModal && editingPointageData && isAdmin && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleAdminSavePointage} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-base font-bold text-slate-900">Modifier le pointage de {editingPointageData.userName}</h3>
+              <button type="button" onClick={() => setShowPointageEditModal(false)} className="w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">✕</button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Date :</label>
+                <input type="date" value={editingPointageData.date} disabled className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-500 font-semibold" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Statut :</label>
+                <select 
+                  value={editingPointageData.status} 
+                  onChange={e => setEditingPointageData({...editingPointageData, status: e.target.value})}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold outline-none"
+                >
+                  <option value="Présent">🟢 Présent</option>
+                  <option value="Congés">🏖️ Congés</option>
+                  <option value="Maladie">🤒 Maladie</option>
+                  <option value="Intempéries">🌧️ Intempéries</option>
+                  <option value="Absence injustifiée">❌ Absence injustifiée</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Nombre d'heures :</label>
+                <input 
+                  type="number" 
+                  step="0.5"
+                  min="0"
+                  max="24"
+                  value={editingPointageData.hours} 
+                  onChange={e => setEditingPointageData({...editingPointageData, hours: e.target.value})}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold outline-none"
+                  required 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Heure début :</label>
+                  <input type="time" value={editingPointageData.startTime} onChange={e => setEditingPointageData({...editingPointageData, startTime: e.target.value})} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Heure fin :</label>
+                  <input type="time" value={editingPointageData.endTime} onChange={e => setEditingPointageData({...editingPointageData, endTime: e.target.value})} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Motif / Commentaire (optionnel) :</label>
+                <input type="text" value={editingPointageData.reason} onChange={e => setEditingPointageData({...editingPointageData, reason: e.target.value})} placeholder="Précision..." className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none" />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button type="button" onClick={() => setShowPointageEditModal(false)} className="px-5 py-2.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">Annuler</button>
+                <button type="submit" className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl shadow-lg shadow-blue-600/20 transition-all">Enregistrer</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
 
       {resolvingReclamation && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
