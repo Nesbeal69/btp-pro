@@ -57,13 +57,11 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authMode, setAuthMode] = useState('login'); 
   const [activeTab, setActiveTab] = useState('dashboard');
-
   const [loadingUser, setLoadingUser] = useState(true);
   
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
-  
   const [resetSent, setResetSent] = useState(false);
   
   const [regName, setRegName] = useState('');
@@ -161,6 +159,11 @@ export default function App() {
   const [workerSearch, setWorkerSearch] = useState('');
   const [workerRoleFilter, setWorkerRoleFilter] = useState('all');
 
+  // Déclarations des rôles en haut pour éviter les erreurs "Cannot access before initialization"
+  const isAdmin = currentUser?.role === 'admin';
+  const canAddReclamation = isAdmin || currentUser?.canAddReclamation === true;
+  const myProjectCode = currentUser ? (currentUser.projectCode || currentUser.adminProjectCode) : null;
+
   const formatPhoneFr = (phoneStr) => {
     if (!phoneStr) return 'Non renseigné';
     const cleaned = phoneStr.replace(/\s+/g, '');
@@ -253,8 +256,6 @@ export default function App() {
     }
   }, [users]);
 
-  const myProjectCode = currentUser ? (currentUser.projectCode || currentUser.adminProjectCode) : null;
-
   const projectEquipment = useMemo(() => {
     if (!myProjectCode) return [];
     return equipment.filter(t => t.projectCode === myProjectCode);
@@ -286,24 +287,20 @@ export default function App() {
   }, [reclamations, myProjectCode]);
 
   const projectPointages = useMemo(() => {
-  if (!myProjectCode) return [];
-  let list = pointages.filter(p => p.projectCode === myProjectCode);
-  
-  // Si ce n'est pas un admin, on restreint STRICTEMENT aux pointages du compagnon connecté
-  if (!isAdmin && currentUser) {
-    const myId = currentUser.userIdNum || currentUser.id;
-    list = list.filter(p => p.userId === myId || p.userId?.toString() === myId?.toString());
-  } else if (isAdmin && pointageUserFilter !== 'all') {
-    list = list.filter(p => p.userId === Number(pointageUserFilter) || p.userId?.toString() === pointageUserFilter.toString());
-  }
-  return list;
-}, [pointages, myProjectCode, currentUser, isAdmin, pointageUserFilter]);
+    if (!myProjectCode) return [];
+    let list = pointages.filter(p => p.projectCode === myProjectCode);
+    
+    if (!isAdmin && currentUser) {
+      const myId = currentUser.userIdNum || currentUser.id;
+      list = list.filter(p => p.userId === myId || p.userId?.toString() === myId?.toString());
+    } else if (isAdmin && pointageUserFilter !== 'all') {
+      list = list.filter(p => p.userId === Number(pointageUserFilter) || p.userId?.toString() === pointageUserFilter.toString());
+    }
+    return list;
+  }, [pointages, myProjectCode, currentUser, isAdmin, pointageUserFilter]);
 
   const approvedUsers = useMemo(() => projectUsers.filter(u => u.status === 'approved'), [projectUsers]);
   const pendingUsers = useMemo(() => projectUsers.filter(u => u.status === 'pending' && u.role !== 'admin'), [projectUsers]);
-
-  const isAdmin = currentUser?.role === 'admin';
-  const canAddReclamation = isAdmin || currentUser?.canAddReclamation === true;
 
   const currentWeekDays = useMemo(() => {
     const simple = new Date(selectedYear, 0, 1 + (selectedWeek - 1) * 7);
@@ -2334,7 +2331,7 @@ export default function App() {
                   <option value="Présent">🟢 Présent</option>
                   <option value="Congés">🏖️ Congés</option>
                   <option value="Maladie">🤒 Maladie</option>
-                  <option value="Intempéries">🎉 Férié </option>
+                  <option value="Férié">🎉 Férié</option>
                   <option value="Absence injustifiée">❌ Absence injustifiée</option>
                 </select>
               </div>
