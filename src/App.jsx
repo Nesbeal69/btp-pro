@@ -935,7 +935,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Pied de page consultable dès la page de connexion */}
         <div className="relative z-10">
           <PrivacyFooter />
         </div>
@@ -945,7 +944,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans">
-      {/* HEADER ULTRA PRO */}
       <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-xs">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
           <div className="flex items-center">
@@ -988,7 +986,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* NAVIGATION MOBILE */}
       <div className="lg:hidden bg-white border-b border-slate-200 px-4 py-2.5 overflow-x-auto flex items-center gap-2 shadow-xs">
         <button onClick={() => setActiveTab('dashboard')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>📊 Accueil</button>
         <button onClick={() => setActiveTab('planning')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'planning' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-700'}`}>📅 Planning</button>
@@ -1117,7 +1114,6 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE DEMANDES DE MATÉRIEL --- */}
         {activeTab === 'requests' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-amber-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-amber-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1276,7 +1272,6 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE RÉCLAMATIONS --- */}
         {activeTab === 'reclamations' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-red-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-red-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1435,7 +1430,6 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE PLANNING --- */}
         {activeTab === 'planning' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-cyan-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1594,7 +1588,6 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE EFFECTIFS --- */}
         {activeTab === 'workers' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-emerald-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1692,7 +1685,6 @@ export default function App() {
           </div>
         )}
 
-        {/* --- MODULE PARC OUTILLAGE --- */}
         {activeTab === 'tools' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-indigo-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1764,7 +1756,6 @@ export default function App() {
           </div>
         )}
 
-        {/* --- VALIDATION COMPTES (ADMIN) --- */}
         {activeTab === 'accounts' && isAdmin && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-purple-900/40 flex items-center gap-4">
@@ -1805,10 +1796,7 @@ export default function App() {
         )}
       </main>
 
-      {/* --- FOOTER PRO CONSULTABLE AVEC POLITIQUE DE CONFIDENTIALITÉ --- */}
       <PrivacyFooter />
-
-      {/* --- MODALES --- */}
 
       {resolvingReclamation && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
@@ -2322,7 +2310,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALE HISTORIQUE COMPLET DES DEMANDES DE MATÉRIEL */}
       {selectedRequestHistory && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl border border-slate-100">
@@ -2408,7 +2395,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALE HISTORIQUE DES PASSAGES */}
       {selectedReclamationHistory && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 max-h-[80vh] overflow-y-auto shadow-2xl">
