@@ -9,8 +9,9 @@ import {
   onAuthStateChanged
 } from 'firebase/auth';
 
+import PrivacyFooter from './components/PrivacyFooter';
+
 import { 
-  Building2, 
   Users, 
   Wrench, 
   ClipboardList, 
@@ -19,7 +20,6 @@ import {
   X, 
   Clock, 
   LogOut,
-  ArrowLeft,
   Calendar as CalendarIcon,
   FileText,
   Download,
@@ -32,19 +32,14 @@ import {
   Key,
   FolderOpen,
   Archive,
-  Smartphone,
   AlertTriangle,
   CheckCircle2,
   History,
   Home,
-  ShieldCheck,
-  Edit3,
-  Trash2,
-  Info
+  Edit3
 } from 'lucide-react';
 
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
-const APP_VERSION = "v1.2.0";
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -137,8 +132,6 @@ export default function App() {
   
   const [editingSignalement, setEditingSignalement] = useState(null);
   const [editSignalementText, setEditSignalementText] = useState('');
-
-  const [showLegalModal, setShowLegalModal] = useState(false);
 
   const [workerSearch, setWorkerSearch] = useState('');
   const [workerRoleFilter, setWorkerRoleFilter] = useState('all');
@@ -667,6 +660,10 @@ export default function App() {
     document.body.removeChild(link);
   };
 
+  const handleDeletePlan = async (firestoreId) => {
+    try { if (firestoreId) await deleteDoc(doc(db, "plans", firestoreId)); } catch (e) { console.error(e); }
+  };
+
   const visiblePlans = useMemo(() => {
     if (!currentUser) return [];
     const myId = currentUser.userIdNum || currentUser.id;
@@ -810,130 +807,137 @@ export default function App() {
 
   if (!currentUser) {
     return (
-      <div className="min-h-screen text-slate-100 flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="min-h-screen text-slate-100 flex flex-col relative overflow-hidden">
         <div 
           className="absolute inset-0 bg-cover bg-center z-0 filter brightness-[0.35] scale-105"
           style={{ backgroundImage: `url('https://images.unsplash.com/photo-1581094288338-2314dddb7ece?q=80&w=2000&auto=format&fit=crop')` }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/40 to-slate-950/60 z-0" />
 
-        <div className="relative z-10 w-full max-w-md bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl shadow-2xl p-8 overflow-hidden">
-          <div className="text-center mb-6">
-            <div className="inline-flex p-3.5 bg-blue-600/20 border border-blue-400/30 rounded-2xl mb-3 shadow-inner">
-              <img src="/logo-off.png" alt="Logo Bâtir+ Pro" className="w-9 h-9 object-contain" />
-            </div>
-            <h1 className="text-2xl font-black text-white tracking-wider">BÂTIR+ <span className="text-blue-400 font-light">PRO</span></h1>
-            <p className="text-xs text-slate-300 mt-1 font-medium tracking-wide">La plateforme opérationnelle dédiée à l'orgnisation de vos chantier. </p>
-          </div>
-
-          {authMode === 'pending' ? (
-            <div className="text-center py-6 space-y-4">
-              <Clock className="w-12 h-12 text-amber-400 mx-auto animate-pulse" />
-              <h2 className="text-lg font-semibold text-white">Compte en Attente de Validation</h2>
-              <p className="text-xs text-slate-300">Votre inscription a bien été enregistrée. Votre administrateur doit valider votre accès avec votre code de chantier.</p>
-              <button onClick={() => { setAuthMode('login'); setAuthError(''); }} className="w-full py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs rounded-xl font-medium transition-colors border border-white/10">Retour à la connexion</button>
-            </div>
-          ) : (
-            <>
-              <div className="flex rounded-xl bg-black/30 p-1 mb-6 border border-white/10">
-                <button type="button" onClick={() => { setAuthMode('login'); setAuthError(''); setResetSent(false); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'login' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Connexion</button>
-                <button type="button" onClick={() => { setAuthMode('register'); setAuthError(''); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'register' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Inscription</button>
+        <div className="flex-1 flex items-center justify-center p-4 relative z-10">
+          <div className="w-full max-w-md bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl shadow-2xl p-8 overflow-hidden">
+            <div className="text-center mb-6">
+              <div className="inline-flex p-3.5 bg-blue-600/20 border border-blue-400/30 rounded-2xl mb-3 shadow-inner">
+                <img src="/logo-off.png" alt="Logo Bâtir+ Pro" className="w-9 h-9 object-contain" />
               </div>
+              <h1 className="text-2xl font-black text-white tracking-wider">BÂTIR+ <span className="text-blue-400 font-light">PRO</span></h1>
+              <p className="text-xs text-slate-300 mt-1 font-medium tracking-wide">La plateforme opérationnelle dédiée à l'organisation de vos chantiers.</p>
+            </div>
 
-              {authError && <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-xs text-red-200 font-medium">{authError}</div>}
-              {resetSent && <div className="mb-4 p-3 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-xs text-emerald-200 font-medium">✅ Un email avec un lien de réinitialisation sécurisé vient d'être envoyé à votre adresse.</div>}
+            {authMode === 'pending' ? (
+              <div className="text-center py-6 space-y-4">
+                <Clock className="w-12 h-12 text-amber-400 mx-auto animate-pulse" />
+                <h2 className="text-lg font-semibold text-white">Compte en Attente de Validation</h2>
+                <p className="text-xs text-slate-300">Votre inscription a bien été enregistrée. Votre administrateur doit valider votre accès avec votre code de chantier.</p>
+                <button onClick={() => { setAuthMode('login'); setAuthError(''); }} className="w-full py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs rounded-xl font-medium transition-colors border border-white/10">Retour à la connexion</button>
+              </div>
+            ) : (
+              <>
+                <div className="flex rounded-xl bg-black/30 p-1 mb-6 border border-white/10">
+                  <button type="button" onClick={() => { setAuthMode('login'); setAuthError(''); setResetSent(false); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'login' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Connexion</button>
+                  <button type="button" onClick={() => { setAuthMode('register'); setAuthError(''); }} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${authMode === 'register' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Inscription</button>
+                </div>
 
-              {authMode === 'login' ? (
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Email</label>
-                    <input type="email" required value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="votre@email.fr" className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
-                  </div>
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="block text-xs font-medium text-slate-300">Mot de passe</label>
-                      <button 
-                        type="button" 
-                        onClick={handleForgotPassword}
-                        className="text-[11px] text-blue-400 hover:underline focus:outline-none font-medium"
-                      >
-                        Mot de passe oublié ?
-                      </button>
+                {authError && <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-xs text-red-200 font-medium">{authError}</div>}
+                {resetSent && <div className="mb-4 p-3 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-xs text-emerald-200 font-medium">✅ Un email avec un lien de réinitialisation sécurisé vient d'être envoyé à votre adresse.</div>}
+
+                {authMode === 'login' ? (
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">Email</label>
+                      <input type="email" required value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="votre@email.fr" className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
                     </div>
-                    <div className="relative">
-                      <input 
-                        type={showLoginPassword ? "text" : "password"} 
-                        required 
-                        value={loginPassword} 
-                        onChange={e => setLoginPassword(e.target.value)} 
-                        placeholder="••••••••" 
-                        className="w-full px-4 py-2.5 pr-10 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" 
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowLoginPassword(!showLoginPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white focus:outline-none"
-                      >
-                        {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-                  <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-500 transition-colors font-bold rounded-xl text-xs text-white shadow-lg shadow-blue-600/30">Se Connecter</button>
-                </form>
-              ) : (
-                <form onSubmit={handleRegister} className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Nom</label>
-                    <input type="text" required value={regName} onChange={e => setRegName(e.target.value)} placeholder="Martin" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Email</label>
-                    <input type="email" required value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="jean@batirpluspro.fr" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Numéro de téléphone</label>
-                    <input type="tel" required value={regPhone} onChange={e => setRegPhone(e.target.value)} placeholder="06 12 34 56 78" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Mot de passe</label>
-                    <div className="relative">
-                      <input 
-                        type={showRegPassword ? "text" : "password"} 
-                        required 
-                        value={regPassword} 
-                        onChange={e => setRegPassword(e.target.value)} 
-                        placeholder="••••••••" 
-                        className="w-full px-4 py-2 pr-10 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" 
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowRegPassword(!showRegPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white focus:outline-none"
-                      >
-                        {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-white/10 space-y-2">
-                    <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-200">
-                      <input type="checkbox" checked={regIsAdmin} onChange={e => setRegIsAdmin(e.target.checked)} className="rounded border-slate-700 bg-black/40 text-blue-600 focus:ring-blue-500" />
-                      <span>Je crée un compte administrateur</span>
-                    </label>
-
-                    {!regIsAdmin && (
-                      <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1">Code projet de votre administrateur</label>
-                        <input type="text" required={!regIsAdmin} value={regProjectCode} onChange={e => setRegProjectCode(e.target.value)} placeholder="ex: CHANTIER-4821" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 uppercase font-mono tracking-wider focus:outline-none" />
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-xs font-medium text-slate-300">Mot de passe</label>
+                        <button 
+                          type="button" 
+                          onClick={handleForgotPassword}
+                          className="text-[11px] text-blue-400 hover:underline focus:outline-none font-medium"
+                        >
+                          Mot de passe oublié ?
+                        </button>
                       </div>
-                    )}
-                  </div>
+                      <div className="relative">
+                        <input 
+                          type={showLoginPassword ? "text" : "password"} 
+                          required 
+                          value={loginPassword} 
+                          onChange={e => setLoginPassword(e.target.value)} 
+                          placeholder="••••••••" 
+                          className="w-full px-4 py-2.5 pr-10 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowLoginPassword(!showLoginPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white focus:outline-none"
+                        >
+                          {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                    <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-500 transition-colors font-bold rounded-xl text-xs text-white shadow-lg shadow-blue-600/30">Se Connecter</button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleRegister} className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">Nom</label>
+                      <input type="text" required value={regName} onChange={e => setRegName(e.target.value)} placeholder="Martin" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">Email</label>
+                      <input type="email" required value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="jean@batirpluspro.fr" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">Numéro de téléphone</label>
+                      <input type="tel" required value={regPhone} onChange={e => setRegPhone(e.target.value)} placeholder="06 12 34 56 78" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">Mot de passe</label>
+                      <div className="relative">
+                        <input 
+                          type={showRegPassword ? "text" : "password"} 
+                          required 
+                          value={regPassword} 
+                          onChange={e => setRegPassword(e.target.value)} 
+                          placeholder="••••••••" 
+                          className="w-full px-4 py-2 pr-10 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowRegPassword(!showRegPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white focus:outline-none"
+                        >
+                          {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
 
-                  <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 transition-colors font-bold rounded-xl text-xs text-white shadow-lg shadow-emerald-600/30 mt-2">S'inscrire</button>
-                </form>
-              )}
-            </>
-          )}
+                    <div className="pt-2 border-t border-white/10 space-y-2">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-200">
+                        <input type="checkbox" checked={regIsAdmin} onChange={e => setRegIsAdmin(e.target.checked)} className="rounded border-slate-700 bg-black/40 text-blue-600 focus:ring-blue-500" />
+                        <span>Je crée un compte administrateur</span>
+                      </label>
+
+                      {!regIsAdmin && (
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Code projet de votre administrateur</label>
+                          <input type="text" required={!regIsAdmin} value={regProjectCode} onChange={e => setRegProjectCode(e.target.value)} placeholder="ex: CHANTIER-4821" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 uppercase font-mono tracking-wider focus:outline-none" />
+                        </div>
+                      )}
+                    </div>
+
+                    <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 transition-colors font-bold rounded-xl text-xs text-white shadow-lg shadow-emerald-600/30 mt-2">S'inscrire</button>
+                  </form>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Pied de page consultable dès la page de connexion */}
+        <div className="relative z-10">
+          <PrivacyFooter />
         </div>
       </div>
     );
@@ -945,7 +949,7 @@ export default function App() {
       <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-xs">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
           <div className="flex items-center">
-         <img src="/logo.png" alt="Bâtir+ Pro" className="w-12 h-12 object-contain" />
+            <img src="/logo.png" alt="Bâtir+ Pro" className="w-12 h-12 object-contain" />
           </div>
           <span className="font-black text-base text-slate-900 tracking-tight">BÂTIR+ <span className="text-blue-600 font-light">PRO</span></span>
         </div>
@@ -1154,7 +1158,6 @@ export default function App() {
                   groupedReqs[authorName].items.push(req);
                 });
 
-                // Tri des demandes par date décroissante
                 Object.values(groupedReqs).forEach(group => {
                   group.items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
                 });
@@ -1257,7 +1260,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Bouton pour voir toutes les demandes du compagnon dans une modale dédiée */}
                       <div className="pt-4 border-t border-slate-100">
                         <button
                           onClick={() => setSelectedRequestHistory(group.items)}
@@ -1469,7 +1471,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Liste verticale ergonomique regroupée par Date + Personne */}
             <div className="space-y-4 max-w-4xl mx-auto">
               {(() => {
                 const groupedMap = {};
@@ -1804,96 +1805,10 @@ export default function App() {
         )}
       </main>
 
-      {/* --- FOOTER PRO DE QUALITÉ --- */}
-      <footer className="mt-auto bg-white border-t border-slate-200 py-6 px-6 text-slate-600 text-xs">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-          
-          <div className="flex items-center gap-3">
-            <div className="flex items-center">
-           <img src="/logo.png" alt="Bâtir+ Pro" className="w-8 h-8 object-contain" />
-           </div>
-            <div>
-              <span className="font-black text-slate-900 tracking-tight text-sm">BÂTIR+ <span className="text-blue-600 font-light">PRO</span></span>
-              <p className="text-[11px] text-slate-400">© 2026 Bâtir+ Pro. Tous droits réservés.</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded-full font-semibold text-[11px]">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>Serveurs Opérationnels</span>
-            </div>
-
-            <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg font-mono font-bold text-[11px] border border-slate-200">
-              {APP_VERSION}
-            </span>
-          </div>
-
-          <div>
-            <button 
-              onClick={() => setShowLegalModal(true)}
-              className="text-slate-500 hover:text-blue-600 font-semibold transition-colors text-xs flex items-center gap-1.5"
-            >
-              <ShieldCheck className="w-4 h-4 text-slate-400" />
-              <span>Mentions Légales & RGPD</span>
-            </button>
-          </div>
-        </div>
-      </footer>
+      {/* --- FOOTER PRO CONSULTABLE AVEC POLITIQUE DE CONFIDENTIALITÉ --- */}
+      <PrivacyFooter />
 
       {/* --- MODALES --- */}
-
-      {showLegalModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden max-h-[85vh] flex flex-col">
-            <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-              <div className="flex items-center gap-2.5">
-                <ShieldCheck className="w-5 h-5 text-blue-600" />
-                <h3 className="text-base font-bold text-slate-900">Mentions Légales & Sécurité</h3>
-              </div>
-              <button 
-                type="button" 
-                onClick={() => setShowLegalModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors text-xs font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-4 text-xs text-slate-600 leading-relaxed">
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm mb-1">1. Éditeur de l'application</h4>
-                <p>L'application <strong>Bâtir+ Pro</strong> est développée et exploitée pour le suivi et la gestion interne des chantiers de réhabilitation du bâtiment.</p>
-              </div>
-
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm mb-1">2. Hébergement & Infrastructure</h4>
-                <p><strong>Hébergement Frontend :</strong> Vercel Inc. (San Francisco, USA)</p>
-                <p><strong>Base de données & Authentification :</strong> Google Firebase (Serveurs sécurisés SSL/TLS)</p>
-              </div>
-
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm mb-1">3. Protection des Données (RGPD)</h4>
-                <p>Les données collectées (nom, prénom, téléphone, réclamations chantier) sont exclusivement destinées à l'organisation technique du chantier et à la coordination des effectifs. Aucun transfert commercial n'est effectué.</p>
-              </div>
-
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm mb-1">4. Sécurité des accès</h4>
-                <p>Chaque espace chantier est strictement isolé via un code projet unique. La session utilisateur est automatiquement expirée après 24 heures d'inactivité.</p>
-              </div>
-            </div>
-
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-              <button 
-                onClick={() => setShowLegalModal(false)} 
-                className="px-5 py-2 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors"
-              >
-                Fermer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {resolvingReclamation && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
