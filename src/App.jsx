@@ -120,7 +120,6 @@ export default function App() {
   const [newNoteText, setNewNoteText] = useState('');
   const [selectedToolImage, setSelectedToolImage] = useState(null);
 
-  // 🛠️ AJOUT DE LA VARIABLE QUI MANQUAIT ICI :
   const [selectedRequestHistory, setSelectedRequestHistory] = useState(null);
 
   const [showAddToolModal, setShowAddToolModal] = useState(false);
@@ -142,7 +141,7 @@ export default function App() {
   const [newRequestData, setNewRequestData] = useState({ items: '', quantity: 1, urgency: 'Normal', description: '', attachmentName: '', attachmentData: '' });
 
   const [showAddReclamationModal, setShowAddReclamationModal] = useState(false);
-  const [newReclamation, setNewReclamation] = useState({ apartment: '', floor: '', clientName: '', observation: '' });
+  const [newReclamation, setNewReclamation] = useState({ building: '', apartment: '', floor: '', clientName: '', observation: '' });
   const [reclamationStatusFilter, setReclamationStatusFilter] = useState('all');
   const [reclamationSearch, setReclamationSearch] = useState('');
   
@@ -280,6 +279,115 @@ export default function App() {
 
   const isAdmin = currentUser?.role === 'admin';
   const canAddReclamation = isAdmin || currentUser?.canAddReclamation === true;
+
+  // 🛠️ AJOUT DU CALCUL DE filteredGroupedReclamations :
+  const filteredGroupedReclamations = useMemo(() => {
+    const grouped = {};
+    projectReclamations.forEach(rec => {
+      const key = `${rec.building || 'Sans Bât'}_${rec.apartment || 'Sans Apt'}`;
+      if (!grouped[key]) {
+        grouped[key] = {
+          key,
+          building: rec.building || '',
+          apartment: rec.apartment || 'Inconnu',
+          floor: rec.floor || '',
+          clientName: rec.clientName || '',
+          items: []
+        };
+      }
+      grouped[key].items.push(rec);
+    });
+
+    return Object.values(grouped).map(group => {
+      group.items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      group.latestTwo = group.items.slice(0, 2);
+      group.pendingCount = group.items.filter(i => i.status !== 'Fait').length;
+      return group;
+    }).filter(group => {
+      const query = reclamationSearch.toLowerCase().trim();
+      const matchesSearch = (
+        group.apartment.toLowerCase().includes(query) ||
+        group.building.toLowerCase().includes(query) ||
+        group.clientName.toLowerCase().includes(query) ||
+        group.items.some(i => i.observation?.toLowerCase().includes(query))
+      );
+
+      let matchesStatus = true;
+      if (reclamationStatusFilter === 'À faire') {
+        matchesStatus = group.items.some(i => i.status !== 'Fait');
+      } else if (reclamationStatusFilter === 'Fait') {
+        matchesStatus = group.items.every(i => i.status === 'Fait');
+      }
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [projectReclamations, reclamationSearch, reclamationStatusFilter]);
+
+  const handleCreateReclamation = async (e) => {
+    e.preventDefault();
+    if (!newReclamation.apartment || !newReclamation.observation || !myProjectCode || !currentUser) return;
+    try {
+      await addDoc(collection(db, "reclamations"), {
+        ...newReclamation,
+        projectCode: myProjectCode,
+        createdBy: currentUser.name,
+        status: 'À faire',
+        createdAt: new Date().toISOString().split('T')[0],
+        passages: []
+      });
+      setShowAddReclamationModal(false);
+      setNewReclamation({ building: '', apartment: '', floor: '', clientName: '', observation: '' });
+    } catch (e) { console.error(e); }
+  };
+
+  const handleConfirmResolveReclamation = async (e) => {
+    e.preventDefault();
+    if (!resolvingReclamation || !currentUser) return;
+    const statusEl = document.getElementById('interventionStatus');
+    const newStatus = statusEl ? statusEl.value : 'Fait';
+
+    const newPassage = {
+      date: new Date().toISOString(),
+      status: newStatus,
+      details: resolutionText,
+      author: currentUser.name
+    };
+
+    try {
+      const recRef = doc(db, "reclamations", resolvingReclamation.firestoreId);
+      const updatedPassages = [newPassage, ...(resolvingReclamation.passages || [])];
+      await updateDoc(recRef, {
+        status: newStatus === 'Fait' ? 'Fait' : 'À faire',
+        passages: updatedPassages
+      });
+      setResolvingReclamation(null);
+      setResolutionText('');
+    } catch (e) { console.error(e); }
+  };
+
+  const handleSaveEditSignalement = async (e) => {
+    e.preventDefault();
+    if (!editingSignalement || !currentUser) return;
+    try {
+      await updateDoc(doc(db, "reclamations", editingSignalement.firestoreId), {
+        observation: editSignalementText
+      });
+      setEditingSignalement(null);
+      setEditSignalementText('');
+    } catch (e) { console.error(e); }
+  };
+
+  const handleDeleteGroupCard = async (items) => {
+    if (window.confirm("Voulez-vous vraiment supprimer toutes les réclamations de ce logement ?")) {
+      try {
+        for (const item of items) {
+          if (item.firestoreId) {
+            await deleteDoc(doc(db, "reclamations", item.firestoreId));
+          }
+        }
+      } catch (e) { console.error(e); }
+    }
+  };
 
   const filteredEquipment = useMemo(() => {
     return projectEquipment.filter(tool => {
