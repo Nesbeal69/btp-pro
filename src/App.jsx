@@ -286,9 +286,18 @@ export default function App() {
   }, [reclamations, myProjectCode]);
 
   const projectPointages = useMemo(() => {
-    if (!myProjectCode) return [];
-    return pointages.filter(p => p.projectCode === myProjectCode);
-  }, [pointages, myProjectCode]);
+  if (!myProjectCode) return [];
+  let list = pointages.filter(p => p.projectCode === myProjectCode);
+  
+  // Si ce n'est pas un admin, on restreint STRICTEMENT aux pointages du compagnon connecté
+  if (!isAdmin && currentUser) {
+    const myId = currentUser.userIdNum || currentUser.id;
+    list = list.filter(p => p.userId === myId || p.userId?.toString() === myId?.toString());
+  } else if (isAdmin && pointageUserFilter !== 'all') {
+    list = list.filter(p => p.userId === Number(pointageUserFilter) || p.userId?.toString() === pointageUserFilter.toString());
+  }
+  return list;
+}, [pointages, myProjectCode, currentUser, isAdmin, pointageUserFilter]);
 
   const approvedUsers = useMemo(() => projectUsers.filter(u => u.status === 'approved'), [projectUsers]);
   const pendingUsers = useMemo(() => projectUsers.filter(u => u.status === 'pending' && u.role !== 'admin'), [projectUsers]);
