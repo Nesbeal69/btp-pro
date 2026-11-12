@@ -36,10 +36,21 @@ import {
   CheckCircle2,
   History,
   Home,
-  Edit3
+  Edit3,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+// Fonction utilitaire pour obtenir le numéro de semaine ISO
+function getWeekNumber(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+}
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -93,6 +104,11 @@ export default function App() {
   const [requests, setRequests] = useState([]);
   const [plans, setPlans] = useState([]);
   const [reclamations, setReclamations] = useState([]);
+
+  // États de navigation Planning (Semaine et Jour sélectionné)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedWeek, setSelectedWeek] = useState(getWeekNumber(new Date()));
+  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(null); // null = vue semaine / récap, ou '1' à '7' pour un jour précis
 
   const [toolSearch, setToolSearch] = useState('');
   const [toolStatusFilter, setToolStatusFilter] = useState('all');
@@ -664,15 +680,68 @@ export default function App() {
     try { if (firestoreId) await deleteDoc(doc(db, "plans", firestoreId)); } catch (e) { console.error(e); }
   };
 
+  // Filtrage des plans selon l'utilisateur connecté ou le filtre ouvrier et la semaine/jour sélectionné
   const visiblePlans = useMemo(() => {
     if (!currentUser) return [];
     const myId = currentUser.userIdNum || currentUser.id;
+    
+    let list = projectPlans;
     if (currentUser.role !== 'admin') {
-      return projectPlans.filter(p => p.targetUserId === 'all' || p.targetUserId === myId || (p.targetUserIds && p.targetUserIds.includes(myId)));
+      list = projectPlans.filter(p => p.targetUserId === 'all' || p.targetUserId === myId || (p.targetUserIds && p.targetUserIds.includes(myId) || (p.targetUserIds && p.targetUserIds.includes('all'))));
+    } else if (selectedWorkerFilter !== 'all') {
+      const wId = Number(selectedWorkerFilter);
+      list = projectPlans.filter(p => p.targetUserId === 'all' || p.targetUserId === wId || (p.targetUserIds && (p.targetUserIds.includes('all') || p.targetUserIds.includes(wId))));
     }
-    if (selectedWorkerFilter === 'all') return projectPlans;
-    return projectPlans.filter(p => p.targetUserId === Number(selectedWorkerFilter) || (p.targetUserIds && p.targetUserIds.includes(Number(selectedWorkerFilter))));
-  }, [projectPlans, currentUser, selectedWorkerFilter]);
+
+    // Filtrer par semaine sélectionnée
+    list = list.filter(p => {
+      if (!p.date) return false;
+      const d = new Date(p.date);
+      const w = getWeekNumber(d);
+      const y = d.getFullYear();
+      return w === selectedWeek && y === selectedYear;
+    });
+
+    // Si un jour spécifique est sélectionné (1 = Lundi, ..., 7 = Dimanche)
+    if (selectedDayOfWeek !== null) {
+      list = list.filter(p => {
+        const d = new Date(p.date);
+        let dayNum = d.getDay(); // 0 = Dimanche, 1 = Lundi, ...
+        if (dayNum === 0) dayNum = 7; // Mettre dimanche à 7
+        return dayNum.toString() === selectedDayOfWeek.toString();
+      });
+    }
+
+    return list;
+  }, [projectPlans, currentUser, selectedWorkerFilter, selectedWeek, selectedYear, selectedDayOfWeek]);
+
+  // Génération des 7 jours de la semaine active pour affichage
+  const currentWeekDays = useMemo(() => {
+    // Trouver le premier jour (lundi) de la semaine ISO sélectionnée
+    const simple = new Date(selectedYear, 0, 1 + (selectedWeek - 1) * 7);
+    const dow = simple.getDay();
+    const ISOweekStart = new Date(simple);
+    if (dow <= 4) {
+      ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+    } else {
+      ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+    }
+
+    const days = [];
+    const dayNames = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+    for (let i = 0; i < 7; i++) {
+      const nextDate = new Date(ISOweekStart);
+      nextDate.setDate(ISOweekStart.getDate() + i);
+      const dateStr = nextDate.toISOString().split('T')[0];
+      days.push({
+        dayIndex: i + 1,
+        name: dayNames[i],
+        dateStr,
+        formattedShort: nextDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+      });
+    }
+    return days;
+  }, [selectedWeek, selectedYear]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -954,7 +1023,7 @@ export default function App() {
 
         <nav className="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200/60">
           <button onClick={() => setActiveTab('dashboard')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'dashboard' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Accueil</button>
-          <button onClick={() => setActiveTab('planning')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'planning' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Planning</button>
+          <button onClick={() => { setSelectedDayOfWeek(null); setActiveTab('planning'); }} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'planning' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Planning</button>
           <button onClick={() => setActiveTab('requests')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'requests' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Matériel</button>
           <button onClick={() => setActiveTab('reclamations')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'reclamations' ? 'bg-white text-red-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Réclamations</button>
           <button onClick={() => setActiveTab('workers')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'workers' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Effectifs</button>
@@ -988,7 +1057,7 @@ export default function App() {
 
       <div className="lg:hidden bg-white border-b border-slate-200 px-4 py-2.5 overflow-x-auto flex items-center gap-2 shadow-xs">
         <button onClick={() => setActiveTab('dashboard')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>📊 Accueil</button>
-        <button onClick={() => setActiveTab('planning')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'planning' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-700'}`}>📅 Planning</button>
+        <button onClick={() => { setSelectedDayOfWeek(null); setActiveTab('planning'); }} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'planning' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-700'}`}>📅 Planning</button>
         <button onClick={() => setActiveTab('requests')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'requests' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-700'}`}>📦 Matériel</button>
         <button onClick={() => setActiveTab('reclamations')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'reclamations' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700'}`}>⚠️ Réclamations</button>
         <button onClick={() => setActiveTab('workers')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'workers' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>👥 Effectifs</button>
@@ -1023,14 +1092,14 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div onClick={() => setActiveTab('planning')} className="group bg-white border border-slate-200/80 hover:border-cyan-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+              <div onClick={() => { setSelectedDayOfWeek(null); setActiveTab('planning'); }} className="group bg-white border border-slate-200/80 hover:border-cyan-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
                     <div className="p-3.5 bg-cyan-50 text-cyan-600 rounded-2xl"><CalendarIcon className="w-6 h-6" /></div>
                     <span className="px-2.5 py-1 bg-cyan-50 text-cyan-700 text-xs font-bold rounded-full">{projectPlans.length} dispo</span>
                   </div>
                   <h3 className="text-base font-bold text-slate-900 group-hover:text-cyan-600">Planning</h3>
-                  <p className="text-xs text-slate-500 mt-1">Retrouvez vos tâches programmées</p>
+                  <p className="text-xs text-slate-500 mt-1">Retrouvez vos tâches programmées par semaine</p>
                 </div>
                 <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-cyan-600">
                   <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
@@ -1439,11 +1508,11 @@ export default function App() {
                 </div>
                 <div>
                   <h2 className="text-xl font-black tracking-wide">Planning & Feuilles de Route</h2>
-                  <p className="text-xs text-slate-300 mt-0.5">Vue terrain : regroupement par jour et multi-affectations.</p>
+                  <p className="text-xs text-slate-300 mt-0.5">Navigation par semaine et sélection par jour.</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                 <select 
                   value={selectedWorkerFilter} 
                   onChange={e => setSelectedWorkerFilter(e.target.value)}
@@ -1465,6 +1534,79 @@ export default function App() {
               </div>
             </div>
 
+            {/* BARRE DE NAVIGATION PAR SEMAINE */}
+            <div className="bg-white border border-slate-200/80 p-4 rounded-3xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    if (selectedWeek > 1) {
+                      setSelectedWeek(selectedWeek - 1);
+                    } else {
+                      setSelectedWeek(52);
+                      setSelectedYear(selectedYear - 1);
+                    }
+                    setSelectedDayOfWeek(null);
+                  }}
+                  className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl transition-colors font-bold flex items-center gap-1 text-xs"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Semaine préc.
+                </button>
+
+                <div className="px-4 py-2 bg-cyan-50 text-cyan-800 border border-cyan-200 rounded-2xl text-xs font-black uppercase tracking-wider">
+                  📅 Semaine {selectedWeek} ({selectedYear})
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (selectedWeek < 52) {
+                      setSelectedWeek(selectedWeek + 1);
+                    } else {
+                      setSelectedWeek(1);
+                      setSelectedYear(selectedYear + 1);
+                    }
+                    setSelectedDayOfWeek(null);
+                  }}
+                  className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl transition-colors font-bold flex items-center gap-1 text-xs"
+                >
+                  Semaine suiv. <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* BOUTONS DES JOURS DE LA SEMAINE */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  onClick={() => setSelectedDayOfWeek(null)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    selectedDayOfWeek === null ? 'bg-cyan-600 text-white shadow-md' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  Vue Semaine
+                </button>
+
+                {currentWeekDays.map(day => {
+                  const isToday = day.dateStr === new Date().toISOString().split('T')[0];
+                  const isSelected = selectedDayOfWeek === day.dayIndex;
+                  return (
+                    <button
+                      key={day.dayIndex}
+                      onClick={() => setSelectedDayOfWeek(day.dayIndex)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex flex-col items-center ${
+                        isSelected 
+                          ? 'bg-slate-900 text-white shadow-md' 
+                          : isToday 
+                            ? 'bg-cyan-100 text-cyan-900 border border-cyan-300' 
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span>{day.name.substring(0, 3)}</span>
+                      <span className="text-[9px] opacity-85">{day.formattedShort}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* LISTE DES TÂCHES / PLANNING */}
             <div className="space-y-4 max-w-4xl mx-auto">
               {(() => {
                 const groupedMap = {};
@@ -1497,8 +1639,8 @@ export default function App() {
                       <div className="w-12 h-12 bg-cyan-50 text-cyan-600 rounded-2xl mx-auto flex items-center justify-center">
                         <FolderOpen className="w-6 h-6" />
                       </div>
-                      <h4 className="text-sm font-bold text-slate-800">Aucune tâche assignée</h4>
-                      <p className="text-xs text-slate-400 max-w-xs mx-auto">Il n'y a actuellement aucun planning ou feuille de route à afficher pour cette période.</p>
+                      <h4 className="text-sm font-bold text-slate-800">Aucune tâche assignée pour cette période</h4>
+                      <p className="text-xs text-slate-400 max-w-xs mx-auto">Il n'y a actuellement aucun planning ou feuille de route pour la Semaine {selectedWeek}{selectedDayOfWeek ? ` (Jour ${selectedDayOfWeek})` : ''}.</p>
                     </div>
                   );
                 }
