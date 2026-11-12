@@ -43,7 +43,6 @@ import {
 
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
 
-// Fonction utilitaire pour obtenir le numéro de semaine ISO
 function getWeekNumber(date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const dayNum = d.getUTCDay() || 7;
@@ -105,10 +104,9 @@ export default function App() {
   const [plans, setPlans] = useState([]);
   const [reclamations, setReclamations] = useState([]);
 
-  // États de navigation Planning (Semaine et Jour sélectionné)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedWeek, setSelectedWeek] = useState(getWeekNumber(new Date()));
-  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(null); // null = vue semaine / récap, ou '1' à '7' pour un jour précis
+  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(null);
 
   const [toolSearch, setToolSearch] = useState('');
   const [toolStatusFilter, setToolStatusFilter] = useState('all');
@@ -680,20 +678,18 @@ export default function App() {
     try { if (firestoreId) await deleteDoc(doc(db, "plans", firestoreId)); } catch (e) { console.error(e); }
   };
 
-  // Filtrage des plans selon l'utilisateur connecté ou le filtre ouvrier et la semaine/jour sélectionné
   const visiblePlans = useMemo(() => {
     if (!currentUser) return [];
     const myId = currentUser.userIdNum || currentUser.id;
     
     let list = projectPlans;
     if (currentUser.role !== 'admin') {
-      list = projectPlans.filter(p => p.targetUserId === 'all' || p.targetUserId === myId || (p.targetUserIds && p.targetUserIds.includes(myId) || (p.targetUserIds && p.targetUserIds.includes('all'))));
+      list = projectPlans.filter(p => p.targetUserId === 'all' || p.targetUserId === myId || (p.targetUserIds && (p.targetUserIds.includes(myId) || p.targetUserIds.includes('all'))));
     } else if (selectedWorkerFilter !== 'all') {
       const wId = Number(selectedWorkerFilter);
       list = projectPlans.filter(p => p.targetUserId === 'all' || p.targetUserId === wId || (p.targetUserIds && (p.targetUserIds.includes('all') || p.targetUserIds.includes(wId))));
     }
 
-    // Filtrer par semaine sélectionnée
     list = list.filter(p => {
       if (!p.date) return false;
       const d = new Date(p.date);
@@ -702,12 +698,11 @@ export default function App() {
       return w === selectedWeek && y === selectedYear;
     });
 
-    // Si un jour spécifique est sélectionné (1 = Lundi, ..., 7 = Dimanche)
     if (selectedDayOfWeek !== null) {
       list = list.filter(p => {
         const d = new Date(p.date);
-        let dayNum = d.getDay(); // 0 = Dimanche, 1 = Lundi, ...
-        if (dayNum === 0) dayNum = 7; // Mettre dimanche à 7
+        let dayNum = d.getDay();
+        if (dayNum === 0) dayNum = 7;
         return dayNum.toString() === selectedDayOfWeek.toString();
       });
     }
@@ -715,9 +710,7 @@ export default function App() {
     return list;
   }, [projectPlans, currentUser, selectedWorkerFilter, selectedWeek, selectedYear, selectedDayOfWeek]);
 
-  // Génération des 7 jours de la semaine active pour affichage
   const currentWeekDays = useMemo(() => {
-    // Trouver le premier jour (lundi) de la semaine ISO sélectionnée
     const simple = new Date(selectedYear, 0, 1 + (selectedWeek - 1) * 7);
     const dow = simple.getDay();
     const ISOweekStart = new Date(simple);
@@ -2639,6 +2632,12 @@ export default function App() {
                 targetName: names.join(', ')
               });
             }
+
+            // Mettre à jour automatiquement la vue planning sur la semaine et l'année de la date sélectionnée pour voir la tâche tout de suite !
+            const targetDateObj = new Date(newPlanData.date);
+            setSelectedWeek(getWeekNumber(targetDateObj));
+            setSelectedYear(targetDateObj.getFullYear());
+            setSelectedDayOfWeek(null);
 
             setShowAddPlanModal(false);
             setNewPlanData({ title: '', targetUserId: 'all', targetUserIds: ['all'], date: new Date().toISOString().split('T')[0], description: '', files: [] });
