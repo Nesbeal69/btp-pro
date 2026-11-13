@@ -200,14 +200,39 @@ export default function App() {
           localStorage.removeItem('loginTimestamp');
           await signOut(auth);
           setCurrentUser(null);
-        } else {
-          setCurrentUser(user);
+          setLoadingUser(false);
+          return;
         }
+
+        // 🔥 On va chercher le profil dans Firestore pour vérifier son statut
+        try {
+          const userDocRef = doc(db, "users", user.uid);
+          const userSnap = await getDoc(userDocRef); // (Assure-toi que getDoc est bien importé de 'firebase/firestore')
+
+          if (userSnap.exists()) {
+            const userData = userSnap.data();
+
+            // Si le compte est en attente et n'est pas admin, on bloque l'accès direct !
+            if (userData.status === 'pending' && userData.role !== 'admin') {
+              await signOut(auth);
+              setCurrentUser(null);
+              setAuthMode('pending');
+              setLoadingUser(false);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error("Erreur vérification statut utilisateur :", err);
+        }
+
+        setCurrentUser(user);
       } else {
         setCurrentUser(null);
       }
       setLoadingUser(false);
     });
+
+    // ... (le reste de tes onSnapshot habituels)
 
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
