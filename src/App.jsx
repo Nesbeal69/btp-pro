@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { db, auth } from './firebase';
-import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
@@ -159,7 +159,6 @@ export default function App() {
   const [workerSearch, setWorkerSearch] = useState('');
   const [workerRoleFilter, setWorkerRoleFilter] = useState('all');
 
-  // Déclarations des rôles en haut pour éviter les erreurs "Cannot access before initialization"
   const isAdmin = currentUser?.role === 'admin';
   const canAddReclamation = isAdmin || currentUser?.canAddReclamation === true;
   const myProjectCode = currentUser ? (currentUser.projectCode || currentUser.adminProjectCode) : null;
@@ -204,15 +203,13 @@ export default function App() {
           return;
         }
 
-        // 🔥 On va chercher le profil dans Firestore pour vérifier son statut
         try {
           const userDocRef = doc(db, "users", user.uid);
-          const userSnap = await getDoc(userDocRef); // (Assure-toi que getDoc est bien importé de 'firebase/firestore')
+          const userSnap = await getDoc(userDocRef);
 
           if (userSnap.exists()) {
             const userData = userSnap.data();
 
-            // Si le compte est en attente et n'est pas admin, on bloque l'accès direct !
             if (userData.status === 'pending' && userData.role !== 'admin') {
               await signOut(auth);
               setCurrentUser(null);
@@ -231,8 +228,6 @@ export default function App() {
       }
       setLoadingUser(false);
     });
-
-    // ... (le reste de tes onSnapshot habituels)
 
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
@@ -933,15 +928,15 @@ export default function App() {
         canViewTools: true
       };
 
-     await setDoc(doc(db, "users", authUser.uid), newUser);
+      await setDoc(doc(db, "users", authUser.uid), newUser);
 
       if (regIsAdmin) {
         setCurrentUser(newUser);
         setActiveTab('dashboard');
       } else {
-        await signOut(auth); // 👈 On déconnecte immédiatement l'utilisateur de Firebase Auth
-        setCurrentUser(null);   // 👈 On s'assure qu'aucun utilisateur n'est connecté en mémoire
-        setAuthMode('pending'); // 👈 On bascule l'affichage sur ton écran "Compte en Attente"
+        await signOut(auth);
+        setCurrentUser(null);
+        setAuthMode('pending');
       }
     } catch (error) {
       console.error(error);
@@ -1302,245 +1297,242 @@ export default function App() {
           </div>
         )}
 
-        {/* ⏱️ ONGLET POINTAGE */}
-{activeTab === 'pointage' && (
-  <div className="space-y-6">
-    <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-blue-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-      <div className="flex items-center gap-4">
-        <div className="p-4 bg-blue-600/20 border border-blue-400/30 rounded-2xl">
-          <Clock className="w-7 h-7 text-blue-400" />
-        </div>
-        <div>
-          <h2 className="text-xl font-black tracking-wide">Pointage & Suivi des Heures</h2>
-          <p className="text-xs text-slate-300 mt-0.5">Semaine type de 37h (Lun-Jeu : 8h / Ven : 5h). Validation rapide ou gestion admin.</p>
-        </div>
-      </div>
-
-      {isAdmin && (
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <select 
-            value={pointageUserFilter} 
-            onChange={e => setPointageUserFilter(e.target.value)}
-            className="px-3.5 py-2.5 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none font-semibold"
-          >
-            <option value="all" className="bg-slate-900">👥 Tous les compagnons</option>
-            {approvedUsers.map(u => (
-              <option key={u.firestoreId} value={u.userIdNum || u.id} className="bg-slate-900">
-                👷‍♂️ {u.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-    </div>
-
-    <div className="bg-white border border-slate-200/80 p-4 rounded-3xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => {
-            if (selectedWeek > 1) setSelectedWeek(selectedWeek - 1);
-            else { setSelectedWeek(52); setSelectedYear(selectedYear - 1); }
-          }}
-          className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl transition-colors font-bold flex items-center gap-1 text-xs"
-        >
-          <ChevronLeft className="w-4 h-4" /> Semaine préc.
-        </button>
-
-        <div className="px-4 py-2 bg-blue-50 text-blue-800 border border-blue-200 rounded-2xl text-xs font-black uppercase tracking-wider">
-          📅 Semaine {selectedWeek} ({selectedYear})
-        </div>
-
-        <button
-          onClick={() => {
-            if (selectedWeek < 52) setSelectedWeek(selectedWeek + 1);
-            else { setSelectedWeek(1); setSelectedYear(selectedYear + 1); }
-          }}
-          className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl transition-colors font-bold flex items-center gap-1 text-xs"
-        >
-          Semaine suiv. <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
-
-      <div className="text-xs font-bold text-slate-500">
-        Total heures semaine : <span className="text-blue-600 font-black text-sm">
-          {(() => {
-            const targetId = isAdmin && pointageUserFilter !== 'all' ? Number(pointageUserFilter) : (currentUser?.userIdNum || currentUser?.id);
-            const weekDates = currentWeekDays.map(d => d.dateStr);
-            const records = projectPointages.filter(p => p.userId === targetId && weekDates.includes(p.date));
-            const total = records.reduce((acc, curr) => acc + (Number(curr.hours) || 0), 0);
-            return total;
-          })()}h / 37h
-        </span>
-      </div>
-    </div>
-
-    {!isAdmin ? (
-      <div className="space-y-4 max-w-3xl mx-auto">
-        {currentWeekDays.filter(d => !d.isWeekend).map(day => {
-          const myId = currentUser.userIdNum || currentUser.id;
-          const record = projectPointages.find(p => p.userId === myId && p.date === day.dateStr);
-          const isToday = day.dateStr === new Date().toISOString().split('T')[0];
-          const defaultHours = day.isFriday ? 5 : 8;
-
-          // Vérifie si les heures sont validées et verrouillées
-          const isLocked = record && record.isValidated;
-          const isPendingChange = record && record.status === 'DemandeModification';
-
-          return (
-            <div key={day.dateStr} className={`bg-white border rounded-3xl p-5 shadow-sm transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${isToday ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10' : 'border-slate-200/80'}`}>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className={`px-2.5 py-0.5 rounded-lg text-xs font-bold ${isToday ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
-                    {day.name}
-                  </span>
-                  <span className="text-xs text-slate-400 font-medium">{day.formattedShort}</span>
+        {activeTab === 'pointage' && (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-blue-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-blue-600/20 border border-blue-400/30 rounded-2xl">
+                  <Clock className="w-7 h-7 text-blue-400" />
                 </div>
-                <div className="text-xs text-slate-600 font-semibold pt-1">
-                  {record ? (
-                    <span className={record.status === 'Présent' ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold'}>
-                      {record.status === 'Présent' ? `✅ Travaillé : ${record.hours}h (${record.startTime} - ${record.endTime})` : `⚠️ ${record.status} (${record.absenceReason || 'Absence'})`}
-                      {isLocked && <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-[10px]">🔒 Verrouillé (Validé)</span>}
-                      {isPendingChange && <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[10px]">⏳ Demande de modif envoyée</span>}
-                    </span>
-                  ) : (
-                    <span className="text-slate-400 italic">Non pointé (Standard : {defaultHours}h)</span>
-                  )}
+                <div>
+                  <h2 className="text-xl font-black tracking-wide">Pointage & Suivi des Heures</h2>
+                  <p className="text-xs text-slate-300 mt-0.5">Semaine type de 37h (Lun-Jeu : 8h / Ven : 5h). Validation rapide ou gestion admin.</p>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                {/* Si c'est verrouillé (validé), l'ouvrier ne peut plus modifier directement */}
-                {isLocked ? (
-                  <button
-                    onClick={() => {
-                      const motif = prompt("Expliquez l'erreur à corriger pour le chef d'équipe :");
-                      if (motif) {
-                        handleQuickPointDay(day, 'DemandeModification', record.hours, motif, record.startTime, record.endTime);
-                      }
-                    }}
-                    className="px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
+              {isAdmin && (
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <select 
+                    value={pointageUserFilter} 
+                    onChange={e => setPointageUserFilter(e.target.value)}
+                    className="px-3.5 py-2.5 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none font-semibold"
                   >
-                    ⚠️ Demander une modification
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => handleQuickPointDay(day, 'Présent', defaultHours, '', '08:00', day.isFriday ? '13:00' : '17:00', true)}
-                      className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <CheckCircle className="w-3.5 h-3.5" /> Valider définitivement ({defaultHours}h)
-                    </button>
+                    <option value="all" className="bg-slate-900">👥 Tous les compagnons</option>
+                    {approvedUsers.map(u => (
+                      <option key={u.firestoreId} value={u.userIdNum || u.id} className="bg-slate-900">
+                        👷‍♂️ {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
 
-                    <button
-                      onClick={() => {
-                        const customH = prompt("Nombre d'heures travaillées ce jour ?", defaultHours);
-                        if (customH !== null) {
-                          handleQuickPointDay(day, 'Présent', Number(customH), '', '08:00', '17:00', true);
-                        }
-                      }}
-                      className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
-                      title="Modifier les heures avant validation"
-                    >
-                      ⏱️ Heures sup
-                    </button>
+            <div className="bg-white border border-slate-200/80 p-4 rounded-3xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    if (selectedWeek > 1) setSelectedWeek(selectedWeek - 1);
+                    else { setSelectedWeek(52); setSelectedYear(selectedYear - 1); }
+                  }}
+                  className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl transition-colors font-bold flex items-center gap-1 text-xs"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Semaine préc.
+                </button>
 
-                    <button
-                      onClick={() => {
-                        const reason = prompt("Motif de l'absence (Congés, Maladie, Intempéries) :", "Congés");
-                        if (reason !== null) {
-                          handleQuickPointDay(day, 'Absent', 0, reason, '00:00', '00:00', true);
-                        }
-                      }}
-                      className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-colors"
-                      title="Signaler une absence"
-                    >
-                      🚫 Absent
-                    </button>
-                  </>
-                )}
+                <div className="px-4 py-2 bg-blue-50 text-blue-800 border border-blue-200 rounded-2xl text-xs font-black uppercase tracking-wider">
+                  📅 Semaine {selectedWeek} ({selectedYear})
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (selectedWeek < 52) setSelectedWeek(selectedWeek + 1);
+                    else { setSelectedWeek(1); setSelectedYear(selectedYear + 1); }
+                  }}
+                  className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl transition-colors font-bold flex items-center gap-1 text-xs"
+                >
+                  Semaine suiv. <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="text-xs font-bold text-slate-500">
+                Total heures semaine : <span className="text-blue-600 font-black text-sm">
+                  {(() => {
+                    const targetId = isAdmin && pointageUserFilter !== 'all' ? Number(pointageUserFilter) : (currentUser?.userIdNum || currentUser?.id);
+                    const weekDates = currentWeekDays.map(d => d.dateStr);
+                    const records = projectPointages.filter(p => p.userId === targetId && weekDates.includes(p.date));
+                    const total = records.reduce((acc, curr) => acc + (Number(curr.hours) || 0), 0);
+                    return total;
+                  })()}h / 37h
+                </span>
               </div>
             </div>
-          );
-        })}
-      </div>
-    ) : (
-      <div className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden shadow-sm">
-        <div className="p-4 bg-slate-50 border-b border-slate-200/80 flex justify-between items-center text-xs font-bold text-slate-700">
-          <span>Tableau de contrôle des heures de l'équipe</span>
-          <span>Semaine {selectedWeek}</span>
-        </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-slate-100/80 text-slate-600 border-b border-slate-200">
-                <th className="p-3.5 font-bold">Compagnon</th>
-                {currentWeekDays.filter(d => !d.isWeekend).map(d => (
-                  <th key={d.dateStr} className="p-3.5 font-bold text-center">
-                    {d.name.substring(0, 3)}<br/><span className="text-[9px] text-slate-400 font-normal">{d.formattedShort}</span>
-                  </th>
-                ))}
-                <th className="p-3.5 font-bold text-center">Total Semaine</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {approvedUsers.filter(u => pointageUserFilter === 'all' || (u.userIdNum || u.id) === Number(pointageUserFilter)).map(worker => {
-                const wId = worker.userIdNum || worker.id;
-                const weekDates = currentWeekDays.filter(d => !d.isWeekend).map(d => d.dateStr);
-                const workerRecords = projectPointages.filter(p => p.userId === wId && weekDates.includes(p.date));
-                const totalW = workerRecords.reduce((acc, curr) => acc + (Number(curr.hours) || 0), 0);
+            {!isAdmin ? (
+              <div className="space-y-4 max-w-3xl mx-auto">
+                {currentWeekDays.filter(d => !d.isWeekend).map(day => {
+                  const myId = currentUser.userIdNum || currentUser.id;
+                  const record = projectPointages.find(p => p.userId === myId && p.date === day.dateStr);
+                  const isToday = day.dateStr === new Date().toISOString().split('T')[0];
+                  const defaultHours = day.isFriday ? 5 : 8;
 
-                return (
-                  <tr key={worker.firestoreId} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="p-3.5 font-bold text-slate-900 flex items-center gap-2">
-                      👷‍♂️ {worker.name}
-                    </td>
-                    {currentWeekDays.filter(d => !d.isWeekend).map(day => {
-                      const rec = workerRecords.find(r => r.date === day.dateStr);
-                      const isPresent = rec && rec.status === 'Présent';
-                      const isAbsent = rec && rec.status !== 'Présent';
+                  const isLocked = record && record.isValidated;
+                  const isPendingChange = record && record.status === 'DemandeModification';
 
-                      return (
-                        <td key={day.dateStr} className="p-3 text-center">
+                  return (
+                    <div key={day.dateStr} className={`bg-white border rounded-3xl p-5 shadow-sm transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${isToday ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10' : 'border-slate-200/80'}`}>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2.5 py-0.5 rounded-lg text-xs font-bold ${isToday ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                            {day.name}
+                          </span>
+                          <span className="text-xs text-slate-400 font-medium">{day.formattedShort}</span>
+                        </div>
+                        <div className="text-xs text-slate-600 font-semibold pt-1">
+                          {record ? (
+                            <span className={record.status === 'Présent' ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold'}>
+                              {record.status === 'Présent' ? `✅ Travaillé : ${record.hours}h (${record.startTime} - ${record.endTime})` : `⚠️ ${record.status} (${record.absenceReason || 'Absence'})`}
+                              {isLocked && <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-[10px]">🔒 Verrouillé (Validé)</span>}
+                              {isPendingChange && <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[10px]">⏳ Demande de modif envoyée</span>}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic">Non pointé (Standard : {defaultHours}h)</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                        {isLocked ? (
                           <button
                             onClick={() => {
-                              setEditingPointageData({
-                                userId: wId,
-                                userName: worker.name,
-                                date: day.dateStr,
-                                status: rec ? rec.status : 'Présent',
-                                hours: rec ? rec.hours : (day.isFriday ? 5 : 8),
-                                reason: rec ? rec.absenceReason : '',
-                                startTime: rec ? rec.startTime : '08:00',
-                                endTime: rec ? rec.endTime : (day.isFriday ? '13:00' : '17:00')
-                              });
-                              setShowPointageEditModal(true);
+                              const motif = prompt("Expliquez l'erreur à corriger pour le chef d'équipe :");
+                              if (motif) {
+                                handleQuickPointDay(day, 'DemandeModification', record.hours, motif, record.startTime, record.endTime);
+                              }
                             }}
-                            className={`px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition-all ${
-                              isPresent ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' :
-                              isAbsent ? 'bg-red-100 text-red-800 hover:bg-red-200' :
-                              'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                            }`}
-                            title="Cliquer pour modifier"
+                            className="px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
                           >
-                            {rec ? `${rec.hours}h` : '-'}
+                            ⚠️ Demander une modification
                           </button>
-                        </td>
-                      );
-                    })}
-                    <td className="p-3.5 text-center font-black text-blue-600 text-sm">
-                      {totalW}h
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    )}
-  </div>
-)}
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handleQuickPointDay(day, 'Présent', defaultHours, '', '08:00', day.isFriday ? '13:00' : '17:00')}
+                              className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" /> Valider définitivement ({defaultHours}h)
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                const customH = prompt("Nombre d'heures travaillées ce jour ?", defaultHours);
+                                if (customH !== null) {
+                                  handleQuickPointDay(day, 'Présent', Number(customH), '', '08:00', '17:00');
+                                }
+                              }}
+                              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
+                              title="Modifier les heures avant validation"
+                            >
+                              ⏱️ Heures sup
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                const reason = prompt("Motif de l'absence (Congés, Maladie, Intempéries) :", "Congés");
+                                if (reason !== null) {
+                                  handleQuickPointDay(day, 'Absent', 0, reason, '00:00', '00:00');
+                                }
+                              }}
+                              className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-colors"
+                              title="Signaler une absence"
+                            >
+                              🚫 Absent
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden shadow-sm">
+                <div className="p-4 bg-slate-50 border-b border-slate-200/80 flex justify-between items-center text-xs font-bold text-slate-700">
+                  <span>Tableau de contrôle des heures de l'équipe</span>
+                  <span>Semaine {selectedWeek}</span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-100/80 text-slate-600 border-b border-slate-200">
+                        <th className="p-3.5 font-bold">Compagnon</th>
+                        {currentWeekDays.filter(d => !d.isWeekend).map(d => (
+                          <th key={d.dateStr} className="p-3.5 font-bold text-center">
+                            {d.name.substring(0, 3)}<br/><span className="text-[9px] text-slate-400 font-normal">{d.formattedShort}</span>
+                          </th>
+                        ))}
+                        <th className="p-3.5 font-bold text-center">Total Semaine</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {approvedUsers.filter(u => pointageUserFilter === 'all' || (u.userIdNum || u.id) === Number(pointageUserFilter)).map(worker => {
+                        const wId = worker.userIdNum || worker.id;
+                        const weekDates = currentWeekDays.filter(d => !d.isWeekend).map(d => d.dateStr);
+                        const workerRecords = projectPointages.filter(p => p.userId === wId && weekDates.includes(p.date));
+                        const totalW = workerRecords.reduce((acc, curr) => acc + (Number(curr.hours) || 0), 0);
+
+                        return (
+                          <tr key={worker.firestoreId} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="p-3.5 font-bold text-slate-900 flex items-center gap-2">
+                              👷‍♂️ {worker.name}
+                            </td>
+                            {currentWeekDays.filter(d => !d.isWeekend).map(day => {
+                              const rec = workerRecords.find(r => r.date === day.dateStr);
+                              const isPresent = rec && rec.status === 'Présent';
+                              const isAbsent = rec && rec.status !== 'Présent';
+
+                              return (
+                                <td key={day.dateStr} className="p-3 text-center">
+                                  <button
+                                    onClick={() => {
+                                      setEditingPointageData({
+                                        userId: wId,
+                                        userName: worker.name,
+                                        date: day.dateStr,
+                                        status: rec ? rec.status : 'Présent',
+                                        hours: rec ? rec.hours : (day.isFriday ? 5 : 8),
+                                        reason: rec ? rec.absenceReason : '',
+                                        startTime: rec ? rec.startTime : '08:00',
+                                        endTime: rec ? rec.endTime : (day.isFriday ? '13:00' : '17:00')
+                                      });
+                                      setShowPointageEditModal(true);
+                                    }}
+                                    className={`px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition-all ${
+                                      isPresent ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' :
+                                      isAbsent ? 'bg-red-100 text-red-800 hover:bg-red-200' :
+                                      'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                                    }`}
+                                    title="Cliquer pour modifier"
+                                  >
+                                    {rec ? `${rec.hours}h` : '-'}
+                                  </button>
+                                </td>
+                              );
+                            })}
+                            <td className="p-3.5 text-center font-black text-blue-600 text-sm">
+                              {totalW}h
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {activeTab === 'requests' && (
           <div className="space-y-6">
