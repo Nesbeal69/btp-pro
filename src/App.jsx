@@ -218,7 +218,6 @@ export default function App() {
               return;
             }
 
-            // ✅ On définit l'utilisateur directement ici avec ses données Firestore
             setCurrentUser({ ...userData, firestoreId: userSnap.id });
             setLoadingUser(false);
             return;
@@ -227,8 +226,7 @@ export default function App() {
           console.error("Erreur vérification statut utilisateur :", err);
         }
 
-        // Fallback si le doc Firestore n'existe pas encore pour une raison quelconque
-        setCurrentUser(user);
+        setCurrentUser(null);
       } else {
         setCurrentUser(null);
       }
@@ -274,13 +272,6 @@ export default function App() {
       unsubPointages();
     };
   }, []);
-
-  useEffect(() => {
-    if (currentUser) {
-      const updated = users.find(u => u.firestoreId === currentUser.firestoreId || u.uid === currentUser.uid || u.email?.toLowerCase() === currentUser.email?.toLowerCase());
-      if (updated) setCurrentUser(updated);
-    }
-  }, [users]);
 
   const projectEquipment = useMemo(() => {
     if (!myProjectCode) return [];
@@ -844,23 +835,34 @@ export default function App() {
     return list;
   }, [projectPlans, currentUser, selectedWorkerFilter, selectedWeek, selectedYear, selectedDayOfWeek]);
 
+  // 🔥 CORRECTION ICI : handleLogin va chercher le profil Firestore complet et l'injecte DIRECTEMENT
   const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
     try {
-      await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
-      let found = users.find(u => u.email.toLowerCase() === loginEmail.toLowerCase().trim());
-      
-      if (!found) {
+      const userCredential = await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
+      const authUser = userCredential.user;
+
+      const userDocRef = doc(db, "users", authUser.uid);
+      const userSnap = await getDoc(userDocRef);
+
+      if (!userSnap.exists()) {
         setAuthError("Compte authentifié, mais profil introuvable dans la base.");
         return;
       }
-      if (found.status === 'pending') {
+
+      const userData = userSnap.data();
+
+      if (userData.status === 'pending' && userData.role !== 'admin') {
         setAuthMode('pending');
+        await signOut(auth);
         return;
       }
+
       localStorage.setItem('loginTimestamp', Date.now().toString());
-      setCurrentUser(found);
+      
+      // Injection immédiate du profil complet avec son code chantier et son rôle
+      setCurrentUser({ ...userData, firestoreId: userSnap.id });
       setActiveTab('dashboard');
     } catch (error) {
       console.error(error);
