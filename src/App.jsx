@@ -2120,16 +2120,24 @@ const handleDeletePlan = async (firestoreId) => {
                         )}
 
                         {isAdmin && (
-                          <div className="pt-2 border-t border-slate-200/60 flex justify-end gap-2">
-                            <button 
-                              onClick={() => handleDeletePlan(plan.firestoreId)} 
-                              className="text-[10px] bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1"
-                              title="Supprimer cette carte planning"
-                            >
-                              <Trash2 className="w-3 h-3" /> Supprimer la carte
-                            </button>
-                          </div>
-                        )}
+                       <div className="pt-2 border-t border-slate-200/60 flex justify-end gap-2">
+                         <button 
+                           onClick={() => handleOpenEditPlan(plan)} 
+                          className="text-[10px] bg-amber-50 hover:bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1"
+                          title="Modifier cette feuille de route"
+                        >
+                          ✏️ Modifier
+                        </button>
+
+                        <button 
+                          onClick={() => handleDeletePlan(plan.firestoreId)} 
+                          className="text-[10px] bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1"
+                          title="Supprimer cette carte planning"
+                       >
+                         <Trash2 className="w-3 h-3" /> Supprimer la carte
+                       </button>
+                      </div>
+                    )}
                       </div>
                     </div>
                   );
