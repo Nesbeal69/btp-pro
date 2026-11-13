@@ -40,7 +40,8 @@ import {
   Edit3,
   ChevronLeft,
   ChevronRight,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Filter
 } from 'lucide-react';
 
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -142,6 +143,9 @@ export default function App() {
 
   const [showAddRequestModal, setShowAddRequestModal] = useState(false);
   const [requestStatusFilter, setRequestStatusFilter] = useState('all');
+  const [requestWorkerFilter, setRequestWorkerFilter] = useState('all');
+  const [requestSearch, setRequestSearch] = useState('');
+
   const [newRequestData, setNewRequestData] = useState({ items: '', quantity: 1, urgency: 'Normal', description: '', attachmentName: '', attachmentData: '' });
 
   const [showAddReclamationModal, setShowAddReclamationModal] = useState(false);
@@ -642,13 +646,30 @@ export default function App() {
     try { if (firestoreId) await deleteDoc(doc(db, "requests", firestoreId)); } catch (e) { console.error(e); }
   };
 
-  const visibleRequests = useMemo(() => {
+  const filteredRequests = useMemo(() => {
     if (!currentUser) return [];
     const myId = currentUser.userIdNum || currentUser.id;
-    let list = currentUser.role === 'admin' ? projectRequests : projectRequests.filter(r => r.requesterId === myId);
-    if (requestStatusFilter !== 'all') list = list.filter(r => r.status === requestStatusFilter);
-    return list;
-  }, [projectRequests, currentUser, requestStatusFilter]);
+    let list = isAdmin ? projectRequests : projectRequests.filter(r => r.requesterId === myId);
+
+    if (requestStatusFilter !== 'all') {
+      list = list.filter(r => r.status === requestStatusFilter);
+    }
+
+    if (isAdmin && requestWorkerFilter !== 'all') {
+      list = list.filter(r => (r.requester || r.userName) === requestWorkerFilter);
+    }
+
+    if (requestSearch.trim()) {
+      const query = requestSearch.toLowerCase().trim();
+      list = list.filter(r => 
+        (r.items && r.items.toLowerCase().includes(query)) ||
+        (r.requester && r.requester.toLowerCase().includes(query)) ||
+        (r.description && r.description.toLowerCase().includes(query))
+      );
+    }
+
+    return list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  }, [projectRequests, currentUser, isAdmin, requestStatusFilter, requestWorkerFilter, requestSearch]);
 
   const filteredWorkers = useMemo(() => {
     return approvedUsers.filter(user => {
@@ -835,7 +856,6 @@ export default function App() {
     return list;
   }, [projectPlans, currentUser, selectedWorkerFilter, selectedWeek, selectedYear, selectedDayOfWeek]);
 
-  // 🔥 CORRECTION ICI : handleLogin va chercher le profil Firestore complet et l'injecte DIRECTEMENT
   const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -861,7 +881,6 @@ export default function App() {
 
       localStorage.setItem('loginTimestamp', Date.now().toString());
       
-      // Injection immédiate du profil complet avec son code chantier et son rôle
       setCurrentUser({ ...userData, firestoreId: userSnap.id });
       setActiveTab('dashboard');
     } catch (error) {
@@ -1232,7 +1251,7 @@ export default function App() {
                 <div>
                   <div className="flex justify-between items-start mb-4">
                     <div className="p-3.5 bg-amber-50 text-amber-600 rounded-2xl"><ClipboardList className="w-6 h-6" /></div>
-                    <span className="px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full">{visibleRequests.length} demandes</span>
+                    <span className="px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full">{projectRequests.length} demandes</span>
                   </div>
                   <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-600">Demandes Matériel & Fournitures</h3>
                   <p className="text-xs text-slate-500 mt-1">Transmettez tous vos besoins EPI, outillage, fournitures.</p>
@@ -1542,6 +1561,7 @@ export default function App() {
           </div>
         )}
 
+        {/* 📦 NOUVEL ONGLET MATÉRIEL REVISÉ (STYLE ERP PRO ET FLUIDE) */}
         {activeTab === 'requests' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-amber-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-amber-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1551,151 +1571,159 @@ export default function App() {
                 </div>
                 <div>
                   <h2 className="text-xl font-black tracking-wide">Demandes de Matériel & Fournitures</h2>
-                  <p className="text-xs text-slate-300 mt-0.5">Suivi des besoins par compagnon, historique et validation des approvisionnements.</p>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    {isAdmin ? "Gestion centralisée des besoins de l'équipe et suivi des approvisionnements." : "Suivi de vos commandes et transmission de vos besoins chantier."}
+                  </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <select value={requestStatusFilter} onChange={e => setRequestStatusFilter(e.target.value)} className="px-3.5 py-2.5 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none">
-                  <option value="all" className="bg-slate-900">🔍 Tous les statuts</option>
-                  <option value="En attente" className="bg-slate-900">⏳ En attente</option>
-                  <option value="Validé / Commandé" className="bg-slate-900">✅ Validé</option>
-                  <option value="Reçu au dépôt" className="bg-slate-900">📦 Reçu</option>
-                </select>
+
+              <div className="flex items-center gap-3">
                 <button onClick={() => setShowAddRequestModal(true)} className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all">
                   <Plus className="w-4 h-4" /> Nouvelle Demande
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {(() => {
-                const groupedReqs = {};
-                
-                (visibleRequests || []).forEach(req => {
-                  const authorName = req.requester || req.userName || req.createdBy || "Compagnon";
-                  if (!groupedReqs[authorName]) {
-                    groupedReqs[authorName] = {
-                      authorName,
-                      items: []
-                    };
-                  }
-                  groupedReqs[authorName].items.push(req);
-                });
+            {/* Barre de filtres moderne */}
+            <div className="bg-white border border-slate-200/80 p-4 rounded-3xl shadow-sm flex flex-wrap items-center gap-3">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  value={requestSearch}
+                  onChange={e => setRequestSearch(e.target.value)}
+                  placeholder="Rechercher par matériel, demandeur..."
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white outline-none font-medium"
+                />
+              </div>
 
-                Object.values(groupedReqs).forEach(group => {
-                  group.items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-                });
+              <select
+                value={requestStatusFilter}
+                onChange={e => setRequestStatusFilter(e.target.value)}
+                className="px-3.5 py-2 bg-slate-50 border border-slate-200 text-xs text-slate-800 font-semibold rounded-xl focus:bg-white outline-none"
+              >
+                <option value="all">🔍 Tous les statuts</option>
+                <option value="En attente">⏳ En attente</option>
+                <option value="Validé / Commandé">✅ Validé / Commandé</option>
+                <option value="Reçu au dépôt">📦 Reçu au dépôt</option>
+                <option value="Refusé">❌ Refusé</option>
+              </select>
 
-                const reqCards = Object.values(groupedReqs);
+              {isAdmin && (
+                <select
+                  value={requestWorkerFilter}
+                  onChange={e => setRequestWorkerFilter(e.target.value)}
+                  className="px-3.5 py-2 bg-slate-50 border border-slate-200 text-xs text-slate-800 font-semibold rounded-xl focus:bg-white outline-none"
+                >
+                  <option value="all">👷‍♂️ Tous les compagnons</option>
+                  {approvedUsers.map(u => (
+                    <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
 
-                if (reqCards.length === 0) {
-                  return (
-                    <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
-                      <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl mx-auto flex items-center justify-center">
-                        <ClipboardList className="w-6 h-6" />
-                      </div>
-                      <h4 className="text-sm font-bold text-slate-800">Aucune demande de matériel</h4>
-                      <p className="text-xs text-slate-400 max-w-xs mx-auto">Aucune commande ou besoin matériel n'a été enregistré pour le moment.</p>
-                    </div>
-                  );
-                }
+            {/* Tableau Moderne / Liste épurée */}
+            <div className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[10px] font-black">
+                      <th className="p-4">Date</th>
+                      <th className="p-4">Demandeur</th>
+                      <th className="p-4">Matériel / Fourniture</th>
+                      <th className="p-4 text-center">Quantité</th>
+                      <th className="p-4 text-center">Urgence</th>
+                      <th className="p-4">Statut & Action</th>
+                      {isAdmin && <th className="p-4 text-right">Actions</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {filteredRequests.map(req => {
+                      const requesterName = req.requester || req.userName || "Compagnon";
+                      const isUrgent = req.urgency === 'Urgent' || req.urgency === 'Critique';
 
-                return reqCards.map((group, gIdx) => {
-                  const pendingCount = group.items.filter(i => i.status !== 'Reçu au dépôt' && i.status !== 'Refusé').length;
-                  const hasPending = pendingCount > 0;
-                  const latestTwo = group.items.slice(0, 2);
+                      return (
+                        <tr key={req.firestoreId} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="p-4 text-slate-500 font-mono">
+                            {req.createdAt ? new Date(req.createdAt).toLocaleDateString('fr-FR') : '-'}
+                          </td>
+                          <td className="p-4 font-bold text-slate-900 flex items-center gap-1.5 pt-5">
+                            👷‍♂️ {requesterName}
+                          </td>
+                          <td className="p-4">
+                            <strong className="text-slate-900 font-black uppercase block">{req.items}</strong>
+                            {req.description && <span className="text-slate-500 text-[11px] block mt-0.5">{req.description}</span>}
+                          </td>
+                          <td className="p-4 text-center">
+                            <span className="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 font-mono font-bold rounded-lg">
+                              {req.quantity}
+                            </span>
+                          </td>
+                          <td className="p-4 text-center">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                              req.urgency === 'Critique' ? 'bg-red-100 text-red-800 border border-red-200' :
+                              req.urgency === 'Urgent' ? 'bg-amber-100 text-amber-800' :
+                              'bg-slate-100 text-slate-600'
+                            }`}>
+                              {req.urgency || 'Normal'}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            {isAdmin ? (
+                              <select 
+                                value={req.status || 'En attente'} 
+                                onChange={(e) => handleUpdateRequestStatus(req.firestoreId, e.target.value)}
+                                className={`px-3 py-1.5 rounded-xl font-bold text-xs outline-none border cursor-pointer ${
+                                  req.status === 'Validé / Commandé' ? 'bg-emerald-50 text-emerald-800 border-emerald-300' :
+                                  req.status === 'Reçu au dépôt' ? 'bg-blue-50 text-blue-800 border-blue-300' :
+                                  req.status === 'Refusé' ? 'bg-red-50 text-red-800 border-red-300' :
+                                  'bg-amber-50 text-amber-800 border-amber-300'
+                                }`}
+                              >
+                                <option value="En attente">⏳ En attente</option>
+                                <option value="Validé / Commandé">✅ Validé / Commandé</option>
+                                <option value="Reçu au dépôt">📦 Reçu au dépôt</option>
+                                <option value="Refusé">❌ Refusé</option>
+                              </select>
+                            ) : (
+                              <span className={`px-3 py-1 rounded-full text-[11px] font-bold inline-block ${
+                                req.status === 'Validé / Commandé' ? 'bg-emerald-100 text-emerald-800' :
+                                req.status === 'Reçu au dépôt' ? 'bg-blue-100 text-blue-800' :
+                                req.status === 'Refusé' ? 'bg-red-100 text-red-800' :
+                                'bg-amber-100 text-amber-800'
+                              }`}>
+                                {req.status || 'En attente'}
+                              </span>
+                            )}
+                          </td>
+                          {isAdmin && (
+                            <td className="p-4 text-right">
+                              <button 
+                                onClick={() => handleDeleteRequest(req.firestoreId)}
+                                className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition-colors font-bold"
+                                title="Supprimer la demande"
+                              >
+                                🗑️
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
-                  return (
-                    <div key={gIdx} className="bg-white border border-slate-200/80 hover:border-amber-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
-                      <div>
-                        <div className="flex justify-between items-start pb-3 border-b border-slate-100">
-                          <div>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Demandeur Chantier</span>
-                            <h3 className="text-lg font-black text-slate-900 flex items-center gap-1.5 mt-0.5">
-                              👷‍♂️ {group.authorName}
-                            </h3>
-                          </div>
-
-                          <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full ${hasPending ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700'}`}>
-                            {hasPending ? `⏳ ${pendingCount} en cours` : '📦 Tout reçu'}
-                          </span>
-                        </div>
-
-                        <div className="mt-4 space-y-3">
-                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Dernières demandes</span>
-                          
-                          {latestTwo.map((req, iIdx) => (
-                            <div key={req.firestoreId || iIdx} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2.5">
-                              <div className="flex justify-between items-start gap-2">
-                                <div className="space-y-1 flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-mono text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md font-bold uppercase border border-amber-100">
-                                      Qté : {req.quantity}
-                                    </span>
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${req.urgency === 'Urgent' ? 'bg-amber-100 text-amber-800' : req.urgency === 'Critique' ? 'bg-red-100 text-red-800' : 'bg-slate-200 text-slate-700'}`}>
-                                      {req.urgency || 'Normal'}
-                                    </span>
-                                  </div>
-                                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide mt-1">
-                                    {req.items}
-                                  </h4>
-                                </div>
-                                
-                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
-                                  req.status === 'Validé / Commandé' ? 'bg-emerald-100 text-emerald-800' :
-                                  req.status === 'Reçu au dépôt' ? 'bg-blue-100 text-blue-800' :
-                                  req.status === 'Refusé' ? 'bg-red-100 text-red-800' :
-                                  'bg-amber-100 text-amber-800'
-                                }`}>
-                                  {req.status || 'En attente'}
-                                </span>
-                              </div>
-
-                              {req.description && (
-                                <p className="text-xs text-slate-600 font-medium bg-white p-2.5 rounded-xl border border-slate-200/60">
-                                  {req.description}
-                                </p>
-                              )}
-
-                              {isAdmin && (
-                                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2">
-                                  <select 
-                                    value={req.status || 'En attente'} 
-                                    onChange={(e) => handleUpdateRequestStatus(req.firestoreId, e.target.value)}
-                                    className="px-3 py-1.5 bg-white border border-slate-300 text-slate-800 text-xs font-semibold rounded-xl focus:outline-none flex-1"
-                                  >
-                                    <option value="En attente">⏳ En attente</option>
-                                    <option value="Validé / Commandé">✅ Validé / Commandé</option>
-                                    <option value="Reçu au dépôt">📦 Reçu au dépôt</option>
-                                    <option value="Refusé">❌ Refusé</option>
-                                  </select>
-
-                                  <button 
-                                    onClick={() => handleDeleteRequest(req.firestoreId)}
-                                    className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-colors"
-                                    title="Supprimer la demande"
-                                  >
-                                    🗑️
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="pt-4 border-t border-slate-100">
-                        <button
-                          onClick={() => setSelectedRequestHistory(group.items)}
-                          className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-                        >
-                          <History className="w-4 h-4" /> Voir toutes les demandes ({group.items.length})
-                        </button>
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
+              {filteredRequests.length === 0 && (
+                <div className="py-16 text-center space-y-3">
+                  <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl mx-auto flex items-center justify-center">
+                    <ClipboardList className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">Aucune demande trouvée</h4>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Aucun matériel ou fourniture ne correspond à vos filtres actuels.</p>
+                </div>
+              )}
             </div>
           </div>
         )}
