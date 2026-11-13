@@ -908,13 +908,15 @@ export default function App() {
         canViewTools: true
       };
 
-      await setDoc(doc(db, "users", authUser.uid), newUser);
+     await setDoc(doc(db, "users", authUser.uid), newUser);
 
       if (regIsAdmin) {
         setCurrentUser(newUser);
         setActiveTab('dashboard');
       } else {
-        setAuthMode('pending');
+        await signOut(auth); // 👈 On déconnecte immédiatement l'utilisateur de Firebase Auth
+        setCurrentUser(null);   // 👈 On s'assure qu'aucun utilisateur n'est connecté en mémoire
+        setAuthMode('pending'); // 👈 On bascule l'affichage sur ton écran "Compte en Attente"
       }
     } catch (error) {
       console.error(error);
