@@ -41,7 +41,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Image as ImageIcon,
-  Filter
+  Filter,
+  Trash2
 } from 'lucide-react';
 
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -139,7 +140,17 @@ export default function App() {
 
   const [showAddPlanModal, setShowAddPlanModal] = useState(false);
   const [selectedWorkerFilter, setSelectedWorkerFilter] = useState('all');
-  const [newPlanData, setNewPlanData] = useState({ title: '', targetUserId: 'all', targetUserIds: ['all'], date: new Date().toISOString().split('T')[0], description: '', files: [] });
+  
+  // Modif Planning Multi-tâches avec créneaux par ligne
+  const [newPlanData, setNewPlanData] = useState({
+    targetUserId: 'all',
+    targetUserIds: ['all'],
+    date: new Date().toISOString().split('T')[0],
+    tasksList: [
+      { slotType: 'Journée complète', timeLabel: '08h00 - 17h00', title: '', description: '' }
+    ],
+    files: []
+  });
 
   const [showAddRequestModal, setShowAddRequestModal] = useState(false);
   const [requestStatusFilter, setRequestStatusFilter] = useState('all');
@@ -1564,7 +1575,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 📦 NOUVEL ONGLET MATÉRIEL REVISÉ (STYLE ERP PRO ET FLUIDE) */}
+        {/* 📦 ONGLET MATÉRIEL REVISÉ (STYLE ERP PRO ET FLUIDE) */}
         {activeTab === 'requests' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-amber-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-amber-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1587,7 +1598,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Barre de filtres moderne */}
             <div className="bg-white border border-slate-200/80 p-4 rounded-3xl shadow-sm flex flex-wrap items-center gap-3">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -1626,7 +1636,6 @@ export default function App() {
               )}
             </div>
 
-            {/* Tableau Moderne / Liste épurée */}
             <div className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
@@ -1644,8 +1653,6 @@ export default function App() {
                   <tbody className="divide-y divide-slate-100 font-medium">
                     {filteredRequests.map(req => {
                       const requesterName = req.requester || req.userName || "Compagnon";
-                      const isUrgent = req.urgency === 'Urgent' || req.urgency === 'Critique';
-
                       return (
                         <tr key={req.firestoreId} className="hover:bg-slate-50/80 transition-colors">
                           <td className="p-4 text-slate-500 font-mono">
@@ -1889,6 +1896,7 @@ export default function App() {
           </div>
         )}
 
+        {/* 📅 ONGLET PLANNING MIS À JOUR (MULTI-TÂCHES & CRÉNEAUX PAR LIGNE) */}
         {activeTab === 'planning' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-cyan-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1918,7 +1926,7 @@ export default function App() {
 
                 {isAdmin && (
                   <button onClick={() => setShowAddPlanModal(true)} className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-cyan-500/20 transition-all">
-                    <Plus className="w-4 h-4" /> Assigner une Tâche 
+                    <Plus className="w-4 h-4" /> Assigner une Journée 
                   </button>
                 )}
               </div>
@@ -1996,14 +2004,18 @@ export default function App() {
                   
                   const planFiles = Array.isArray(plan.files) ? plan.files.filter(f => f && f.data) : [];
 
+                  const planTasks = Array.isArray(plan.tasksList) && plan.tasksList.length > 0 
+                    ? plan.tasksList 
+                    : [{ slotType: plan.slotType || 'Journée complète', timeLabel: plan.timeLabel || '08h00 - 17h00', title: plan.title, description: plan.description }];
+
                   if (!groupedMap[key]) {
                     groupedMap[key] = {
                       ...plan,
-                      tasks: [{ title: plan.title, description: plan.description, firestoreId: plan.firestoreId }],
+                      tasksList: [...planTasks],
                       files: [...planFiles]
                     };
                   } else {
-                    groupedMap[key].tasks.push({ title: plan.title, description: plan.description, firestoreId: plan.firestoreId });
+                    groupedMap[key].tasksList.push(...planTasks);
                     planFiles.forEach(f => {
                       if (!groupedMap[key].files.some(existing => existing.name === f.name)) {
                         groupedMap[key].files.push(f);
@@ -2048,19 +2060,33 @@ export default function App() {
                           </span>
                         </div>
 
+                        {/* Affichage Multi-Tâches avec Badge de Créneau */}
                         <div className="space-y-3 pt-1">
-                          {(plan.tasks || []).map((t, tIdx) => (
-                            <div key={t.firestoreId || tIdx} className="space-y-1">
-                              <h3 className="text-lg md:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                                <Home className="w-5 h-5 text-cyan-600 shrink-0" /> {t.title}
-                              </h3>
-                              {t.description && (
-                                <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-100 font-medium">
-                                  {t.description}
-                                </p>
-                              )}
-                            </div>
-                          ))}
+                          {(plan.tasksList || []).map((t, tIdx) => {
+                            const badgeColor = 
+                              t.slotType === 'Matin' ? 'bg-amber-100 text-amber-800 border-amber-200' :
+                              t.slotType === 'Après-midi' ? 'bg-indigo-100 text-indigo-800 border-indigo-200' :
+                              t.slotType === 'Journée complète' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
+                              'bg-blue-100 text-blue-800 border-blue-200';
+
+                            return (
+                              <div key={tIdx} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1.5">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider border ${badgeColor}`}>
+                                    {t.slotType?.toUpperCase()} ({t.timeLabel})
+                                  </span>
+                                </div>
+                                <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                                  <Home className="w-4 h-4 text-cyan-600 shrink-0" /> {t.title}
+                                </h4>
+                                {t.description && (
+                                  <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                                    {t.description}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
 
@@ -2090,16 +2116,13 @@ export default function App() {
 
                         {isAdmin && (
                           <div className="pt-2 border-t border-slate-200/60 flex justify-end gap-2">
-                            {(plan.tasks || []).map(t => (
-                              <button 
-                                key={t.firestoreId} 
-                                onClick={() => handleDeletePlan(t.firestoreId)} 
-                                className="text-[10px] bg-red-50 hover:bg-red-100 text-red-600 px-2 py-1 rounded-lg font-bold transition-colors"
-                                title="Supprimer cette tâche spécifique"
-                              >
-                                🗑️ Supprimer tâche
-                              </button>
-                            ))}
+                            <button 
+                              onClick={() => handleDeletePlan(plan.firestoreId)} 
+                              className="text-[10px] bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1"
+                              title="Supprimer cette carte planning"
+                            >
+                              <Trash2 className="w-3 h-3" /> Supprimer la carte
+                            </button>
                           </div>
                         )}
                       </div>
@@ -3173,18 +3196,18 @@ export default function App() {
         </div>
       )}
 
+      {/* MODAL ASSIGNATION JOURNÉE / MULTI-TÂCHES AVEC CRÉNEAUX PAR LIGNE */}
       {showAddPlanModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={async (e) => {
             e.preventDefault();
-            if (!newPlanData.title || !myProjectCode) return;
+            if (!myProjectCode) return;
 
             const selectedIds = newPlanData.targetUserIds || ['all'];
             
             if (selectedIds.includes('all')) {
               await addDoc(collection(db, "plans"), {
-                title: newPlanData.title,
-                description: newPlanData.description,
+                tasksList: newPlanData.tasksList,
                 date: newPlanData.date,
                 formattedDate: formatDateFr(newPlanData.date),
                 files: newPlanData.files,
@@ -3200,8 +3223,7 @@ export default function App() {
               }).filter(Boolean);
 
               await addDoc(collection(db, "plans"), {
-                title: newPlanData.title,
-                description: newPlanData.description,
+                tasksList: newPlanData.tasksList,
                 date: newPlanData.date,
                 formattedDate: formatDateFr(newPlanData.date),
                 files: newPlanData.files,
@@ -3218,25 +3240,33 @@ export default function App() {
             setSelectedDayOfWeek(null);
 
             setShowAddPlanModal(false);
-            setNewPlanData({ title: '', targetUserId: 'all', targetUserIds: ['all'], date: new Date().toISOString().split('T')[0], description: '', files: [] });
-          }} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            setNewPlanData({
+              targetUserId: 'all',
+              targetUserIds: ['all'],
+              date: new Date().toISOString().split('T')[0],
+              tasksList: [{ slotType: 'Journée complète', timeLabel: '08h00 - 17h00', title: '', description: '' }],
+              files: []
+            });
+          }} className="bg-white p-6 rounded-3xl w-full max-w-xl space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900">Assigner une Tâche</h3>
+              <h3 className="text-base font-bold text-slate-900">Assigner une Feuille de Route / Tâches</h3>
               <button type="button" onClick={() => setShowAddPlanModal(false)}>✕</button>
             </div>
 
-            <input 
-              type="text" 
-              placeholder="Titre intervention (ex: Bat. 15 LGT 361)" 
-              value={newPlanData.title} 
-              onChange={e => setNewPlanData({...newPlanData, title: e.target.value})} 
-              required 
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs" 
-            />
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Date d'intervention *</label>
+              <input 
+                type="date" 
+                value={newPlanData.date} 
+                onChange={e => setNewPlanData({...newPlanData, date: e.target.value})} 
+                required 
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold" 
+              />
+            </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">Assigner à (1 ou plusieurs compagnons) :</label>
-              <div className="space-y-1.5 max-h-40 overflow-y-auto p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+              <div className="space-y-1.5 max-h-36 overflow-y-auto p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
                 <label className="flex items-center gap-2 font-bold text-slate-800 cursor-pointer pb-2 border-b border-slate-200">
                   <input 
                     type="checkbox" 
@@ -3280,32 +3310,125 @@ export default function App() {
               </div>
             </div>
 
-            <input 
-              type="date" 
-              value={newPlanData.date} 
-              onChange={e => setNewPlanData({...newPlanData, date: e.target.value})} 
-              required 
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs" 
-            />
+            {/* LISTE DES TÂCHES MULTIPLES AVEC CRÉNEAU INDIVIDUEL */}
+            <div className="space-y-3 pt-2">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">Activités / Tâches de la journée</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = [...newPlanData.tasksList, { slotType: 'Matin', timeLabel: '08h00 - 12h00', title: '', description: '' }];
+                    setNewPlanData({...newPlanData, tasksList: updated});
+                  }}
+                  className="px-3 py-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 font-bold text-xs rounded-xl transition-colors flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Ajouter une autre tâche
+                </button>
+              </div>
 
-            <input 
-              type="file" 
-              accept=".pdf" 
-              multiple 
-              onChange={handleMultipleFilesChange} 
-              className="w-full text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100" 
-            />
+              {newPlanData.tasksList.map((tItem, idx) => (
+                <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 relative">
+                  {newPlanData.tasksList.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = newPlanData.tasksList.filter((_, i) => i !== idx);
+                        setNewPlanData({...newPlanData, tasksList: updated});
+                      }}
+                      className="absolute right-3 top-3 w-6 h-6 bg-red-100 hover:bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs font-bold"
+                      title="Supprimer cette ligne"
+                    >
+                      ✕
+                    </button>
+                  )}
 
-            <textarea 
-              placeholder="Consignes particulières..." 
-              value={newPlanData.description} 
-              onChange={e => setNewPlanData({...newPlanData, description: e.target.value})} 
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs h-20" 
-            />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Créneau / Période</label>
+                      <select
+                        value={tItem.slotType}
+                        onChange={e => {
+                          const val = e.target.value;
+                          let defaultTime = '08h00 - 17h00';
+                          if (val === 'Matin') defaultTime = '08h00 - 12h00';
+                          if (val === 'Après-midi') defaultTime = '13h00 - 17h00';
+                          if (val === 'Journée complète') defaultTime = '08h00 - 17h00';
+
+                          const updated = [...newPlanData.tasksList];
+                          updated[idx].slotType = val;
+                          updated[idx].timeLabel = defaultTime;
+                          setNewPlanData({...newPlanData, tasksList: updated});
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none"
+                      >
+                        <option value="Matin">🌅 Matin</option>
+                        <option value="Après-midi">☀️ Après-midi</option>
+                        <option value="Journée complète">📅 Journée complète</option>
+                        <option value="Personnalisé">⏱️ Personnalisé</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Horaires affichés</label>
+                      <input
+                        type="text"
+                        value={tItem.timeLabel}
+                        onChange={e => {
+                          const updated = [...newPlanData.tasksList];
+                          updated[idx].timeLabel = e.target.value;
+                          setNewPlanData({...newPlanData, tasksList: updated});
+                        }}
+                        placeholder="ex: 08h00 - 12h00"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <input 
+                      type="text" 
+                      placeholder="Titre de la tâche (ex: Bat. 15 LGT 361 - Pose des nourrices)" 
+                      value={tItem.title} 
+                      onChange={e => {
+                        const updated = [...newPlanData.tasksList];
+                        updated[idx].title = e.target.value;
+                        setNewPlanData({...newPlanData, tasksList: updated});
+                      }} 
+                      required 
+                      className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none" 
+                    />
+                  </div>
+
+                  <div>
+                    <textarea 
+                      placeholder="Consignes particulières pour cette tâche..." 
+                      value={tItem.description} 
+                      onChange={e => {
+                        const updated = [...newPlanData.tasksList];
+                        updated[idx].description = e.target.value;
+                        setNewPlanData({...newPlanData, tasksList: updated});
+                      }} 
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs h-16 outline-none resize-none" 
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Documents PDF joints (plans, fiches techniques)</label>
+              <input 
+                type="file" 
+                accept=".pdf" 
+                multiple 
+                onChange={handleMultipleFilesChange} 
+                className="w-full text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100" 
+              />
+            </div>
 
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setShowAddPlanModal(false)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl font-semibold">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-cyan-600 text-white text-xs rounded-xl font-bold shadow-md shadow-cyan-600/20">Publier</button>
+              <button type="submit" className="px-4 py-2 bg-cyan-600 text-white text-xs rounded-xl font-bold shadow-md shadow-cyan-600/20">Publier la feuille de route</button>
             </div>
           </form>
         </div>
