@@ -353,7 +353,7 @@ export default function App() {
     return days;
   }, [selectedWeek, selectedYear]);
 
-  const handleQuickPointDay = async (day, status, hours, reason = '', startTime = '08:00', endTime = day.isFriday ? '13:00' : '17:00') => {
+  const handleQuickPointDay = async (day, status, hours, reason = '', startTime = '08:00', endTime = day.isFriday ? '13:00' : '17:00', isValidated = true) => {
     if (!currentUser || !myProjectCode) return;
     const myId = currentUser.userIdNum || currentUser.id;
     const docId = `${myProjectCode}_${myId}_${day.dateStr}`;
@@ -369,6 +369,7 @@ export default function App() {
         absenceReason: reason,
         startTime,
         endTime,
+        isValidated,
         updatedAt: new Date().toISOString()
       }, { merge: true });
     } catch (e) {
@@ -392,6 +393,7 @@ export default function App() {
         absenceReason: editingPointageData.reason || '',
         startTime: editingPointageData.startTime || '08:00',
         endTime: editingPointageData.endTime || '17:00',
+        isValidated: editingPointageData.isValidated ?? true,
         updatedAt: new Date().toISOString()
       }, { merge: true });
       setShowPointageEditModal(false);
@@ -1403,7 +1405,7 @@ export default function App() {
                   const isToday = day.dateStr === new Date().toISOString().split('T')[0];
                   const defaultHours = day.isFriday ? 5 : 8;
 
-                  const isLocked = record && record.isValidated;
+                  const isLocked = record && record.isValidated === true;
                   const isPendingChange = record && record.status === 'DemandeModification';
 
                   return (
@@ -1434,7 +1436,7 @@ export default function App() {
                             onClick={() => {
                               const motif = prompt("Expliquez l'erreur à corriger pour le chef d'équipe :");
                               if (motif) {
-                                handleQuickPointDay(day, 'DemandeModification', record.hours, motif, record.startTime, record.endTime);
+                                handleQuickPointDay(day, 'DemandeModification', record.hours, motif, record.startTime, record.endTime, true);
                               }
                             }}
                             className="px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
@@ -1444,7 +1446,7 @@ export default function App() {
                         ) : (
                           <>
                             <button
-                              onClick={() => handleQuickPointDay(day, 'Présent', defaultHours, '', '08:00', day.isFriday ? '13:00' : '17:00')}
+                              onClick={() => handleQuickPointDay(day, 'Présent', defaultHours, '', '08:00', day.isFriday ? '13:00' : '17:00', true)}
                               className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5"
                             >
                               <CheckCircle className="w-3.5 h-3.5" /> Valider définitivement ({defaultHours}h)
@@ -1454,7 +1456,7 @@ export default function App() {
                               onClick={() => {
                                 const customH = prompt("Nombre d'heures travaillées ce jour ?", defaultHours);
                                 if (customH !== null) {
-                                  handleQuickPointDay(day, 'Présent', Number(customH), '', '08:00', '17:00');
+                                  handleQuickPointDay(day, 'Présent', Number(customH), '', '08:00', '17:00', true);
                                 }
                               }}
                               className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
@@ -1467,7 +1469,7 @@ export default function App() {
                               onClick={() => {
                                 const reason = prompt("Motif de l'absence (Congés, Maladie, Intempéries) :", "Congés");
                                 if (reason !== null) {
-                                  handleQuickPointDay(day, 'Absent', 0, reason, '00:00', '00:00');
+                                  handleQuickPointDay(day, 'Absent', 0, reason, '00:00', '00:00', true);
                                 }
                               }}
                               className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-colors"
@@ -1531,7 +1533,8 @@ export default function App() {
                                         hours: rec ? rec.hours : (day.isFriday ? 5 : 8),
                                         reason: rec ? rec.absenceReason : '',
                                         startTime: rec ? rec.startTime : '08:00',
-                                        endTime: rec ? rec.endTime : (day.isFriday ? '13:00' : '17:00')
+                                        endTime: rec ? rec.endTime : (day.isFriday ? '13:00' : '17:00'),
+                                        isValidated: true
                                       });
                                       setShowPointageEditModal(true);
                                     }}
