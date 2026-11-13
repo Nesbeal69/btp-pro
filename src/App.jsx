@@ -217,18 +217,24 @@ export default function App() {
               setLoadingUser(false);
               return;
             }
+
+            // ✅ On définit l'utilisateur directement ici avec ses données Firestore
+            setCurrentUser({ ...userData, firestoreId: userSnap.id });
+            setLoadingUser(false);
+            return;
           }
         } catch (err) {
           console.error("Erreur vérification statut utilisateur :", err);
         }
 
+        // Fallback si le doc Firestore n'existe pas encore pour une raison quelconque
         setCurrentUser(user);
       } else {
         setCurrentUser(null);
       }
       setLoadingUser(false);
     });
-
+    
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
