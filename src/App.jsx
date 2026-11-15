@@ -41,7 +41,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Image as ImageIcon,
-  Filter,
   Shield,
   Trash2
 } from 'lucide-react';
@@ -68,8 +67,10 @@ export default function App() {
   const [resetSent, setResetSent] = useState(false);
   
   const [regName, setRegName] = useState('');
+  const [regFirstName, setRegFirstName] = useState(''); // Prénom
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
+  const [regSharePhone, setRegSharePhone] = useState(true); // Partager ou masquer son numéro
   const [regPassword, setRegPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [regIsAdmin, setRegIsAdmin] = useState(false);
@@ -80,7 +81,9 @@ export default function App() {
   const [userModalData, setUserModalData] = useState({ 
     firestoreId: '', 
     name: '', 
+    firstName: '',
     phone: '', 
+    sharePhone: true,
     role: 'Employé', 
     customRole: '',
     password: '', 
@@ -93,6 +96,10 @@ export default function App() {
     canViewPointage: true,
     canAddReclamation: false
   });
+
+  const [phoneRequests, setPhoneRequests] = useState([]); // Demandes d'accès numéro
+  const [showPhoneRequestModal, setShowPhoneRequestModal] = useState(false);
+  const [phoneRequestTarget, setPhoneRequestTarget] = useState(null);
 
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [userToApprove, setUserToApprove] = useState(null);
@@ -139,8 +146,6 @@ export default function App() {
   const [selectedTool, setSelectedTool] = useState(null);
   const [newNoteText, setNewNoteText] = useState('');
   const [selectedToolImage, setSelectedToolImage] = useState(null);
-
-  const [selectedRequestHistory, setSelectedRequestHistory] = useState(null);
 
   const [showAddToolModal, setShowAddToolModal] = useState(false);
   const [newToolData, setNewToolData] = useState({ 
@@ -191,7 +196,6 @@ export default function App() {
   const isAdmin = currentUser?.role === 'admin';
   const myProjectCode = currentUser ? (currentUser.projectCode || currentUser.adminProjectCode) : null;
 
-  // Fonctions de vérification des onglets pour l'utilisateur connecté
   const hasAccess = (tabName) => {
     if (isAdmin) return true;
     if (!currentUser) return false;
@@ -204,9 +208,6 @@ export default function App() {
     if (tabName === 'pointage') return currentUser.canViewPointage ?? true;
     return true;
   };
-
-  // Droit de création dissocié de la simple vue
-  const canAddReclamation = isAdmin || currentUser?.canAddReclamation === true;
 
   const formatPhoneFr = (phoneStr) => {
     if (!phoneStr) return 'Non renseigné';
@@ -306,6 +307,10 @@ export default function App() {
       setPointages(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
 
+    const unsubPhoneReqs = onSnapshot(collection(db, "phoneRequests"), (snapshot) => {
+      setPhoneRequests(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
+    });
+
     return () => {
       unsubscribeAuth();
       unsubUsers();
@@ -315,6 +320,7 @@ export default function App() {
       unsubPlans();
       unsubReclamations();
       unsubPointages();
+      unsubPhoneReqs();
     };
   }, []);
 
@@ -363,6 +369,12 @@ export default function App() {
 
   const approvedUsers = useMemo(() => projectUsers.filter(u => u.status === 'approved'), [projectUsers]);
   const pendingUsers = useMemo(() => projectUsers.filter(u => u.status === 'pending' && u.role !== 'admin'), [projectUsers]);
+
+  const myIncomingPhoneRequests = useMemo(() => {
+    if (!currentUser) return [];
+    const myId = currentUser.userIdNum || currentUser.id;
+    return phoneRequests.filter(req => (req.targetUserId === myId || req.targetUserId?.toString() === myId?.toString()) && req.status === 'pending');
+  }, [phoneRequests, currentUser]);
 
   const currentWeekDays = useMemo(() => {
     const simple = new Date(selectedYear, 0, 1 + (selectedWeek - 1) * 7);
@@ -729,8 +741,10 @@ export default function App() {
 
     setUserModalData({ 
       firestoreId: userToEdit.firestoreId, 
-      name: userToEdit.name, 
+      name: userToEdit.name || '', 
+      firstName: userToEdit.firstName || '',
       phone: userToEdit.phone || '', 
+      sharePhone: userToEdit.sharePhone ?? true,
       role: isStandard ? currentRole : 'Autre',
       customRole: isStandard ? '' : currentRole,
       password: userToEdit.password || '', 
@@ -755,7 +769,9 @@ export default function App() {
     try {
       const updatePayload = {
         name: userModalData.name,
+        firstName: userModalData.firstName,
         phone: userModalData.phone,
+        sharePhone: userModalData.sharePhone,
         password: userModalData.password,
         photoURL: userModalData.photoURL || '',
       };
@@ -781,6 +797,7 @@ export default function App() {
       try {
         await addDoc(collection(db, "archivedUsers"), {
           name: userObj.name,
+          firstName: userObj.firstName || '',
           email: userObj.email,
           phone: userObj.phone || '',
           role: userObj.role,
@@ -840,6 +857,57 @@ export default function App() {
     try { await deleteDoc(doc(db, "users", firestoreId)); } catch (e) { console.error(e); }
   };
 
+  const handleRequestPhoneNumber = async (worker) => {
+    if (!currentUser) return;
+    const myId = currentUser.userIdNum || currentUser.id;
+    const workerId = worker.userIdNum || worker.id;
+
+    if (myId === workerId) return;
+
+    try {
+      await addDoc(collection(db, "phoneRequests"), {
+        projectCode: myProjectCode,
+        requesterId: myId,
+        requesterName: currentUser.name,
+        targetUserId: workerId,
+        targetUserName: worker.name,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      });
+      alert(`✅ Demande d'accès au numéro envoyée à ${worker.name}. Il sera notifié pour accepter ou refuser.`);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAnswerPhoneRequest = async (requestId, accept) => {
+    try {
+      await updateDoc(doc(db, "phoneRequests", requestId), {
+        status: accept ? 'accepted' : 'refused'
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const hasAccessToPhone = (worker) => {
+    if (!currentUser) return false;
+    if (isAdmin || worker.email === currentUser.email) return true;
+    if (worker.sharePhone !== false) return true; // Si partagé publiquement
+
+    const myId = currentUser.userIdNum || currentUser.id;
+    const workerId = worker.userIdNum || worker.id;
+
+    // Vérifier si une demande a été acceptée
+    const acceptedReq = phoneRequests.find(req => 
+      (req.targetUserId === workerId || req.targetUserId?.toString() === workerId?.toString()) &&
+      (req.requesterId === myId || req.requesterId?.toString() === myId?.toString()) &&
+      req.status === 'accepted'
+    );
+
+    return !!acceptedReq;
+  };
+
   const handleMultipleFilesChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
     if (selectedFiles.length === 0) return;
@@ -850,9 +918,7 @@ export default function App() {
 
     selectedFiles.forEach((file) => {
       if (file.size > 600 * 1024) {
-        alert(`❌ Le fichier "${file.name}" est trop lourd (${Math.round(file.size / 1024)} Ko).
-
-La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre !`);
+        alert(`❌ Le fichier "${file.name}" est trop lourd (${Math.round(file.size / 1024)} Ko).\n\nLa taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre !`);
         hasError = true;
         return;
       }
@@ -982,8 +1048,8 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
   const handleRegister = async (e) => {
     e.preventDefault();
     setAuthError('');
-    if (!regName || !regEmail || !regPhone || !regPassword) {
-      setAuthError('Veuillez remplir tous les champs.');
+    if (!regName || !regFirstName || !regEmail || !regPhone || !regPassword) {
+      setAuthError('Veuillez remplir tous les champs (Nom, Prénom, Email, Tél, Mot de passe).');
       return;
     }
 
@@ -1008,8 +1074,10 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
         uid: authUser.uid,
         userIdNum: Date.now(),
         name: regName,
+        firstName: regFirstName, // Enregistrement du prénom
         email: regEmail.toLowerCase().trim(),
         phone: regPhone,
+        sharePhone: regSharePhone, // Choix de partage ou masquage du numéro
         role: regIsAdmin ? 'admin' : 'Employé',
         team: regIsAdmin ? 'Direction Chantier' : 'Ouvriers',
         status: regIsAdmin ? 'approved' : 'pending',
@@ -1148,6 +1216,10 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
                       <input type="text" required value={regName} onChange={e => setRegName(e.target.value)} placeholder="Martin" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
                     </div>
                     <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">Prénom</label>
+                      <input type="text" required value={regFirstName} onChange={e => setRegFirstName(e.target.value)} placeholder="Jean" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-slate-300 mb-1">Email</label>
                       <input type="email" required value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="jean@batirpluspro.fr" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
                     </div>
@@ -1155,6 +1227,20 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
                       <label className="block text-xs font-medium text-slate-300 mb-1">Numéro de téléphone</label>
                       <input type="tel" required value={regPhone} onChange={e => setRegPhone(e.target.value)} placeholder="06 12 34 56 78" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none" />
                     </div>
+
+                    <div className="bg-black/30 p-3 rounded-xl border border-white/10 flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-white block">Partager mon numéro</span>
+                        <span className="text-[10px] text-slate-400">Si masqué, les gars devront faire une demande.</span>
+                      </div>
+                      <input 
+                        type="checkbox" 
+                        checked={regSharePhone} 
+                        onChange={e => setRegSharePhone(e.target.checked)} 
+                        className="w-4 h-4 rounded text-blue-600 bg-black/40 border-slate-700 focus:ring-blue-500 cursor-pointer" 
+                      />
+                    </div>
+
                     <div>
                       <label className="block text-xs font-medium text-slate-300 mb-1">Mot de passe</label>
                       <div className="relative">
@@ -1252,6 +1338,17 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
         </nav>
 
         <div className="flex items-center gap-3">
+          {/* Notification de demande de numéro reçue */}
+          {myIncomingPhoneRequests.length > 0 && (
+            <button 
+              onClick={() => setShowPhoneRequestModal(true)}
+              className="relative px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold flex items-center gap-1.5 animate-pulse shadow-md"
+            >
+              <Phone className="w-4 h-4" />
+              <span>Demande tél ({myIncomingPhoneRequests.length})</span>
+            </button>
+          )}
+
           <div className="flex items-center gap-3 pl-2 border-l border-slate-200">
             {currentUser?.photoURL ? (
               <img src={currentUser.photoURL} alt={currentUser?.name} className="w-9 h-9 rounded-full object-cover border-2 border-blue-600/30 shadow-xs" />
@@ -1261,7 +1358,7 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
               </div>
             )}
             <div className="hidden sm:block text-right text-xs">
-              <span className="font-bold text-slate-900 block">{currentUser?.name}</span>
+              <span className="font-bold text-slate-900 block">{currentUser?.firstName} {currentUser?.name}</span>
               <span className="text-[10px] text-blue-600 font-semibold">{isAdmin ? 'CHEF / ADMIN' : currentUser?.role?.toUpperCase()}</span>
             </div>
           </div>
@@ -1301,11 +1398,11 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
               <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
               
               <div className="space-y-1 relative z-10">
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 border border-blue-400/30 rounded-xl text-blue-300 text-[11px] font-bold uppercase tracking-wider mb-1">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 border border-blue-400/30 rounded-2xl text-blue-300 text-[11px] font-bold uppercase tracking-wider mb-1">
                   ✨ Tableau de bord • Actif
                 </div>
                 <h1 className="text-xl md:text-2xl font-black tracking-tight">
-                  Bienvenue sur votre espace, <span className="text-blue-400">{currentUser?.name}</span>.
+                  Bienvenue sur votre espace, <span className="text-blue-400">{currentUser?.firstName} {currentUser?.name}</span>.
                 </h1>
                 <p className="text-xs text-slate-300">Retrouvez ici vos feuilles de route, vos pointages et le suivi de vos chantiers.</p>
               </div>
@@ -1469,7 +1566,7 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
                     <option value="all" className="bg-slate-900">👥 Tous les compagnons</option>
                     {approvedUsers.map(u => (
                       <option key={u.firestoreId} value={u.userIdNum || u.id} className="bg-slate-900">
-                        👷‍♂️ {u.name}
+                        👷‍♂️ {u.firstName} {u.name}
                       </option>
                     ))}
                   </select>
@@ -1634,7 +1731,7 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
                         return (
                           <tr key={worker.firestoreId} className="hover:bg-slate-50/80 transition-colors">
                             <td className="p-3.5 font-bold text-slate-900 flex items-center gap-2">
-                              👷‍♂️ {worker.name}
+                              👷‍♂️ {worker.firstName} {worker.name}
                             </td>
                             {currentWeekDays.filter(d => !d.isWeekend).map(day => {
                               const rec = workerRecords.find(r => r.date === day.dateStr);
@@ -1647,7 +1744,7 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
                                     onClick={() => {
                                       setEditingPointageData({
                                         userId: wId,
-                                        userName: worker.name,
+                                        userName: `${worker.firstName || ''} ${worker.name}`,
                                         date: day.dateStr,
                                         status: rec ? rec.status : 'Présent',
                                         hours: rec ? rec.hours : (day.isFriday ? 5 : 8),
@@ -1738,7 +1835,7 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
                 >
                   <option value="all">👷‍♂️ Tous les compagnons</option>
                   {approvedUsers.map(u => (
-                    <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name}</option>
+                    <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.firstName} {u.name}</option>
                   ))}
                 </select>
               )}
@@ -2026,7 +2123,7 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
                   <option value="all" className="bg-slate-900">👥 Tout le planning</option>
                   {approvedUsers.map(u => (
                     <option key={u.firestoreId} value={u.userIdNum || u.id} className="bg-slate-900">
-                      👷‍♂️ {u.name}
+                      👷‍♂️ {u.firstName} {u.name}
                     </option>
                   ))}
                 </select>
@@ -2267,41 +2364,63 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredWorkers.map(user => (
-                <div key={user.firestoreId} className="bg-white border border-slate-200/80 hover:border-emerald-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between dark:bg-white dark:border-slate-200">
-                  <div>
-                    <div className="flex justify-between items-start">
-                      <h3 className="text-base font-bold text-slate-900">{user.name}</h3>
-                      <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl border border-emerald-200">{user.role}</span>
-                    </div>
-
-                    <a 
-                      href={`tel:${user.phone ? user.phone.replace(/\s+/g, '') : ''}`}
-                      className="mt-4 flex items-center gap-3 text-xs text-slate-700 bg-emerald-50/50 hover:bg-emerald-100/80 p-3 rounded-2xl border border-emerald-200/60 transition-colors group cursor-pointer"
-                      title="Cliquer pour appeler"
-                    >
-                      <div className="p-2 bg-emerald-600 text-white rounded-xl shadow-sm group-hover:scale-110 transition-transform">
-                        <Phone className="w-4 h-4" />
+              {filteredWorkers.map(user => {
+                const canSeePhone = hasAccessToPhone(user);
+                return (
+                  <div key={user.firestoreId} className="bg-white border border-slate-200/80 hover:border-emerald-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between dark:bg-white dark:border-slate-200">
+                    <div>
+                      <div className="flex justify-between items-start">
+                        <h3 className="text-base font-bold text-slate-900">{user.firstName} {user.name}</h3>
+                        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl border border-emerald-200">{user.role}</span>
                       </div>
-                      <div>
-                        <span className="block text-[10px] text-emerald-700 font-bold uppercase tracking-wider">Téléphone (Appel direct)</span>
-                        <span className="font-mono font-bold text-slate-900 text-sm">{formatPhoneFr(user.phone)}</span>
-                      </div>
-                    </a>
 
-                    <div className="mt-2 text-[11px] text-slate-400 font-medium">Inscrit le : {user.joinedAt}</div>
-                  </div>
-
-                  {(isAdmin || user.email === currentUser.email) && (
-                    <div className="pt-3 border-t border-slate-100 flex gap-2">
-                      <button onClick={() => handleOpenUserModal(user)} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors">Modifier</button>
-                      {isAdmin && user.email !== currentUser.email && (
-                        <button onClick={() => handleDeleteUser(user)} className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded-xl transition-colors font-bold" title="Supprimer et archiver">🗑️</button>
+                      {canSeePhone ? (
+                        <a 
+                          href={`tel:${user.phone ? user.phone.replace(/\s+/g, '') : ''}`}
+                          className="mt-4 flex items-center gap-3 text-xs text-slate-700 bg-emerald-50/50 hover:bg-emerald-100/80 p-3 rounded-2xl border border-emerald-200/60 transition-colors group cursor-pointer"
+                          title="Cliquer pour appeler"
+                        >
+                          <div className="p-2 bg-emerald-600 text-white rounded-xl shadow-sm group-hover:scale-110 transition-transform">
+                            <Phone className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-emerald-700 font-bold uppercase tracking-wider">Téléphone (Appel direct)</span>
+                            <span className="font-mono font-bold text-slate-900 text-sm">{formatPhoneFr(user.phone)}</span>
+                          </div>
+                        </a>
+                      ) : (
+                        <div 
+                          onClick={() => handleRequestPhoneNumber(user)}
+                          className="mt-4 flex items-center justify-between text-xs text-slate-700 bg-amber-50/70 hover:bg-amber-100 p-3 rounded-2xl border border-amber-200 transition-colors cursor-pointer group"
+                          title="Numéro masqué - Cliquer pour demander l'accès"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-amber-500 text-white rounded-xl shadow-sm">
+                              <EyeOff className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <span className="block text-[10px] text-amber-700 font-bold uppercase tracking-wider">Numéro masqué</span>
+                              <span className="font-mono font-bold text-slate-500 filter blur-xs select-none">06 •• •• •• ••</span>
+                            </div>
+                          </div>
+                          <span className="text-[10px] bg-amber-200 text-amber-900 font-bold px-2 py-1 rounded-lg group-hover:bg-amber-300">Demander</span>
+                        </div>
                       )}
+
+                      <div className="mt-2 text-[11px] text-slate-400 font-medium">Inscrit le : {user.joinedAt}</div>
                     </div>
-                  )}
-                </div>
-              ))}
+
+                    {(isAdmin || user.email === currentUser.email) && (
+                      <div className="pt-3 border-t border-slate-100 flex gap-2">
+                        <button onClick={() => handleOpenUserModal(user)} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors">Modifier</button>
+                        {isAdmin && user.email !== currentUser.email && (
+                          <button onClick={() => handleDeleteUser(user)} className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded-xl transition-colors font-bold" title="Supprimer et archiver">🗑️</button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
 
               {filteredWorkers.length === 0 && (
                 <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3 dark:bg-white dark:border-slate-200">
@@ -2325,7 +2444,7 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
                     {projectArchivedUsers.map((arch, idx) => (
                       <div key={idx} className="p-4 flex justify-between items-center text-xs">
                         <div>
-                          <span className="font-bold text-slate-800 text-sm">{arch.name}</span>
+                          <span className="font-bold text-slate-800 text-sm">{arch.firstName} {arch.name}</span>
                           <span className="ml-2 px-2 py-0.5 bg-slate-100 text-slate-600 rounded-lg">{arch.role}</span>
                           <p className="text-slate-400 mt-0.5">Tél : {formatPhoneFr(arch.phone)} | Supprimé le : {arch.deletedAt}</p>
                         </div>
@@ -2393,7 +2512,7 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
                 <option value="all">👷‍♂️ Tous les compagnons</option>
                 <option value="Dépôt Central">📦 Dépôt Central</option>
                 {approvedUsers.map(u => (
-                  <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name}</option>
+                  <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.firstName} {u.name}</option>
                 ))}
               </select>
 
@@ -2492,7 +2611,7 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
               {pendingUsers.map(user => (
                 <div key={user.firestoreId} className="bg-white border border-slate-200/80 p-6 rounded-3xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm dark:bg-white dark:border-slate-200">
                   <div>
-                    <h3 className="text-base font-bold text-slate-900">{user.name} <span className="text-xs font-normal text-slate-500">({user.email})</span></h3>
+                    <h3 className="text-base font-bold text-slate-900">{user.firstName} {user.name} <span className="text-xs font-normal text-slate-500">({user.email})</span></h3>
                     <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-emerald-600" /> <span className="font-mono">{formatPhoneFr(user.phone)}</span></p>
                   </div>
                   <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -2517,6 +2636,52 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
       </main>
 
       <PrivacyFooter />
+
+      {/* Modal de gestion des demandes d'accès aux numéros de téléphone */}
+      {showPhoneRequestModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden dark:bg-white">
+            <div className="px-6 py-4 bg-amber-500 text-slate-950 flex justify-between items-center">
+              <h3 className="text-base font-bold flex items-center gap-2">
+                <Phone className="w-4 h-4" /> Demandes d'accès à votre numéro
+              </h3>
+              <button type="button" onClick={() => setShowPhoneRequestModal(false)} className="w-8 h-8 rounded-full bg-black/10 hover:bg-black/20 flex items-center justify-center text-xs font-bold">✕</button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {myIncomingPhoneRequests.length > 0 ? (
+                myIncomingPhoneRequests.map(req => (
+                  <div key={req.firestoreId} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                    <p className="text-xs text-slate-800">
+                      <strong>{req.requesterName}</strong> souhaite consulter votre numéro de téléphone masqué.
+                    </p>
+                    <div className="flex gap-2 justify-end">
+                      <button 
+                        onClick={() => handleAnswerPhoneRequest(req.firestoreId, false)}
+                        className="px-3 py-1.5 bg-red-100 text-red-700 text-xs font-bold rounded-xl hover:bg-red-200"
+                      >
+                        Refuser
+                      </button>
+                      <button 
+                        onClick={() => handleAnswerPhoneRequest(req.firestoreId, true)}
+                        className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-500"
+                      >
+                        Accepter
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-slate-500 text-center py-6">Aucune demande en attente.</p>
+              )}
+
+              <div className="flex justify-end pt-3 border-t border-slate-100">
+                <button type="button" onClick={() => setShowPhoneRequestModal(false)} className="px-5 py-2.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Fermer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showPointageEditModal && editingPointageData && isAdmin && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
@@ -2740,7 +2905,7 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleConfirmApprove} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto dark:bg-white">
             <div>
-              <h3 className="text-lg font-bold text-slate-900">Approuver {userToApprove.name}</h3>
+              <h3 className="text-lg font-bold text-slate-900">Approuver {userToApprove.firstName} {userToApprove.name}</h3>
               <p className="text-xs text-slate-500 mt-0.5">Définissez son rôle et cochez les onglets autorisés.</p>
             </div>
             
@@ -2872,7 +3037,7 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
               <label className="block text-xs font-semibold text-slate-700 mb-1">Affecter à :</label>
               <select value={editToolForm.assignedTo} onChange={e => setEditToolForm({...editToolForm, assignedTo: e.target.value})} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold">
                 <option value="Dépôt Central">📦 Dépôt Central (Libre)</option>
-                {approvedUsers.map(u => <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name}</option>)}
+                {approvedUsers.map(u => <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.firstName} {u.name}</option>)}
               </select>
             </div>
 
@@ -2968,11 +3133,22 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Nom complet *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Nom *</label>
                 <input 
                   type="text" 
                   value={userModalData.name} 
                   onChange={e => setUserModalData({...userModalData, name: e.target.value})} 
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium" 
+                  required 
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Prénom *</label>
+                <input 
+                  type="text" 
+                  value={userModalData.firstName} 
+                  onChange={e => setUserModalData({...userModalData, firstName: e.target.value})} 
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium" 
                   required 
                 />
@@ -2986,6 +3162,19 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
                   onChange={e => setUserModalData({...userModalData, phone: e.target.value})} 
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium" 
                   required 
+                />
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">Partager mon numéro</span>
+                  <span className="text-[10px] text-slate-500">Autoriser son affichage public dans l'onglet Effectifs.</span>
+                </div>
+                <input 
+                  type="checkbox" 
+                  checked={userModalData.sharePhone} 
+                  onChange={e => setUserModalData({...userModalData, sharePhone: e.target.checked})} 
+                  className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer" 
                 />
               </div>
 
@@ -3199,91 +3388,6 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
         </div>
       )}
 
-      {selectedRequestHistory && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl border border-slate-100 dark:bg-white">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-              <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
-                📦 Historique complet des demandes
-              </h3>
-              <button 
-                onClick={() => setSelectedRequestHistory(null)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {selectedRequestHistory.map((req, idx) => (
-                <div key={req.firestoreId || idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2.5">
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md font-bold uppercase border border-amber-100">
-                          Qté : {req.quantity}
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-medium">
-                          {req.createdAt ? new Date(req.createdAt).toLocaleDateString('fr-FR') : 'Récemment'}
-                        </span>
-                      </div>
-                      <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide mt-1">
-                        {req.items}
-                      </h4>
-                    </div>
-
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
-                      req.status === 'Validé / Commandé' ? 'bg-emerald-100 text-emerald-800' :
-                      req.status === 'Reçu au dépôt' ? 'bg-blue-100 text-blue-800' :
-                      req.status === 'Refusé' ? 'bg-red-100 text-red-800' :
-                      'bg-amber-100 text-amber-800'
-                    }`}>
-                      {req.status || 'En attente'}
-                    </span>
-                  </div>
-
-                  {req.description && (
-                    <p className="text-xs text-slate-600 font-medium bg-white p-2.5 rounded-xl border border-slate-200/60">
-                      {req.description}
-                    </p>
-                  )}
-
-                  {isAdmin && (
-                    <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2">
-                      <select 
-                        value={req.status || 'En attente'} 
-                        onChange={(e) => handleUpdateRequestStatus(req.firestoreId, e.target.value)}
-                        className="px-3 py-1.5 bg-white border border-slate-300 text-slate-800 text-xs font-semibold rounded-xl focus:outline-none flex-1"
-                      >
-                        <option value="En attente">⏳ En attente</option>
-                        <option value="Validé / Commandé">✅ Validé / Commandé</option>
-                        <option value="Reçu au dépôt">📦 Reçu au dépôt</option>
-                        <option value="Refusé">❌ Refusé</option>
-                      </select>
-
-                      <button 
-                        onClick={() => handleDeleteRequest(req.firestoreId)}
-                        className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-colors"
-                        title="Supprimer la demande"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setSelectedRequestHistory(null)}
-              className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-colors shadow-md"
-            >
-              Fermer
-            </button>
-          </div>
-        </div>
-      )}
-
       {selectedReclamationHistory && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 max-h-[80vh] overflow-y-auto shadow-2xl dark:bg-white">
@@ -3370,7 +3474,7 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
             } else {
               const names = selectedIds.map(id => {
                 const found = approvedUsers.find(u => (u.userIdNum || u.id) === Number(id));
-                return found ? found.name : '';
+                return found ? `${found.firstName || ''} ${found.name}` : '';
               }).filter(Boolean);
 
               await addDoc(collection(db, "plans"), {
@@ -3454,7 +3558,7 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
                         }}
                         className="rounded text-cyan-600 w-4 h-4"
                       />
-                      <span>👷‍♂️ {u.name} ({u.role})</span>
+                      <span>👷‍♂️ {u.firstName} {u.name} ({u.role})</span>
                     </label>
                   );
                 })}
@@ -3752,7 +3856,7 @@ La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre 
               <label className="block text-xs font-semibold text-slate-700 mb-1">Affectation initiale :</label>
               <select value={newToolData.assignedTo} onChange={e => setNewToolData({...newToolData, assignedTo: e.target.value})} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold">
                 <option value="Dépôt Central">📦 Dépôt Central (Libre)</option>
-                {approvedUsers.map(u => <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.name}</option>)}
+                {approvedUsers.map(u => <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.firstName} {u.name}</option>)}
               </select>
             </div>
 
