@@ -141,7 +141,6 @@ export default function App() {
   const [showAddPlanModal, setShowAddPlanModal] = useState(false);
   const [selectedWorkerFilter, setSelectedWorkerFilter] = useState('all');
   
-  // Modif Planning Multi-tâches avec créneaux par ligne
   const [editingPlan, setEditingPlan] = useState(null);
   const [newPlanData, setNewPlanData] = useState({
     targetUserId: 'all',
@@ -835,12 +834,12 @@ export default function App() {
   };
 
   const handleOpenEditPlan = (plan) => {
-  setEditingPlan(JSON.parse(JSON.stringify(plan)));
-};
+    setEditingPlan(JSON.parse(JSON.stringify(plan)));
+  };
 
-const handleDeletePlan = async (firestoreId) => {
-  try { if (firestoreId) await deleteDoc(doc(db, "plans", firestoreId)); } catch (e) { console.error(e); }
-};
+  const handleDeletePlan = async (firestoreId) => {
+    try { if (firestoreId) await deleteDoc(doc(db, "plans", firestoreId)); } catch (e) { console.error(e); }
+  };
 
   const visiblePlans = useMemo(() => {
     if (!currentUser) return [];
@@ -1580,7 +1579,6 @@ const handleDeletePlan = async (firestoreId) => {
           </div>
         )}
 
-        {/* 📦 ONGLET MATÉRIEL REVISÉ (STYLE ERP PRO ET FLUIDE) */}
         {activeTab === 'requests' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-amber-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-amber-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1901,7 +1899,6 @@ const handleDeletePlan = async (firestoreId) => {
           </div>
         )}
 
-        {/* 📅 ONGLET PLANNING MIS À JOUR (MULTI-TÂCHES & CRÉNEAUX PAR LIGNE) */}
         {activeTab === 'planning' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-cyan-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -2065,7 +2062,6 @@ const handleDeletePlan = async (firestoreId) => {
                           </span>
                         </div>
 
-                        {/* Affichage Multi-Tâches avec Badge de Créneau */}
                         <div className="space-y-3 pt-1">
                           {(plan.tasksList || []).map((t, tIdx) => {
                             const badgeColor = 
@@ -2120,24 +2116,24 @@ const handleDeletePlan = async (firestoreId) => {
                         )}
 
                         {isAdmin && (
-                       <div className="pt-2 border-t border-slate-200/60 flex justify-end gap-2">
-                         <button 
-                           onClick={() => handleOpenEditPlan(plan)} 
-                          className="text-[10px] bg-amber-50 hover:bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1"
-                          title="Modifier cette feuille de route"
-                        >
-                          ✏️ Modifier
-                        </button>
+                          <div className="pt-2 border-t border-slate-200/60 flex justify-end gap-2">
+                            <button 
+                              onClick={() => handleOpenEditPlan(plan)} 
+                              className="text-[10px] bg-amber-50 hover:bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1"
+                              title="Modifier cette feuille de route"
+                            >
+                              ✏️ Modifier
+                            </button>
 
-                        <button 
-                          onClick={() => handleDeletePlan(plan.firestoreId)} 
-                          className="text-[10px] bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1"
-                          title="Supprimer cette carte planning"
-                       >
-                         <Trash2 className="w-3 h-3" /> Supprimer la carte
-                       </button>
-                      </div>
-                    )}
+                            <button 
+                              onClick={() => handleDeletePlan(plan.firestoreId)} 
+                              className="text-[10px] bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1"
+                              title="Supprimer cette carte planning"
+                            >
+                              <Trash2 className="w-3 h-3" /> Supprimer
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -2423,7 +2419,6 @@ const handleDeletePlan = async (firestoreId) => {
 
       <PrivacyFooter />
 
-      {/* MODAL MODIFICATION POINTAGE ADMIN */}
       {showPointageEditModal && editingPointageData && isAdmin && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleAdminSavePointage} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
@@ -3209,7 +3204,6 @@ const handleDeletePlan = async (firestoreId) => {
         </div>
       )}
 
-      {/* MODAL ASSIGNATION JOURNÉE / MULTI-TÂCHES AVEC CRÉNEAUX PAR LIGNE */}
       {showAddPlanModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={async (e) => {
@@ -3323,7 +3317,6 @@ const handleDeletePlan = async (firestoreId) => {
               </div>
             </div>
 
-            {/* LISTE DES TÂCHES MULTIPLES AVEC CRÉNEAU INDIVIDUEL */}
             <div className="space-y-3 pt-2">
               <div className="flex justify-between items-center">
                 <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">Activités / Tâches de la journée</label>
@@ -3448,148 +3441,148 @@ const handleDeletePlan = async (firestoreId) => {
       )}
 
       {editingPlan && (
-  <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-    <form onSubmit={async (e) => {
-      e.preventDefault();
-      if (!editingPlan.firestoreId) return;
-      try {
-        const planRef = doc(db, "plans", editingPlan.firestoreId);
-        await updateDoc(planRef, {
-          date: editingPlan.date,
-          formattedDate: formatDateFr(editingPlan.date),
-          tasksList: editingPlan.tasksList,
-          files: editingPlan.files || []
-        });
-        setEditingPlan(null);
-      } catch (err) {
-        console.error("Erreur modification plan :", err);
-      }
-    }} className="bg-white p-6 rounded-3xl w-full max-w-xl space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-      <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-        <h3 className="text-base font-bold text-slate-900">Modifier la feuille de route</h3>
-        <button type="button" onClick={() => setEditingPlan(null)}>✕</button>
-      </div>
-
-      <div>
-        <label className="block text-xs font-semibold text-slate-700 mb-1">Date d'intervention *</label>
-        <input 
-          type="date" 
-          value={editingPlan.date} 
-          onChange={e => setEditingPlan({...editingPlan, date: e.target.value})} 
-          required 
-          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold" 
-        />
-      </div>
-
-      <div className="space-y-3 pt-2">
-        <div className="flex justify-between items-center">
-          <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">Activités / Tâches</label>
-          <button
-            type="button"
-            onClick={() => {
-              const updated = [...(editingPlan.tasksList || []), { slotType: 'Matin', timeLabel: '08h00 - 12h00', title: '', description: '' }];
-              setEditingPlan({...editingPlan, tasksList: updated});
-            }}
-            className="px-3 py-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 font-bold text-xs rounded-xl transition-colors flex items-center gap-1"
-          >
-            <Plus className="w-3.5 h-3.5" /> Ajouter une tâche
-          </button>
-        </div>
-
-        {(editingPlan.tasksList || []).map((tItem, idx) => (
-          <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 relative">
-            {editingPlan.tasksList.length > 1 && (
-              <button
-                type="button"
-                onClick={() => {
-                  const updated = editingPlan.tasksList.filter((_, i) => i !== idx);
-                  setEditingPlan({...editingPlan, tasksList: updated});
-                }}
-                className="absolute right-3 top-3 w-6 h-6 bg-red-100 hover:bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs font-bold"
-              >
-                ✕
-              </button>
-            )}
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Créneau</label>
-                <select
-                  value={tItem.slotType}
-                  onChange={e => {
-                    const val = e.target.value;
-                    let defaultTime = '08h00 - 17h00';
-                    if (val === 'Matin') defaultTime = '08h00 - 12h00';
-                    if (val === 'Après-midi') defaultTime = '13h00 - 17h00';
-                    if (val === 'Journée complète') defaultTime = '08h00 - 17h00';
-
-                    const updated = [...editingPlan.tasksList];
-                    updated[idx].slotType = val;
-                    updated[idx].timeLabel = defaultTime;
-                    setEditingPlan({...editingPlan, tasksList: updated});
-                  }}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none"
-                >
-                  <option value="Matin">🌅 Matin</option>
-                  <option value="Après-midi">☀️ Après-midi</option>
-                  <option value="Journée complète">📅 Journée complète</option>
-                  <option value="Personnalisé">⏱️ Personnalisé</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Horaires</label>
-                <input
-                  type="text"
-                  value={tItem.timeLabel}
-                  onChange={e => {
-                    const updated = [...editingPlan.tasksList];
-                    updated[idx].timeLabel = e.target.value;
-                    setEditingPlan({...editingPlan, tasksList: updated});
-                  }}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none"
-                />
-              </div>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            if (!editingPlan.firestoreId) return;
+            try {
+              const planRef = doc(db, "plans", editingPlan.firestoreId);
+              await updateDoc(planRef, {
+                date: editingPlan.date,
+                formattedDate: formatDateFr(editingPlan.date),
+                tasksList: editingPlan.tasksList,
+                files: editingPlan.files || []
+              });
+              setEditingPlan(null);
+            } catch (err) {
+              console.error("Erreur modification plan :", err);
+            }
+          }} className="bg-white p-6 rounded-3xl w-full max-w-xl space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900">Modifier la feuille de route</h3>
+              <button type="button" onClick={() => setEditingPlan(null)}>✕</button>
             </div>
 
             <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Date d'intervention *</label>
               <input 
-                type="text" 
-                placeholder="Titre de la tâche" 
-                value={tItem.title} 
-                onChange={e => {
-                  const updated = [...editingPlan.tasksList];
-                  updated[idx].title = e.target.value;
-                  setEditingPlan({...editingPlan, tasksList: updated});
-                }} 
+                type="date" 
+                value={editingPlan.date} 
+                onChange={e => setEditingPlan({...editingPlan, date: e.target.value})} 
                 required 
-                className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none" 
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold" 
               />
             </div>
 
-            <div>
-              <textarea 
-                placeholder="Consignes..." 
-                value={tItem.description || ''} 
-                onChange={e => {
-                  const updated = [...editingPlan.tasksList];
-                  updated[idx].description = e.target.value;
-                  setEditingPlan({...editingPlan, tasksList: updated});
-                }} 
-                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs h-16 outline-none resize-none" 
-              />
-            </div>
-          </div>
-        ))}
-      </div>
+            <div className="space-y-3 pt-2">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">Activités / Tâches</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = [...(editingPlan.tasksList || []), { slotType: 'Matin', timeLabel: '08h00 - 12h00', title: '', description: '' }];
+                    setEditingPlan({...editingPlan, tasksList: updated});
+                  }}
+                  className="px-3 py-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 font-bold text-xs rounded-xl transition-colors flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Ajouter une tâche
+                </button>
+              </div>
 
-      <div className="flex justify-end gap-2 pt-2">
-        <button type="button" onClick={() => setEditingPlan(null)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl font-semibold">Annuler</button>
-        <button type="submit" className="px-4 py-2 bg-cyan-600 text-white text-xs rounded-xl font-bold shadow-md">Enregistrer les modifications</button>
-      </div>
-    </form>
-  </div>
-)}
+              {(editingPlan.tasksList || []).map((tItem, idx) => (
+                <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 relative">
+                  {editingPlan.tasksList.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = editingPlan.tasksList.filter((_, i) => i !== idx);
+                        setEditingPlan({...editingPlan, tasksList: updated});
+                      }}
+                      className="absolute right-3 top-3 w-6 h-6 bg-red-100 hover:bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs font-bold"
+                    >
+                      ✕
+                    </button>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Créneau</label>
+                      <select
+                        value={tItem.slotType}
+                        onChange={e => {
+                          const val = e.target.value;
+                          let defaultTime = '08h00 - 17h00';
+                          if (val === 'Matin') defaultTime = '08h00 - 12h00';
+                          if (val === 'Après-midi') defaultTime = '13h00 - 17h00';
+                          if (val === 'Journée complète') defaultTime = '08h00 - 17h00';
+
+                          const updated = [...editingPlan.tasksList];
+                          updated[idx].slotType = val;
+                          updated[idx].timeLabel = defaultTime;
+                          setEditingPlan({...editingPlan, tasksList: updated});
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none"
+                      >
+                        <option value="Matin">🌅 Matin</option>
+                        <option value="Après-midi">☀️ Après-midi</option>
+                        <option value="Journée complète">📅 Journée complète</option>
+                        <option value="Personnalisé">⏱️ Personnalisé</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Horaires</label>
+                      <input
+                        type="text"
+                        value={tItem.timeLabel}
+                        onChange={e => {
+                          const updated = [...editingPlan.tasksList];
+                          updated[idx].timeLabel = e.target.value;
+                          setEditingPlan({...editingPlan, tasksList: updated});
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <input 
+                      type="text" 
+                      placeholder="Titre de la tâche" 
+                      value={tItem.title} 
+                      onChange={e => {
+                        const updated = [...editingPlan.tasksList];
+                        updated[idx].title = e.target.value;
+                        setEditingPlan({...editingPlan, tasksList: updated});
+                      }} 
+                      required 
+                      className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none" 
+                    />
+                  </div>
+
+                  <div>
+                    <textarea 
+                      placeholder="Consignes..." 
+                      value={tItem.description || ''} 
+                      onChange={e => {
+                        const updated = [...editingPlan.tasksList];
+                        updated[idx].description = e.target.value;
+                        setEditingPlan({...editingPlan, tasksList: updated});
+                      }} 
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs h-16 outline-none resize-none" 
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setEditingPlan(null)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl font-semibold">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-cyan-600 text-white text-xs rounded-xl font-bold shadow-md">Enregistrer les modifications</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {showAddToolModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
