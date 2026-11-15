@@ -73,7 +73,9 @@ export default function App() {
   const [regSharePhone, setRegSharePhone] = useState(true); // Partager ou masquer son numéro
   const [regPassword, setRegPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
-  const [regIsAdmin, setRegIsAdmin] = useState(false);
+  
+  // Remplacement de la case à cocher par un mode d'inscription ('join' ou 'create')
+  const [registrationType, setRegistrationType] = useState('join');
   const [regProjectCode, setRegProjectCode] = useState('');
   const [authError, setAuthError] = useState('');
 
@@ -1053,8 +1055,10 @@ export default function App() {
       return;
     }
 
+    const isAdminCreation = registrationType === 'create';
     let assignedProjectCode = '';
-    if (regIsAdmin) {
+    
+    if (isAdminCreation) {
       assignedProjectCode = 'CHANTIER-' + Math.floor(1000 + Math.random() * 9000);
     } else {
       const trimmedCode = regProjectCode.toUpperCase().trim();
@@ -1078,9 +1082,9 @@ export default function App() {
         email: regEmail.toLowerCase().trim(),
         phone: regPhone,
         sharePhone: regSharePhone, // Choix de partage ou masquage du numéro
-        role: regIsAdmin ? 'admin' : 'Employé',
-        team: regIsAdmin ? 'Direction Chantier' : 'Ouvriers',
-        status: regIsAdmin ? 'approved' : 'pending',
+        role: isAdminCreation ? 'admin' : 'Employé',
+        team: isAdminCreation ? 'Direction Chantier' : 'Ouvriers',
+        status: isAdminCreation ? 'approved' : 'pending',
         projectCode: assignedProjectCode,
         joinedAt: new Date().toISOString().split('T')[0],
         canViewPlanning: true,
@@ -1089,13 +1093,13 @@ export default function App() {
         canViewWorkers: true,
         canViewTools: true,
         canViewPointage: true,
-        canAddReclamation: regIsAdmin,
+        canAddReclamation: isAdminCreation,
         canAddRequest: true
       };
 
       await setDoc(doc(db, "users", authUser.uid), newUser);
 
-      if (regIsAdmin) {
+      if (isAdminCreation) {
         setCurrentUser(newUser);
         setActiveTab('dashboard');
       } else {
@@ -1231,7 +1235,7 @@ export default function App() {
                     <div className="bg-black/30 p-3 rounded-xl border border-white/10 flex items-center justify-between">
                       <div>
                         <span className="text-xs font-bold text-white block">Partager mon numéro</span>
-                        <span className="text-[10px] text-slate-400">Si masqué, une demande d'accès est requise. </span>
+                        <span className="text-[10px] text-slate-400">Si le numéro est masqué, une demande d'accès est requise.</span>
                       </div>
                       <input 
                         type="checkbox" 
@@ -1262,16 +1266,49 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-white/10 space-y-2">
-                      <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-200">
-                        <input type="checkbox" checked={regIsAdmin} onChange={e => setRegIsAdmin(e.target.checked)} className="rounded border-slate-700 bg-black/40 text-blue-600 focus:ring-blue-500" />
-                        <span>Je crée un compte administrateur</span>
-                      </label>
+                    {/* Choix interactif entre Rejoindre un chantier ou Créer un compte administrateur */}
+                    <div className="pt-2 border-t border-white/10 space-y-3">
+                      <label className="block text-xs font-medium text-slate-300">Que souhaitez-vous faire ?</label>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setRegistrationType('join')}
+                          className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                            registrationType === 'join'
+                              ? 'bg-blue-600/30 border-blue-500 text-white shadow-md'
+                              : 'bg-black/30 border-white/10 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <span className="text-xs font-bold block mb-1">👷‍♂️ Je rejoins un chantier</span>
+                          <span className="text-[10px] opacity-80">Saisir le code de votre chef</span>
+                        </button>
 
-                      {!regIsAdmin && (
-                        <div>
-                          <label className="block text-xs font-medium text-slate-300 mb-1">Code projet de votre administrateur</label>
-                          <input type="text" required={!regIsAdmin} value={regProjectCode} onChange={e => setRegProjectCode(e.target.value)} placeholder="ex: CHANTIER-4821" className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 uppercase font-mono tracking-wider focus:outline-none" />
+                        <button
+                          type="button"
+                          onClick={() => setRegistrationType('create')}
+                          className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                            registrationType === 'create'
+                              ? 'bg-emerald-600/30 border-emerald-500 text-white shadow-md'
+                              : 'bg-black/30 border-white/10 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <span className="text-xs font-bold block mb-1">🚀 Je crée un chantier</span>
+                          <span className="text-[10px] opacity-80">Créer mon compte Admin</span>
+                        </button>
+                      </div>
+
+                      {registrationType === 'join' && (
+                        <div className="animate-fadeIn pt-1">
+                          <label className="block text-xs font-medium text-slate-300 mb-1">Code du chantier (transmis par votre chef)</label>
+                          <input 
+                            type="text" 
+                            required={registrationType === 'join'} 
+                            value={regProjectCode} 
+                            onChange={e => setRegProjectCode(e.target.value)} 
+                            placeholder="ex: CHANTIER-4821" 
+                            className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 uppercase font-mono tracking-wider focus:outline-none" 
+                          />
                         </div>
                       )}
                     </div>
