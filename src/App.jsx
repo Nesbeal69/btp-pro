@@ -42,6 +42,7 @@ import {
   ChevronRight,
   Image as ImageIcon,
   Filter,
+  Shield,
   Trash2
 } from 'lucide-react';
 
@@ -84,9 +85,12 @@ export default function App() {
     customRole: '',
     password: '', 
     photoURL: '',
-    canAddReclamation: false,
-    canAddRequest: true,
-    canViewTools: true
+    canViewPlanning: true,
+    canViewRequests: true,
+    canViewReclamations: true,
+    canViewWorkers: true,
+    canViewTools: true,
+    canViewPointage: true
   });
 
   const [showApproveModal, setShowApproveModal] = useState(false);
@@ -94,9 +98,12 @@ export default function App() {
   const [selectedRoleToAssign, setSelectedRoleToAssign] = useState('Employé');
   const [customRoleInput, setCustomRoleInput] = useState('');
   const [approvePermissions, setApprovePermissions] = useState({
-    canAddReclamation: false,
-    canAddRequest: true,
-    canViewTools: true
+    canViewPlanning: true,
+    canViewRequests: true,
+    canViewReclamations: true,
+    canViewWorkers: true,
+    canViewTools: true,
+    canViewPointage: true
   });
 
   const [users, setUsers] = useState([]);
@@ -175,8 +182,23 @@ export default function App() {
   const [workerRoleFilter, setWorkerRoleFilter] = useState('all');
 
   const isAdmin = currentUser?.role === 'admin';
-  const canAddReclamation = isAdmin || currentUser?.canAddReclamation === true;
   const myProjectCode = currentUser ? (currentUser.projectCode || currentUser.adminProjectCode) : null;
+
+  // Fonctions de vérification des onglets pour l'utilisateur connecté
+  const hasAccess = (tabName) => {
+    if (isAdmin) return true;
+    if (!currentUser) return false;
+    if (tabName === 'dashboard') return true;
+    if (tabName === 'planning') return currentUser.canViewPlanning ?? true;
+    if (tabName === 'requests') return currentUser.canViewRequests ?? true;
+    if (tabName === 'reclamations') return currentUser.canViewReclamations ?? true;
+    if (tabName === 'workers') return currentUser.canViewWorkers ?? true;
+    if (tabName === 'tools') return currentUser.canViewTools ?? true;
+    if (tabName === 'pointage') return currentUser.canViewPointage ?? true;
+    return true;
+  };
+
+  const canAddReclamation = isAdmin || currentUser?.canAddReclamation === true || currentUser?.canViewReclamations === true;
 
   const formatPhoneFr = (phoneStr) => {
     if (!phoneStr) return 'Non renseigné';
@@ -705,9 +727,12 @@ export default function App() {
       customRole: isStandard ? '' : currentRole,
       password: userToEdit.password || '', 
       photoURL: userToEdit.photoURL || '',
-      canAddReclamation: userToEdit.canAddReclamation || false,
-      canAddRequest: userToEdit.canAddRequest ?? true,
-      canViewTools: userToEdit.canViewTools ?? true
+      canViewPlanning: userToEdit.canViewPlanning ?? true,
+      canViewRequests: userToEdit.canViewRequests ?? true,
+      canViewReclamations: userToEdit.canViewReclamations ?? true,
+      canViewWorkers: userToEdit.canViewWorkers ?? true,
+      canViewTools: userToEdit.canViewTools ?? true,
+      canViewPointage: userToEdit.canViewPointage ?? true
     });
     setShowUserModal(true);
   };
@@ -728,9 +753,13 @@ export default function App() {
 
       if (currentUser.role === 'admin') {
         updatePayload.role = finalRole;
-        updatePayload.canAddReclamation = userModalData.canAddReclamation;
-        updatePayload.canAddRequest = userModalData.canAddRequest;
+        updatePayload.canViewPlanning = userModalData.canViewPlanning;
+        updatePayload.canViewRequests = userModalData.canViewRequests;
+        updatePayload.canViewReclamations = userModalData.canViewReclamations;
+        updatePayload.canViewWorkers = userModalData.canViewWorkers;
         updatePayload.canViewTools = userModalData.canViewTools;
+        updatePayload.canViewPointage = userModalData.canViewPointage;
+        updatePayload.canAddReclamation = userModalData.canViewReclamations;
       }
 
       await updateDoc(doc(db, "users", userModalData.firestoreId), updatePayload);
@@ -762,9 +791,12 @@ export default function App() {
     setSelectedRoleToAssign('Employé');
     setCustomRoleInput('');
     setApprovePermissions({
-      canAddReclamation: false,
-      canAddRequest: true,
-      canViewTools: true
+      canViewPlanning: true,
+      canViewRequests: true,
+      canViewReclamations: true,
+      canViewWorkers: true,
+      canViewTools: true,
+      canViewPointage: true
     });
     setShowApproveModal(true);
   };
@@ -779,9 +811,13 @@ export default function App() {
       await updateDoc(doc(db, "users", userToApprove.firestoreId), { 
         status: 'approved',
         role: finalRole,
-        canAddReclamation: approvePermissions.canAddReclamation,
-        canAddRequest: approvePermissions.canAddRequest,
-        canViewTools: approvePermissions.canViewTools
+        canViewPlanning: approvePermissions.canViewPlanning,
+        canViewRequests: approvePermissions.canViewRequests,
+        canViewReclamations: approvePermissions.canViewReclamations,
+        canViewWorkers: approvePermissions.canViewWorkers,
+        canViewTools: approvePermissions.canViewTools,
+        canViewPointage: approvePermissions.canViewPointage,
+        canAddReclamation: approvePermissions.canViewReclamations
       });
       setShowApproveModal(false);
       setUserToApprove(null);
@@ -967,9 +1003,14 @@ export default function App() {
         status: regIsAdmin ? 'approved' : 'pending',
         projectCode: assignedProjectCode,
         joinedAt: new Date().toISOString().split('T')[0],
+        canViewPlanning: true,
+        canViewRequests: true,
+        canViewReclamations: regIsAdmin,
+        canViewWorkers: true,
+        canViewTools: true,
+        canViewPointage: true,
         canAddReclamation: regIsAdmin,
-        canAddRequest: true,
-        canViewTools: true
+        canAddRequest: true
       };
 
       await setDoc(doc(db, "users", authUser.uid), newUser);
@@ -1164,12 +1205,26 @@ export default function App() {
 
         <nav className="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200/60">
           <button onClick={() => setActiveTab('dashboard')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'dashboard' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Accueil</button>
-          <button onClick={() => { setSelectedDayOfWeek(null); setActiveTab('planning'); }} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'planning' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Planning</button>
-          <button onClick={() => setActiveTab('requests')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'requests' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Matériel</button>
-          <button onClick={() => setActiveTab('reclamations')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'reclamations' ? 'bg-white text-red-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Réclamations</button>
-          <button onClick={() => setActiveTab('workers')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'workers' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Effectifs</button>
-          <button onClick={() => setActiveTab('tools')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'tools' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Outillage</button>
-          <button onClick={() => setActiveTab('pointage')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'pointage' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Pointage</button>
+          
+          {hasAccess('planning') && (
+            <button onClick={() => { setSelectedDayOfWeek(null); setActiveTab('planning'); }} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'planning' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Planning</button>
+          )}
+          {hasAccess('requests') && (
+            <button onClick={() => setActiveTab('requests')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'requests' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Matériel</button>
+          )}
+          {hasAccess('reclamations') && (
+            <button onClick={() => setActiveTab('reclamations')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'reclamations' ? 'bg-white text-red-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Réclamations</button>
+          )}
+          {hasAccess('workers') && (
+            <button onClick={() => setActiveTab('workers')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'workers' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Effectifs</button>
+          )}
+          {hasAccess('tools') && (
+            <button onClick={() => setActiveTab('tools')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'tools' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Outillage</button>
+          )}
+          {hasAccess('pointage') && (
+            <button onClick={() => setActiveTab('pointage')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'pointage' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Pointage</button>
+          )}
+
           {isAdmin && (
             <button onClick={() => setActiveTab('accounts')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'accounts' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Validation Comptes</button>
           )}
@@ -1199,13 +1254,12 @@ export default function App() {
 
       <div className="lg:hidden bg-white border-b border-slate-200 px-4 py-2.5 overflow-x-auto flex items-center gap-2 shadow-xs">
         <button onClick={() => setActiveTab('dashboard')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>📊 Accueil</button>
-        <button onClick={() => { setSelectedDayOfWeek(null); setActiveTab('planning'); }} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'planning' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-700'}`}>📅 Planning</button>
-        <button onClick={() => setActiveTab('requests')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'requests' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-700'}`}>📦 Matériel</button>
-        <button onClick={() => setActiveTab('reclamations')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'reclamations' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700'}`}>⚠️ Réclamations</button>
-        <button onClick={() => setActiveTab('workers')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'workers' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>👥 Effectifs</button>
-        <button onClick={() => setActiveTab('tools')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'tools' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700'}`}>🔧 Outillage</button>
-        <button onClick={() => setActiveTab('pointage')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'pointage' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>⏱️ Pointage</button>
-
+        {hasAccess('planning') && <button onClick={() => { setSelectedDayOfWeek(null); setActiveTab('planning'); }} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'planning' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-700'}`}>📅 Planning</button>}
+        {hasAccess('requests') && <button onClick={() => setActiveTab('requests')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'requests' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-700'}`}>📦 Matériel</button>}
+        {hasAccess('reclamations') && <button onClick={() => setActiveTab('reclamations')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'reclamations' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700'}`}>⚠️ Réclamations</button>}
+        {hasAccess('workers') && <button onClick={() => setActiveTab('workers')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'workers' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>👥 Effectifs</button>}
+        {hasAccess('tools') && <button onClick={() => setActiveTab('tools')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'tools' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700'}`}>🔧 Outillage</button>}
+        {hasAccess('pointage') && <button onClick={() => setActiveTab('pointage')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'pointage' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>⏱️ Pointage</button>}
         {isAdmin && <button onClick={() => setActiveTab('accounts')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'accounts' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-700'}`}>🛡️ Comptes</button>}
       </div>
 
@@ -1236,91 +1290,103 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div onClick={() => { setSelectedDayOfWeek(null); setActiveTab('planning'); }} className="group bg-white border border-slate-200/80 hover:border-cyan-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-3.5 bg-cyan-50 text-cyan-600 rounded-2xl"><CalendarIcon className="w-6 h-6" /></div>
-                    <span className="px-2.5 py-1 bg-cyan-50 text-cyan-700 text-xs font-bold rounded-full">{projectPlans.length} dispo</span>
+              {hasAccess('planning') && (
+                <div onClick={() => { setSelectedDayOfWeek(null); setActiveTab('planning'); }} className="group bg-white border border-slate-200/80 hover:border-cyan-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="p-3.5 bg-cyan-50 text-cyan-600 rounded-2xl"><CalendarIcon className="w-6 h-6" /></div>
+                      <span className="px-2.5 py-1 bg-cyan-50 text-cyan-700 text-xs font-bold rounded-full">{projectPlans.length} dispo</span>
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900 group-hover:text-cyan-600">Planning</h3>
+                    <p className="text-xs text-slate-500 mt-1">Retrouvez vos tâches programmées par semaine</p>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-cyan-600">Planning</h3>
-                  <p className="text-xs text-slate-500 mt-1">Retrouvez vos tâches programmées par semaine</p>
+                  <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-cyan-600">
+                    <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
+                  </div>
                 </div>
-                <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-cyan-600">
-                  <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
-                </div>
-              </div>
+              )}
 
-              <div onClick={() => setActiveTab('pointage')} className="group bg-white border border-slate-200/80 hover:border-blue-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl"><Clock className="w-6 h-6" /></div>
-                    <span className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full">Heures</span>
+              {hasAccess('pointage') && (
+                <div onClick={() => setActiveTab('pointage')} className="group bg-white border border-slate-200/80 hover:border-blue-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl"><Clock className="w-6 h-6" /></div>
+                      <span className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full">Heures</span>
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600">Pointage & Absences</h3>
+                    <p className="text-xs text-slate-500 mt-1">Validez vos heures de la semaine en 1 clic.</p>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600">Pointage & Absences</h3>
-                  <p className="text-xs text-slate-500 mt-1">Validez vos heures de la semaine en 1 clic.</p>
+                  <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-blue-600">
+                    <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
+                  </div>
                 </div>
-                <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-blue-600">
-                  <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
-                </div>
-              </div>
+              )}
 
-              <div onClick={() => setActiveTab('requests')} className="group bg-white border border-slate-200/80 hover:border-amber-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-3.5 bg-amber-50 text-amber-600 rounded-2xl"><ClipboardList className="w-6 h-6" /></div>
-                    <span className="px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full">{projectRequests.length} demandes</span>
+              {hasAccess('requests') && (
+                <div onClick={() => setActiveTab('requests')} className="group bg-white border border-slate-200/80 hover:border-amber-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="p-3.5 bg-amber-50 text-amber-600 rounded-2xl"><ClipboardList className="w-6 h-6" /></div>
+                      <span className="px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full">{projectRequests.length} demandes</span>
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-600">Demandes Matériel & Fournitures</h3>
+                    <p className="text-xs text-slate-500 mt-1">Transmettez tous vos besoins EPI, outillage, fournitures.</p>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-600">Demandes Matériel & Fournitures</h3>
-                  <p className="text-xs text-slate-500 mt-1">Transmettez tous vos besoins EPI, outillage, fournitures.</p>
+                  <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-amber-600">
+                    <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
+                  </div>
                 </div>
-                <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-amber-600">
-                  <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
-                </div>
-              </div>
+              )}
 
-              <div onClick={() => setActiveTab('reclamations')} className="group bg-white border border-slate-200/80 hover:border-red-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-3.5 bg-red-50 text-red-600 rounded-2xl"><AlertTriangle className="w-6 h-6" /></div>
-                    <span className="px-2.5 py-1 bg-red-50 text-red-700 text-xs font-bold rounded-full">
-                      {projectReclamations.filter(r => r.status === 'À faire').length} en cours
-                    </span>
+              {hasAccess('reclamations') && (
+                <div onClick={() => setActiveTab('reclamations')} className="group bg-white border border-slate-200/80 hover:border-red-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="p-3.5 bg-red-50 text-red-600 rounded-2xl"><AlertTriangle className="w-6 h-6" /></div>
+                      <span className="px-2.5 py-1 bg-red-50 text-red-700 text-xs font-bold rounded-full">
+                        {projectReclamations.filter(r => r.status === 'À faire').length} en cours
+                      </span>
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900 group-hover:text-red-600">Réclamations & Réserves</h3>
+                    <p className="text-xs text-slate-500 mt-1">Suivi par logement, appartement et étage.</p>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-red-600">Réclamations & Réserves</h3>
-                  <p className="text-xs text-slate-500 mt-1">Suivi par logement, appartement et étage.</p>
+                  <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-red-600">
+                    <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
+                  </div>
                 </div>
-                <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-red-600">
-                  <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
-                </div>
-              </div>
+              )}
 
-              <div onClick={() => setActiveTab('workers')} className="group bg-white border border-slate-200/80 hover:border-emerald-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl"><Users className="w-6 h-6" /></div>
-                    <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full">{approvedUsers.length} actifs</span>
+              {hasAccess('workers') && (
+                <div onClick={() => setActiveTab('workers')} className="group bg-white border border-slate-200/80 hover:border-emerald-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl"><Users className="w-6 h-6" /></div>
+                      <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full">{approvedUsers.length} actifs</span>
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900 group-hover:text-emerald-600">Effectifs</h3>
+                    <p className="text-xs text-slate-500 mt-1">Annuaire de votre équipe et numéros.</p>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-emerald-600">Effectifs</h3>
-                  <p className="text-xs text-slate-500 mt-1">Annuaire de votre équipe et numéros.</p>
+                  <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-emerald-600">
+                    <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
+                  </div>
                 </div>
-                <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-emerald-600">
-                  <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
-                </div>
-              </div>
+              )}
 
-              <div onClick={() => setActiveTab('tools')} className="group bg-white border border-slate-200/80 hover:border-indigo-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl"><Wrench className="w-6 h-6" /></div>
-                    <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full">{projectEquipment.length} machines</span>
+              {hasAccess('tools') && (
+                <div onClick={() => setActiveTab('tools')} className="group bg-white border border-slate-200/80 hover:border-indigo-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl"><Wrench className="w-6 h-6" /></div>
+                      <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full">{projectEquipment.length} machines</span>
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600">Parc Outillage</h3>
+                    <p className="text-xs text-slate-500 mt-1">Suivi du parc et des maintenances.</p>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600">Parc Outillage</h3>
-                  <p className="text-xs text-slate-500 mt-1">Suivi du parc et des maintenances.</p>
+                  <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-indigo-600">
+                    <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
+                  </div>
                 </div>
-                <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-indigo-600">
-                  <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
-                </div>
-              </div>
+              )}
 
               {isAdmin && (
                 <div onClick={() => setActiveTab('accounts')} className="group bg-white border border-slate-200/80 hover:border-purple-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
@@ -1341,7 +1407,7 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === 'pointage' && (
+        {activeTab === 'pointage' && hasAccess('pointage') && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-blue-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex items-center gap-4">
@@ -1579,7 +1645,7 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === 'requests' && (
+        {activeTab === 'requests' && hasAccess('requests') && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-amber-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-amber-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex items-center gap-4">
@@ -1741,7 +1807,7 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === 'reclamations' && (
+        {activeTab === 'reclamations' && hasAccess('reclamations') && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-red-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-red-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex items-center gap-4">
@@ -1899,7 +1965,7 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === 'planning' && (
+        {activeTab === 'planning' && hasAccess('planning') && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-cyan-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex items-center gap-4">
@@ -2143,7 +2209,7 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === 'workers' && (
+        {activeTab === 'workers' && hasAccess('workers') && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-emerald-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex items-center gap-4">
@@ -2183,12 +2249,6 @@ export default function App() {
                         <span className="font-mono font-bold text-slate-900 text-sm">{formatPhoneFr(user.phone)}</span>
                       </div>
                     </a>
-
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {user.canAddReclamation && (
-                        <span className="px-2 py-0.5 bg-red-50 text-red-700 text-[10px] font-bold rounded-lg border border-red-200">⚠️ Peut ajouter réclamations</span>
-                      )}
-                    </div>
 
                     <div className="mt-2 text-[11px] text-slate-400 font-medium">Inscrit le : {user.joinedAt}</div>
                   </div>
@@ -2240,7 +2300,7 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === 'tools' && (
+        {activeTab === 'tools' && hasAccess('tools') && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-indigo-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex items-center gap-4">
@@ -2642,7 +2702,7 @@ export default function App() {
           <form onSubmit={handleConfirmApprove} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
             <div>
               <h3 className="text-lg font-bold text-slate-900">Approuver {userToApprove.name}</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Définissez son rôle et ses permissions d'accès au chantier.</p>
+              <p className="text-xs text-slate-500 mt-0.5">Définissez son rôle et cochez les onglets autorisés.</p>
             </div>
             
             <div>
@@ -2671,21 +2731,35 @@ export default function App() {
               )}
             </div>
 
-            <div className="pt-3 border-t border-slate-100 space-y-2.5">
-              <span className="text-xs font-bold text-slate-800 block">Permissions & Autorisations :</span>
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <span className="text-xs font-bold text-slate-800 block">Autorisations d'accès aux onglets :</span>
               
-              <label className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-xl border border-slate-200/60 cursor-pointer">
-                <input 
-                  type="checkbox"
-                  checked={approvePermissions.canAddReclamation}
-                  onChange={e => setApprovePermissions({...approvePermissions, canAddReclamation: e.target.checked})}
-                  className="rounded border-slate-300 text-red-600 focus:ring-red-500 w-4 h-4"
-                />
-                <div className="text-xs">
-                  <strong className="text-slate-900 block">Ajouter des Réclamations / Réserves</strong>
-                  <span className="text-slate-500 text-[10px]">Permet de créer et déclarer des réserves logements.</span>
-                </div>
-              </label>
+              <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/70 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.canViewPlanning} onChange={e => setApprovePermissions({...approvePermissions, canViewPlanning: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>📅 Planning</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.canViewRequests} onChange={e => setApprovePermissions({...approvePermissions, canViewRequests: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>📦 Matériel</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.canViewReclamations} onChange={e => setApprovePermissions({...approvePermissions, canViewReclamations: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>⚠️ Réclamations</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.canViewWorkers} onChange={e => setApprovePermissions({...approvePermissions, canViewWorkers: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>👥 Effectifs</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.canViewTools} onChange={e => setApprovePermissions({...approvePermissions, canViewTools: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>🔧 Outillage</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.canViewPointage} onChange={e => setApprovePermissions({...approvePermissions, canViewPointage: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>⏱️ Pointage</span>
+                </label>
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
@@ -2899,19 +2973,36 @@ export default function App() {
 
               {isAdmin && (
                 <div className="pt-3 border-t border-slate-100 space-y-2">
-                  <span className="text-xs font-bold text-slate-800 block">Permissions d'accès :</span>
-                  <label className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-xl border border-slate-200/60 cursor-pointer">
-                    <input 
-                      type="checkbox"
-                      checked={userModalData.canAddReclamation}
-                      onChange={e => setUserModalData({...userModalData, canAddReclamation: e.target.checked})}
-                      className="rounded border-slate-300 text-red-600 focus:ring-red-500 w-4 h-4"
-                    />
-                    <div className="text-xs">
-                      <strong className="text-slate-900 block">Ajouter des Réclamations</strong>
-                      <span className="text-slate-500 text-[10px]">Autorise à créer des fiches réserves.</span>
-                    </div>
-                  </label>
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                    <Shield className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Autorisations d'accès aux onglets (Admin uniquement) :</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/70 text-xs">
+                    <label className="flex items-center gap-2 cursor-pointer font-medium">
+                      <input type="checkbox" checked={userModalData.canViewPlanning} onChange={e => setUserModalData({...userModalData, canViewPlanning: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                      <span>📅 Planning</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer font-medium">
+                      <input type="checkbox" checked={userModalData.canViewRequests} onChange={e => setUserModalData({...userModalData, canViewRequests: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                      <span>📦 Matériel</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer font-medium">
+                      <input type="checkbox" checked={userModalData.canViewReclamations} onChange={e => setUserModalData({...userModalData, canViewReclamations: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                      <span>⚠️ Réclamations</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer font-medium">
+                      <input type="checkbox" checked={userModalData.canViewWorkers} onChange={e => setUserModalData({...userModalData, canViewWorkers: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                      <span>👥 Effectifs</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer font-medium">
+                      <input type="checkbox" checked={userModalData.canViewTools} onChange={e => setUserModalData({...userModalData, canViewTools: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                      <span>🔧 Outillage</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer font-medium">
+                      <input type="checkbox" checked={userModalData.canViewPointage} onChange={e => setUserModalData({...userModalData, canViewPointage: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                      <span>⏱️ Pointage</span>
+                    </label>
+                  </div>
                 </div>
               )}
 
