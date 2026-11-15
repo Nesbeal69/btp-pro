@@ -90,7 +90,8 @@ export default function App() {
     canViewReclamations: true,
     canViewWorkers: true,
     canViewTools: true,
-    canViewPointage: true
+    canViewPointage: true,
+    canAddReclamation: false
   });
 
   const [showApproveModal, setShowApproveModal] = useState(false);
@@ -103,7 +104,8 @@ export default function App() {
     canViewReclamations: true,
     canViewWorkers: true,
     canViewTools: true,
-    canViewPointage: true
+    canViewPointage: true,
+    canAddReclamation: false
   });
 
   const [users, setUsers] = useState([]);
@@ -198,7 +200,8 @@ export default function App() {
     return true;
   };
 
-  const canAddReclamation = isAdmin || currentUser?.canAddReclamation === true || currentUser?.canViewReclamations === true;
+  // Droit de création dissocié de la simple vue
+  const canAddReclamation = isAdmin || currentUser?.canAddReclamation === true;
 
   const formatPhoneFr = (phoneStr) => {
     if (!phoneStr) return 'Non renseigné';
@@ -732,7 +735,8 @@ export default function App() {
       canViewReclamations: userToEdit.canViewReclamations ?? true,
       canViewWorkers: userToEdit.canViewWorkers ?? true,
       canViewTools: userToEdit.canViewTools ?? true,
-      canViewPointage: userToEdit.canViewPointage ?? true
+      canViewPointage: userToEdit.canViewPointage ?? true,
+      canAddReclamation: userToEdit.canAddReclamation ?? false
     });
     setShowUserModal(true);
   };
@@ -759,7 +763,7 @@ export default function App() {
         updatePayload.canViewWorkers = userModalData.canViewWorkers;
         updatePayload.canViewTools = userModalData.canViewTools;
         updatePayload.canViewPointage = userModalData.canViewPointage;
-        updatePayload.canAddReclamation = userModalData.canViewReclamations;
+        updatePayload.canAddReclamation = userModalData.canAddReclamation;
       }
 
       await updateDoc(doc(db, "users", userModalData.firestoreId), updatePayload);
@@ -796,7 +800,8 @@ export default function App() {
       canViewReclamations: true,
       canViewWorkers: true,
       canViewTools: true,
-      canViewPointage: true
+      canViewPointage: true,
+      canAddReclamation: false
     });
     setShowApproveModal(true);
   };
@@ -817,7 +822,7 @@ export default function App() {
         canViewWorkers: approvePermissions.canViewWorkers,
         canViewTools: approvePermissions.canViewTools,
         canViewPointage: approvePermissions.canViewPointage,
-        canAddReclamation: approvePermissions.canViewReclamations
+        canAddReclamation: approvePermissions.canAddReclamation
       });
       setShowApproveModal(false);
       setUserToApprove(null);
@@ -1005,7 +1010,7 @@ export default function App() {
         joinedAt: new Date().toISOString().split('T')[0],
         canViewPlanning: true,
         canViewRequests: true,
-        canViewReclamations: regIsAdmin,
+        canViewReclamations: true,
         canViewWorkers: true,
         canViewTools: true,
         canViewPointage: true,
@@ -2745,7 +2750,7 @@ export default function App() {
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer font-medium">
                   <input type="checkbox" checked={approvePermissions.canViewReclamations} onChange={e => setApprovePermissions({...approvePermissions, canViewReclamations: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
-                  <span>⚠️ Réclamations</span>
+                  <span>⚠️ Réclamations (Voir)</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer font-medium">
                   <input type="checkbox" checked={approvePermissions.canViewWorkers} onChange={e => setApprovePermissions({...approvePermissions, canViewWorkers: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
@@ -2758,6 +2763,13 @@ export default function App() {
                 <label className="flex items-center gap-2 cursor-pointer font-medium">
                   <input type="checkbox" checked={approvePermissions.canViewPointage} onChange={e => setApprovePermissions({...approvePermissions, canViewPointage: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
                   <span>⏱️ Pointage</span>
+                </label>
+              </div>
+
+              <div className="bg-red-50/60 p-3 rounded-2xl border border-red-200/60 mt-2">
+                <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-red-900">
+                  <input type="checkbox" checked={approvePermissions.canAddReclamation} onChange={e => setApprovePermissions({...approvePermissions, canAddReclamation: e.target.checked})} className="rounded text-red-600 w-4 h-4" />
+                  <span>➕ Autoriser à créer des réclamations</span>
                 </label>
               </div>
             </div>
@@ -2988,7 +3000,7 @@ export default function App() {
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer font-medium">
                       <input type="checkbox" checked={userModalData.canViewReclamations} onChange={e => setUserModalData({...userModalData, canViewReclamations: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
-                      <span>⚠️ Réclamations</span>
+                      <span>⚠️ Réclamations (Voir)</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer font-medium">
                       <input type="checkbox" checked={userModalData.canViewWorkers} onChange={e => setUserModalData({...userModalData, canViewWorkers: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
@@ -3001,6 +3013,13 @@ export default function App() {
                     <label className="flex items-center gap-2 cursor-pointer font-medium">
                       <input type="checkbox" checked={userModalData.canViewPointage} onChange={e => setUserModalData({...userModalData, canViewPointage: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
                       <span>⏱️ Pointage</span>
+                    </label>
+                  </div>
+
+                  <div className="bg-red-50/60 p-3 rounded-2xl border border-red-200/60 mt-2">
+                    <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-red-900">
+                      <input type="checkbox" checked={userModalData.canAddReclamation} onChange={e => setUserModalData({...userModalData, canAddReclamation: e.target.checked})} className="rounded text-red-600 w-4 h-4" />
+                      <span>➕ Autoriser à créer des réclamations</span>
                     </label>
                   </div>
                 </div>
