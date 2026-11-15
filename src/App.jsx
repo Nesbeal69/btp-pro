@@ -1306,22 +1306,6 @@ export default function App() {
                 </div>
               )}
 
-              {hasAccess('pointage') && (
-                <div onClick={() => setActiveTab('pointage')} className="group bg-white border border-slate-200/80 hover:border-blue-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
-                  <div>
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl"><Clock className="w-6 h-6" /></div>
-                      <span className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full">Heures</span>
-                    </div>
-                    <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600">Pointage & Absences</h3>
-                    <p className="text-xs text-slate-500 mt-1">Validez vos heures de la semaine en 1 clic.</p>
-                  </div>
-                  <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-blue-600">
-                    <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
-                  </div>
-                </div>
-              )}
-
               {hasAccess('requests') && (
                 <div onClick={() => setActiveTab('requests')} className="group bg-white border border-slate-200/80 hover:border-amber-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
                   <div>
@@ -1383,6 +1367,22 @@ export default function App() {
                     <p className="text-xs text-slate-500 mt-1">Suivi du parc et des maintenances.</p>
                   </div>
                   <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-indigo-600">
+                    <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
+                  </div>
+                </div>
+              )}
+
+              {hasAccess('pointage') && (
+                <div onClick={() => setActiveTab('pointage')} className="group bg-white border border-slate-200/80 hover:border-blue-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl"><Clock className="w-6 h-6" /></div>
+                      <span className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full">Heures</span>
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600">Pointage & Absences</h3>
+                    <p className="text-xs text-slate-500 mt-1">Validez vos heures de la semaine en 1 clic.</p>
+                  </div>
+                  <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-blue-600">
                     <span>Accéder</span> <ArrowUpRight className="w-4 h-4" />
                   </div>
                 </div>
