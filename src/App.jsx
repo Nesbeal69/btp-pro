@@ -1231,7 +1231,7 @@ export default function App() {
                     <div className="bg-black/30 p-3 rounded-xl border border-white/10 flex items-center justify-between">
                       <div>
                         <span className="text-xs font-bold text-white block">Partager mon numéro</span>
-                        <span className="text-[10px] text-slate-400">Si masqué, les gars devront faire une demande.</span>
+                        <span className="text-[10px] text-slate-400">Si masqué, une demande d'accès est requise. </span>
                       </div>
                       <input 
                         type="checkbox" 
