@@ -1153,10 +1153,10 @@ export default function App() {
           <div className="w-full max-w-md bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl shadow-2xl p-8 overflow-hidden">
             <div className="text-center mb-6">
               <div className="inline-flex p-3.5 bg-blue-600/20 border border-blue-400/30 rounded-2xl mb-3 shadow-inner">
-                <img src="/logo-off.png" alt="Logo Bâtir+ Pro" className="w-9 h-9 object-contain" />
+                <img src="/Logo-casque-jaune.png" alt="Logo Bâtir+ Pro" className="w-9 h-9 object-contain" />
               </div>
               <h1 className="text-2xl font-black text-white tracking-wider">BÂTIR+ <span className="text-blue-400 font-light">PRO</span></h1>
-              <p className="text-xs text-slate-300 mt-1 font-medium tracking-wide">La plateforme opérationnelle dédiée à l'organisation de vos chantiers.</p>
+              <p className="text-xs text-slate-300 mt-1 font-medium tracking-wide">La plateforme opérationnelle dédiée à l'organisation de vos équipes sur chantiers.</p>
             </div>
 
             {authMode === 'pending' ? (
@@ -1333,7 +1333,7 @@ export default function App() {
       <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-xs dark:bg-white">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
           <div className="flex items-center">
-            <img src="/logo.png" alt="Bâtir+ Pro" className="w-12 h-12 object-contain" />
+            <img src="/Logo-casque-jaune.png" alt="Bâtir+ Pro" className="w-12 h-12 object-contain" />
           </div>
           <span className="font-black text-base text-slate-900 tracking-tight">BÂTIR+ <span className="text-blue-600 font-light">PRO</span></span>
         </div>
