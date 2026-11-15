@@ -1281,7 +1281,7 @@ export default function App() {
                           }`}
                         >
                           <span className="text-xs font-bold block mb-1">👷‍♂️ Je rejoins un chantier</span>
-                          <span className="text-[10px] opacity-80">Saisir le code de votre chef</span>
+                          <span className="text-[10px] opacity-80">Saisir le code de votre administrateur</span>
                         </button>
 
                         <button
