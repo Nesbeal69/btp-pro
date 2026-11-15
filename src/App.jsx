@@ -118,7 +118,12 @@ export default function App() {
 
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedWeek, setSelectedWeek] = useState(getWeekNumber(new Date()));
-  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(null);
+  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(() => {
+    const d = new Date();
+    let dayNum = d.getDay();
+    if (dayNum === 0) dayNum = 7;
+    return dayNum <= 5 ? dayNum : 1;
+  });
 
   const [pointageUserFilter, setPointageUserFilter] = useState('all');
   const [showPointageEditModal, setShowPointageEditModal] = useState(false);
@@ -845,7 +850,9 @@ export default function App() {
 
     selectedFiles.forEach((file) => {
       if (file.size > 600 * 1024) {
-        alert(`❌ Le fichier "${file.name}" est trop lourd (${Math.round(file.size / 1024)} Ko).\n\nLa taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre !`);
+        alert(`❌ Le fichier "${file.name}" est trop lourd (${Math.round(file.size / 1024)} Ko).
+
+La taille max est de 600 Ko. Compresse ton PDF sur ILovePDF avant de le joindre !`);
         hasError = true;
         return;
       }
@@ -1063,7 +1070,7 @@ export default function App() {
 
   if (!currentUser) {
     return (
-      <div className="min-h-screen text-slate-100 flex flex-col relative overflow-hidden">
+      <div className="min-h-screen text-slate-100 flex flex-col relative overflow-hidden bg-white dark:bg-black">
         <div 
           className="absolute inset-0 bg-cover bg-center z-0 filter brightness-[0.35] scale-105"
           style={{ backgroundImage: `url('https://images.unsplash.com/photo-1581094288338-2314dddb7ece?q=80&w=2000&auto=format&fit=crop')` }}
@@ -1199,8 +1206,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans">
-      <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+    <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans dark:bg-white dark:text-slate-900">
+      <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-xs dark:bg-white">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
           <div className="flex items-center">
             <img src="/logo.png" alt="Bâtir+ Pro" className="w-12 h-12 object-contain" />
@@ -1208,11 +1215,20 @@ export default function App() {
           <span className="font-black text-base text-slate-900 tracking-tight">BÂTIR+ <span className="text-blue-600 font-light">PRO</span></span>
         </div>
 
-        <nav className="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200/60">
+        <nav className="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200/60 dark:bg-slate-100">
           <button onClick={() => setActiveTab('dashboard')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'dashboard' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Accueil</button>
           
           {hasAccess('planning') && (
-            <button onClick={() => { setSelectedDayOfWeek(null); setActiveTab('planning'); }} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'planning' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Planning</button>
+            <button onClick={() => { 
+              const todayIndex = (() => {
+                const d = new Date();
+                let dayNum = d.getDay();
+                if (dayNum === 0) dayNum = 7;
+                return dayNum <= 5 ? dayNum : 1;
+              })();
+              setSelectedDayOfWeek(todayIndex); 
+              setActiveTab('planning'); 
+            }} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'planning' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Planning</button>
           )}
           {hasAccess('requests') && (
             <button onClick={() => setActiveTab('requests')} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'requests' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Matériel</button>
@@ -1257,9 +1273,18 @@ export default function App() {
         </div>
       </header>
 
-      <div className="lg:hidden bg-white border-b border-slate-200 px-4 py-2.5 overflow-x-auto flex items-center gap-2 shadow-xs">
+      <div className="lg:hidden bg-white border-b border-slate-200 px-4 py-2.5 overflow-x-auto flex items-center gap-2 shadow-xs dark:bg-white">
         <button onClick={() => setActiveTab('dashboard')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>📊 Accueil</button>
-        {hasAccess('planning') && <button onClick={() => { setSelectedDayOfWeek(null); setActiveTab('planning'); }} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'planning' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-700'}`}>📅 Planning</button>}
+        {hasAccess('planning') && <button onClick={() => { 
+          const todayIndex = (() => {
+            const d = new Date();
+            let dayNum = d.getDay();
+            if (dayNum === 0) dayNum = 7;
+            return dayNum <= 5 ? dayNum : 1;
+          })();
+          setSelectedDayOfWeek(todayIndex); 
+          setActiveTab('planning'); 
+        }} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'planning' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-700'}`}>📅 Planning</button>}
         {hasAccess('requests') && <button onClick={() => setActiveTab('requests')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'requests' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-700'}`}>📦 Matériel</button>}
         {hasAccess('reclamations') && <button onClick={() => setActiveTab('reclamations')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'reclamations' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700'}`}>⚠️ Réclamations</button>}
         {hasAccess('workers') && <button onClick={() => setActiveTab('workers')} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'workers' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>👥 Effectifs</button>}
@@ -1296,7 +1321,16 @@ export default function App() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {hasAccess('planning') && (
-                <div onClick={() => { setSelectedDayOfWeek(null); setActiveTab('planning'); }} className="group bg-white border border-slate-200/80 hover:border-cyan-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                <div onClick={() => { 
+                  const todayIndex = (() => {
+                    const d = new Date();
+                    let dayNum = d.getDay();
+                    if (dayNum === 0) dayNum = 7;
+                    return dayNum <= 5 ? dayNum : 1;
+                  })();
+                  setSelectedDayOfWeek(todayIndex); 
+                  setActiveTab('planning'); 
+                }} className="group bg-white border border-slate-200/80 hover:border-cyan-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between dark:bg-white dark:border-slate-200">
                   <div>
                     <div className="flex justify-between items-start mb-4">
                       <div className="p-3.5 bg-cyan-50 text-cyan-600 rounded-2xl"><CalendarIcon className="w-6 h-6" /></div>
@@ -1312,7 +1346,7 @@ export default function App() {
               )}
 
               {hasAccess('requests') && (
-                <div onClick={() => setActiveTab('requests')} className="group bg-white border border-slate-200/80 hover:border-amber-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                <div onClick={() => setActiveTab('requests')} className="group bg-white border border-slate-200/80 hover:border-amber-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between dark:bg-white dark:border-slate-200">
                   <div>
                     <div className="flex justify-between items-start mb-4">
                       <div className="p-3.5 bg-amber-50 text-amber-600 rounded-2xl"><ClipboardList className="w-6 h-6" /></div>
@@ -1328,7 +1362,7 @@ export default function App() {
               )}
 
               {hasAccess('reclamations') && (
-                <div onClick={() => setActiveTab('reclamations')} className="group bg-white border border-slate-200/80 hover:border-red-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                <div onClick={() => setActiveTab('reclamations')} className="group bg-white border border-slate-200/80 hover:border-red-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between dark:bg-white dark:border-slate-200">
                   <div>
                     <div className="flex justify-between items-start mb-4">
                       <div className="p-3.5 bg-red-50 text-red-600 rounded-2xl"><AlertTriangle className="w-6 h-6" /></div>
@@ -1346,7 +1380,7 @@ export default function App() {
               )}
 
               {hasAccess('workers') && (
-                <div onClick={() => setActiveTab('workers')} className="group bg-white border border-slate-200/80 hover:border-emerald-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                <div onClick={() => setActiveTab('workers')} className="group bg-white border border-slate-200/80 hover:border-emerald-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between dark:bg-white dark:border-slate-200">
                   <div>
                     <div className="flex justify-between items-start mb-4">
                       <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl"><Users className="w-6 h-6" /></div>
@@ -1362,7 +1396,7 @@ export default function App() {
               )}
 
               {hasAccess('tools') && (
-                <div onClick={() => setActiveTab('tools')} className="group bg-white border border-slate-200/80 hover:border-indigo-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                <div onClick={() => setActiveTab('tools')} className="group bg-white border border-slate-200/80 hover:border-indigo-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between dark:bg-white dark:border-slate-200">
                   <div>
                     <div className="flex justify-between items-start mb-4">
                       <div className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl"><Wrench className="w-6 h-6" /></div>
@@ -1378,7 +1412,7 @@ export default function App() {
               )}
 
               {hasAccess('pointage') && (
-                <div onClick={() => setActiveTab('pointage')} className="group bg-white border border-slate-200/80 hover:border-blue-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                <div onClick={() => setActiveTab('pointage')} className="group bg-white border border-slate-200/80 hover:border-blue-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between dark:bg-white dark:border-slate-200">
                   <div>
                     <div className="flex justify-between items-start mb-4">
                       <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl"><Clock className="w-6 h-6" /></div>
@@ -1394,7 +1428,7 @@ export default function App() {
               )}
 
               {isAdmin && (
-                <div onClick={() => setActiveTab('accounts')} className="group bg-white border border-slate-200/80 hover:border-purple-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                <div onClick={() => setActiveTab('accounts')} className="group bg-white border border-slate-200/80 hover:border-purple-500/60 p-6 rounded-3xl cursor-pointer shadow-sm hover:shadow-xl transition-all flex flex-col justify-between dark:bg-white dark:border-slate-200">
                   <div>
                     <div className="flex justify-between items-start mb-4">
                       <div className="p-3.5 bg-purple-50 text-purple-600 rounded-2xl"><UserCheck className="w-6 h-6" /></div>
@@ -1443,7 +1477,7 @@ export default function App() {
               )}
             </div>
 
-            <div className="bg-white border border-slate-200/80 p-4 rounded-3xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="bg-white border border-slate-200/80 p-4 rounded-3xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 dark:bg-white dark:border-slate-200">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
@@ -1495,7 +1529,7 @@ export default function App() {
                   const isPendingChange = record && record.status === 'DemandeModification';
 
                   return (
-                    <div key={day.dateStr} className={`bg-white border rounded-3xl p-5 shadow-sm transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${isToday ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10' : 'border-slate-200/80'}`}>
+                    <div key={day.dateStr} className={`bg-white border rounded-3xl p-5 shadow-sm transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 dark:bg-white ${isToday ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10' : 'border-slate-200/80'}`}>
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <span className={`px-2.5 py-0.5 rounded-lg text-xs font-bold ${isToday ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
@@ -1571,7 +1605,7 @@ export default function App() {
                 })}
               </div>
             ) : (
-              <div className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden shadow-sm">
+              <div className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden shadow-sm dark:bg-white dark:border-slate-200">
                 <div className="p-4 bg-slate-50 border-b border-slate-200/80 flex justify-between items-center text-xs font-bold text-slate-700">
                   <span>Tableau de contrôle des heures de l'équipe</span>
                   <span>Semaine {selectedWeek}</span>
@@ -1672,7 +1706,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200/80 p-4 rounded-3xl shadow-sm flex flex-wrap items-center gap-3">
+            <div className="bg-white border border-slate-200/80 p-4 rounded-3xl shadow-sm flex flex-wrap items-center gap-3 dark:bg-white dark:border-slate-200">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 <input
@@ -1710,7 +1744,7 @@ export default function App() {
               )}
             </div>
 
-            <div className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden shadow-sm">
+            <div className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden shadow-sm dark:bg-white dark:border-slate-200">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
@@ -1865,7 +1899,7 @@ export default function App() {
                   const pendingItemsCount = group.items ? group.items.filter(i => i.status !== 'Fait').length : (group.pendingCount || 0);
                   const hasPending = pendingItemsCount > 0;
                   return (
-                    <div key={group.key} className="bg-white border border-slate-200/80 hover:border-red-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative group/card">
+                    <div key={group.key} className="bg-white border border-slate-200/80 hover:border-red-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between relative group/card dark:bg-white dark:border-slate-200">
                       
                       {isAdmin && (
                         <button
@@ -1958,7 +1992,7 @@ export default function App() {
                 })}
 
               {filteredGroupedReclamations.length === 0 && (
-                <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3 dark:bg-white dark:border-slate-200">
                   <div className="w-12 h-12 bg-red-50 text-red-600 rounded-2xl mx-auto flex items-center justify-center">
                     <AlertTriangle className="w-6 h-6" />
                   </div>
@@ -2005,7 +2039,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200/80 p-4 rounded-3xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="bg-white border border-slate-200/80 p-4 rounded-3xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 dark:bg-white dark:border-slate-200">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
@@ -2101,7 +2135,7 @@ export default function App() {
 
                 if (mergedPlans.length === 0) {
                   return (
-                    <div className="py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                    <div className="py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3 dark:bg-white dark:border-slate-200">
                       <div className="w-12 h-12 bg-cyan-50 text-cyan-600 rounded-2xl mx-auto flex items-center justify-center">
                         <FolderOpen className="w-6 h-6" />
                       </div>
@@ -2116,7 +2150,7 @@ export default function App() {
                   return (
                     <div 
                       key={plan.firestoreId || Math.random()} 
-                      className={`bg-white border rounded-3xl p-6 shadow-sm hover:shadow-md transition-all relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 ${
+                      className={`bg-white border rounded-3xl p-6 shadow-sm hover:shadow-md transition-all relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 dark:bg-white ${
                         isToday ? 'border-cyan-500 ring-2 ring-cyan-500/20 bg-gradient-to-r from-cyan-50/30 to-white' : 'border-slate-200/80'
                       }`}
                     >
@@ -2234,7 +2268,7 @@ export default function App() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredWorkers.map(user => (
-                <div key={user.firestoreId} className="bg-white border border-slate-200/80 hover:border-emerald-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                <div key={user.firestoreId} className="bg-white border border-slate-200/80 hover:border-emerald-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between dark:bg-white dark:border-slate-200">
                   <div>
                     <div className="flex justify-between items-start">
                       <h3 className="text-base font-bold text-slate-900">{user.name}</h3>
@@ -2270,7 +2304,7 @@ export default function App() {
               ))}
 
               {filteredWorkers.length === 0 && (
-                <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3 dark:bg-white dark:border-slate-200">
                   <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl mx-auto flex items-center justify-center">
                     <Users className="w-6 h-6" />
                   </div>
@@ -2286,7 +2320,7 @@ export default function App() {
                   <Archive className="w-5 h-5 text-slate-500" />
                   <h3 className="text-base font-bold">Historique des effectifs archivés</h3>
                 </div>
-                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm dark:bg-white dark:border-slate-200">
                   <div className="divide-y divide-slate-100">
                     {projectArchivedUsers.map((arch, idx) => (
                       <div key={idx} className="p-4 flex justify-between items-center text-xs">
@@ -2325,7 +2359,7 @@ export default function App() {
               )}
             </div>
 
-            <div className="bg-white border border-slate-200/80 p-4 rounded-3xl shadow-sm flex flex-wrap items-center gap-3">
+            <div className="bg-white border border-slate-200/80 p-4 rounded-3xl shadow-sm flex flex-wrap items-center gap-3 dark:bg-white dark:border-slate-200">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 <input
@@ -2381,7 +2415,7 @@ export default function App() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredEquipment.map(tool => (
-                <div key={tool.firestoreId} className="bg-white border border-slate-200/80 hover:border-indigo-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+                <div key={tool.firestoreId} className="bg-white border border-slate-200/80 hover:border-indigo-500/50 p-6 rounded-3xl space-y-4 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between dark:bg-white dark:border-slate-200">
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-mono text-xs font-bold rounded-xl border border-indigo-100">
@@ -2430,7 +2464,7 @@ export default function App() {
               ))}
 
               {filteredEquipment.length === 0 && (
-                <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                <div className="col-span-full py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3 dark:bg-white dark:border-slate-200">
                   <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl mx-auto flex items-center justify-center">
                     <Wrench className="w-6 h-6" />
                   </div>
@@ -2456,7 +2490,7 @@ export default function App() {
 
             <div className="space-y-4">
               {pendingUsers.map(user => (
-                <div key={user.firestoreId} className="bg-white border border-slate-200/80 p-6 rounded-3xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
+                <div key={user.firestoreId} className="bg-white border border-slate-200/80 p-6 rounded-3xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm dark:bg-white dark:border-slate-200">
                   <div>
                     <h3 className="text-base font-bold text-slate-900">{user.name} <span className="text-xs font-normal text-slate-500">({user.email})</span></h3>
                     <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-emerald-600" /> <span className="font-mono">{formatPhoneFr(user.phone)}</span></p>
@@ -2469,7 +2503,7 @@ export default function App() {
               ))}
 
               {pendingUsers.length === 0 && (
-                <div className="py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3">
+                <div className="py-16 text-center bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-3 dark:bg-white dark:border-slate-200">
                   <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl mx-auto flex items-center justify-center">
                     <UserCheck className="w-6 h-6" />
                   </div>
@@ -2486,7 +2520,7 @@ export default function App() {
 
       {showPointageEditModal && editingPointageData && isAdmin && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleAdminSavePointage} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
+          <form onSubmit={handleAdminSavePointage} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden dark:bg-white">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <h3 className="text-base font-bold text-slate-900">Modifier le pointage de {editingPointageData.userName}</h3>
               <button type="button" onClick={() => setShowPointageEditModal(false)} className="w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">✕</button>
@@ -2554,7 +2588,7 @@ export default function App() {
 
       {resolvingReclamation && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleConfirmResolveReclamation} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
+          <form onSubmit={handleConfirmResolveReclamation} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden dark:bg-white">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <div>
                 <h3 className="text-base font-bold text-slate-900">Mettre à jour le signalement</h3>
@@ -2599,7 +2633,7 @@ export default function App() {
 
       {editingSignalement && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleSaveEditSignalement} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
+          <form onSubmit={handleSaveEditSignalement} className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden dark:bg-white">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <div>
                 <h3 className="text-base font-bold text-slate-900">Modifier le signalement</h3>
@@ -2630,7 +2664,7 @@ export default function App() {
 
       {showAddReclamationModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleCreateReclamation} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl">
+          <form onSubmit={handleCreateReclamation} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl dark:bg-white">
             <div className="flex justify-between items-center pb-2 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900">Nouvelle Réclamation / Réserve</h3>
               <button type="button" onClick={() => setShowAddReclamationModal(false)}>✕</button>
@@ -2704,7 +2738,7 @@ export default function App() {
 
       {showApproveModal && userToApprove && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleConfirmApprove} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+          <form onSubmit={handleConfirmApprove} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto dark:bg-white">
             <div>
               <h3 className="text-lg font-bold text-slate-900">Approuver {userToApprove.name}</h3>
               <p className="text-xs text-slate-500 mt-0.5">Définissez son rôle et cochez les onglets autorisés.</p>
@@ -2784,7 +2818,7 @@ export default function App() {
 
       {selectedTool && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white p-6 rounded-3xl w-full max-w-lg space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white p-6 rounded-3xl w-full max-w-lg space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto dark:bg-white">
             <div className="flex justify-between items-center pb-2 border-b border-slate-100">
               <div>
                 <h3 className="text-base font-bold text-slate-900">{selectedTool.name}</h3>
@@ -2818,7 +2852,7 @@ export default function App() {
 
       {selectedToolImage && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white p-4 rounded-3xl max-w-lg w-full space-y-4 shadow-2xl relative">
+          <div className="bg-white p-4 rounded-3xl max-w-lg w-full space-y-4 shadow-2xl relative dark:bg-white">
             <button onClick={() => setSelectedToolImage(null)} className="absolute right-4 top-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-xs z-10">✕</button>
             <h3 className="text-sm font-bold text-slate-900 px-2">Aperçu photo machine</h3>
             <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 flex items-center justify-center max-h-[70vh]">
@@ -2831,7 +2865,7 @@ export default function App() {
 
       {editingTool && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleSaveToolEdit} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl">
+          <form onSubmit={handleSaveToolEdit} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl dark:bg-white">
             <h3 className="text-lg font-bold text-slate-900">Modifier / Réaffecter l'outil</h3>
             
             <div>
@@ -2878,7 +2912,7 @@ export default function App() {
 
       {showUserModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden max-h-[90vh] overflow-y-auto dark:bg-white">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
@@ -3058,7 +3092,7 @@ export default function App() {
 
       {showAddRequestModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden">
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden dark:bg-white">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-bold text-sm">
@@ -3167,7 +3201,7 @@ export default function App() {
 
       {selectedRequestHistory && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl border border-slate-100">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl border border-slate-100 dark:bg-white">
             <div className="flex justify-between items-center pb-3 border-b border-slate-100">
               <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
                 📦 Historique complet des demandes
@@ -3252,7 +3286,7 @@ export default function App() {
 
       {selectedReclamationHistory && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 max-h-[80vh] overflow-y-auto shadow-2xl">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 max-h-[80vh] overflow-y-auto shadow-2xl dark:bg-white">
             <div className="flex justify-between items-center pb-3 border-b border-slate-100">
               <h3 className="font-bold text-slate-900 text-base">
                 Historique des passages et statuts
@@ -3364,7 +3398,7 @@ export default function App() {
               tasksList: [{ slotType: 'Journée complète', timeLabel: '08h00 - 17h00', title: '', description: '' }],
               files: []
             });
-          }} className="bg-white p-6 rounded-3xl w-full max-w-xl space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+          }} className="bg-white p-6 rounded-3xl w-full max-w-xl space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto dark:bg-white">
             <div className="flex justify-between items-center pb-2 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900">Assigner une Feuille de Route / Tâches</h3>
               <button type="button" onClick={() => setShowAddPlanModal(false)}>✕</button>
@@ -3567,7 +3601,7 @@ export default function App() {
             } catch (err) {
               console.error("Erreur modification plan :", err);
             }
-          }} className="bg-white p-6 rounded-3xl w-full max-w-xl space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+          }} className="bg-white p-6 rounded-3xl w-full max-w-xl space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto dark:bg-white">
             <div className="flex justify-between items-center pb-2 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900">Modifier la feuille de route</h3>
               <button type="button" onClick={() => setEditingPlan(null)}>✕</button>
@@ -3696,7 +3730,7 @@ export default function App() {
 
       {showAddToolModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleCreateTool} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl">
+          <form onSubmit={handleCreateTool} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl dark:bg-white">
             <h3 className="text-lg font-bold text-slate-900">Ajouter une machine</h3>
             
             <div>
