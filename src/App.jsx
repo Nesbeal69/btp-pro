@@ -2015,7 +2015,7 @@ export default function App() {
                   <option value="Fait" className="bg-slate-900">✅ Toutes résolues</option>
                 </select>
 
-                {canAddReclamation && (
+                 {(isAdmin || currentUser?.canAddReclamation) && (
                   <button 
                     onClick={() => setShowAddReclamationModal(true)} 
                     className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-red-600/30 transition-all"
@@ -2088,7 +2088,7 @@ export default function App() {
                                     <CheckCircle2 className="w-3.5 h-3.5" /> Mettre à jour
                                   </button>
 
-                                  {canAddReclamation && (
+                                  {(isAdmin || currentUser?.canAddReclamation) && (
                                     <button
                                       onClick={() => { setEditingSignalement(sig); setEditSignalementText(sig.observation); }}
                                       className="p-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl transition-colors"
