@@ -44,7 +44,8 @@ import {
   Shield,
   Trash2,
   Bell,
-  BellOff
+  BellOff,
+  Check
 } from 'lucide-react';
 
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -57,27 +58,20 @@ function getWeekNumber(date) {
   return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 
-// Fonction utilitaire pour vérifier si on est dans les horaires de travail
 function isWithinWorkingHours() {
   const now = new Date();
-  const day = now.getDay(); // 0 = Dimanche, 1 = Lundi, ..., 5 = Vendredi, 6 = Samedi
+  const day = now.getDay(); 
   const hours = now.getHours();
   const minutes = now.getMinutes();
   const currentTimeInMinutes = hours * 60 + minutes;
 
-  // Weekend (Samedi ou Dimanche)
   if (day === 0 || day === 6) return false;
-
-  // Vendredi : 8h00 à 13h00 (8 * 60 = 480 min, 13 * 60 = 780 min)
   if (day === 5) {
     return currentTimeInMinutes >= 480 && currentTimeInMinutes <= 780;
   }
-
-  // Lundi au Jeudi : 8h00 à 17h00 (8 * 60 = 480 min, 17 * 60 = 1020 min)
   if (day >= 1 && day <= 4) {
     return currentTimeInMinutes >= 480 && currentTimeInMinutes <= 1020;
   }
-
   return false;
 }
 
@@ -89,6 +83,10 @@ export default function App() {
   
   // État pour le mode repos (coché par défaut sur l'accueil)
   const [restModeEnabled, setRestModeEnabled] = useState(true);
+
+  // État pour la cloche de notifications
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
   
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -241,14 +239,32 @@ export default function App() {
   const isAdmin = currentUser?.role === 'admin';
   const myProjectCode = currentUser ? (currentUser.projectCode || currentUser.adminProjectCode) : null;
 
-  // Vérification de l'envoi des notifications pour un onglet donné
-  const shouldSendNotification = (tabName) => {
-    if (!currentUser) return false;
-    if (restModeEnabled && !isWithinWorkingHours()) {
-      return false;
+  // Fonction centrale pour déclencher et stocker une notification dans la cloche
+  const triggerNotification = async (tabName, title, message) => {
+    if (!currentUser || !myProjectCode) return;
+
+    // Si le mode repos global est actif ET qu'on est hors horaires, on ne fait pas de popup instantanée, 
+    // mais on enregistre quand même dans Firestore pour la cloche (historique persistant)
+    const isRestBlocked = restModeEnabled && !isWithinWorkingHours();
+    
+    // Vérification des onglets autorisés pour l'utilisateur
+    if (!isAdmin && currentUser.notifTabs?.[tabName] === false) {
+      return; // L'utilisateur a désactivé les notifs pour cet onglet
     }
-    if (isAdmin) return true;
-    return currentUser.notifTabs?.[tabName] ?? true;
+
+    try {
+      await addDoc(collection(db, "notifications"), {
+        projectCode: myProjectCode,
+        targetUserId: isAdmin ? 'all' : (currentUser.userIdNum || currentUser.id),
+        tabName,
+        title,
+        message,
+        createdAt: new Date().toISOString(),
+        read: false
+      });
+    } catch (e) {
+      console.error("Erreur enregistrement notification :", e);
+    }
   };
 
   const hasAccess = (tabName) => {
@@ -366,6 +382,10 @@ export default function App() {
       setPhoneRequests(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
     });
 
+    const unsubNotifs = onSnapshot(collection(db, "notifications"), (snapshot) => {
+      setNotifications(snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id })));
+    });
+
     return () => {
       unsubscribeAuth();
       unsubUsers();
@@ -376,8 +396,33 @@ export default function App() {
       unsubReclamations();
       unsubPointages();
       unsubPhoneReqs();
+      unsubNotifs();
     };
   }, []);
+
+  const projectNotifications = useMemo(() => {
+    if (!myProjectCode || !currentUser) return [];
+    const myId = currentUser.userIdNum || currentUser.id;
+    return notifications.filter(n => 
+      n.projectCode === myProjectCode && (n.targetUserId === 'all' || n.targetUserId === myId || n.targetUserId?.toString() === myId?.toString())
+    ).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  }, [notifications, myProjectCode, currentUser]);
+
+  const unreadNotifCount = useMemo(() => {
+    return projectNotifications.filter(n => !n.read).length;
+  }, [projectNotifications]);
+
+  const markAllNotificationsAsRead = async () => {
+    try {
+      for (const notif of projectNotifications) {
+        if (!notif.read && notif.firestoreId) {
+          await updateDoc(doc(db, "notifications", notif.firestoreId), { read: true });
+        }
+      }
+    } catch (e) {
+      console.error("Erreur lecture notifications :", e);
+    }
+  };
 
   const projectEquipment = useMemo(() => {
     if (!myProjectCode) return [];
@@ -480,6 +525,10 @@ export default function App() {
         isValidated,
         updatedAt: new Date().toISOString()
       }, { merge: true });
+
+      if (status === 'DemandeModification') {
+        await triggerNotification('pointage', '⚠️ Demande de modification d\'heure', `${currentUser.firstName} ${currentUser.name} demande une correction pour le ${day.dateStr}.`);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -574,9 +623,7 @@ export default function App() {
         passages: []
       });
 
-      if (shouldSendNotification('reclamations')) {
-        console.log("🔔 Notification réclamations envoyée");
-      }
+      await triggerNotification('reclamations', '⚠️ Nouvelle Réclamation', `Logement ${newReclamation.apartment} : ${newReclamation.observation}`);
 
       setShowAddReclamationModal(false);
       setNewReclamation({ building: '', apartment: '', floor: '', clientName: '', observation: '', urgency: 'Normal' });
@@ -678,9 +725,7 @@ export default function App() {
         notes: [initialNote]
       });
 
-      if (shouldSendNotification('tools')) {
-        console.log("🔔 Notification outillage envoyée");
-      }
+      await triggerNotification('tools', '🔧 Nouveau Matériel / Machine', `${newToolData.name} (${newToolData.brand}) ajouté au parc.`);
 
       setShowAddToolModal(false);
       setNewToolData({ id: '', name: '', brand: 'REMS', status: 'Disponible', assignedTo: 'Dépôt Central', imageURL: '' });
@@ -715,6 +760,7 @@ export default function App() {
       let transferNoteText = `Mise à jour statut / affectation`;
       if (oldAssign !== newAssign) {
         transferNoteText = `🔄 Transfert d'affectation : Passé de [${oldAssign}] à [${newAssign}] (par ${authorFullName})`;
+        await triggerNotification('tools', '🔄 Transfert d\'outillage', `${editingTool.name} transféré de ${oldAssign} à ${newAssign}.`);
       }
 
       const newHistoryNote = {
@@ -762,9 +808,7 @@ export default function App() {
         receivedDate: null
       });
 
-      if (shouldSendNotification('requests')) {
-        console.log("🔔 Notification matériel envoyée");
-      }
+      await triggerNotification('requests', '📦 Nouvelle Demande Matériel', `${requesterFullName} a demandé : ${newRequestData.items} (x${newRequestData.quantity})`);
 
       setShowAddRequestModal(false);
       setNewRequestData({ items: '', quantity: 1, urgency: 'Normal', description: '', attachmentName: '', attachmentData: '' });
@@ -1491,6 +1535,82 @@ export default function App() {
             </button>
           )}
 
+          {/* CLOCHE DE NOTIFICATIONS (LU / NON LU) */}
+          <div className="relative">
+            <button 
+              onClick={() => setShowNotifPanel(!showNotifPanel)}
+              className="relative p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors flex items-center justify-center border border-slate-200 shadow-xs"
+              title="Historique des notifications"
+            >
+              <Bell className="w-4 h-4 text-slate-600" />
+              {unreadNotifCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white rounded-full text-[10px] font-black flex items-center justify-center shadow-md animate-bounce">
+                  {unreadNotifCount}
+                </span>
+              )}
+            </button>
+
+            {/* Panneau déroulant de la cloche */}
+            {showNotifPanel && (
+              <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white border border-slate-200 rounded-3xl shadow-2xl z-50 overflow-hidden dark:bg-white animate-fadeIn">
+                <div className="p-4 bg-slate-900 text-white flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <Bell className="w-4 h-4 text-blue-400" />
+                    <span className="text-xs font-bold uppercase tracking-wider">Centre de Notifications</span>
+                  </div>
+                  {unreadNotifCount > 0 && (
+                    <button 
+                      onClick={markAllNotificationsAsRead}
+                      className="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded-lg font-bold transition-colors"
+                    >
+                      Tout marquer comme lu
+                    </button>
+                  )}
+                </div>
+
+                <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 p-2 space-y-1">
+                  {projectNotifications.length > 0 ? (
+                    projectNotifications.map(n => (
+                      <div 
+                        key={n.firestoreId} 
+                        onClick={async () => {
+                          if (!n.read && n.firestoreId) {
+                            await updateDoc(doc(db, "notifications", n.firestoreId), { read: true });
+                          }
+                        }}
+                        className={`p-3 rounded-2xl transition-colors cursor-pointer text-xs space-y-1 ${
+                          n.read ? 'bg-white hover:bg-slate-50 text-slate-600' : 'bg-blue-50/70 hover:bg-blue-50 text-slate-900 font-semibold border-l-4 border-blue-600'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className="font-bold text-slate-900">{n.title}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {n.createdAt ? new Date(n.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}
+                          </span>
+                        </div>
+                        <p className="text-[11px] leading-relaxed">{n.message}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-12 text-center text-xs text-slate-400 space-y-2">
+                      <BellOff className="w-8 h-8 mx-auto text-slate-300" />
+                      <p>Aucune notification pour le moment.</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3 bg-slate-50 border-t border-slate-100 text-center">
+                  <button 
+                    onClick={() => setShowNotifPanel(false)}
+                    className="text-xs text-slate-600 font-bold hover:text-slate-900"
+                  >
+                    Fermer le panneau
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center gap-3 pl-2 border-l border-slate-200">
             {currentUser?.photoURL ? (
               <img src={currentUser.photoURL} alt={currentUser?.name} className="w-9 h-9 rounded-full object-cover border-2 border-blue-600/30 shadow-xs" />
@@ -1568,8 +1688,8 @@ export default function App() {
                   <h3 className="text-sm font-bold text-slate-900">Mode Repos / Horaires de travail</h3>
                   <p className="text-xs text-slate-500">
                     {restModeEnabled 
-                      ? "Actif : Les notifications sont suspendues hors horaires (Lun-Jeu : 8h-17h, Ven : 8h-13h)."
-                      : "Inactif : Vous recevez les notifications 24h/24."}
+                      ? "Actif : Les notifications pop-up sont suspendues hors horaires (Lun-Jeu : 8h-17h, Ven : 8h-13h)."
+                      : "Inactif : Vous recevez les notifications en continu 24h/24."}
                   </p>
                 </div>
               </div>
@@ -3768,39 +3888,28 @@ export default function App() {
             if (!myProjectCode) return;
 
             const selectedIds = newPlanData.targetUserIds || ['all'];
+            let targetNameStr = "Toute l'équipe";
             
-            if (selectedIds.includes('all')) {
-              await addDoc(collection(db, "plans"), {
-                tasksList: newPlanData.tasksList,
-                date: newPlanData.date,
-                formattedDate: formatDateFr(newPlanData.date),
-                files: newPlanData.files,
-                projectCode: myProjectCode,
-                targetUserId: 'all',
-                targetUserIds: ['all'],
-                targetName: "Toute l'équipe"
-              });
-            } else {
+            if (!selectedIds.includes('all')) {
               const names = selectedIds.map(id => {
                 const found = approvedUsers.find(u => (u.userIdNum || u.id) === Number(id));
                 return found ? `${found.firstName || ''} ${found.name}` : '';
               }).filter(Boolean);
-
-              await addDoc(collection(db, "plans"), {
-                tasksList: newPlanData.tasksList,
-                date: newPlanData.date,
-                formattedDate: formatDateFr(newPlanData.date),
-                files: newPlanData.files,
-                projectCode: myProjectCode,
-                targetUserId: Number(selectedIds[0]),
-                targetUserIds: selectedIds.map(Number),
-                targetName: names.join(', ')
-              });
+              targetNameStr = names.join(', ');
             }
 
-            if (shouldSendNotification('planning')) {
-              console.log("🔔 Notification planning envoyée");
-            }
+            await addDoc(collection(db, "plans"), {
+              tasksList: newPlanData.tasksList,
+              date: newPlanData.date,
+              formattedDate: formatDateFr(newPlanData.date),
+              files: newPlanData.files,
+              projectCode: myProjectCode,
+              targetUserId: selectedIds.includes('all') ? 'all' : Number(selectedIds[0]),
+              targetUserIds: selectedIds.includes('all') ? ['all'] : selectedIds.map(Number),
+              targetName: targetNameStr
+            });
+
+            await triggerNotification('planning', '📅 Nouvelle Feuille de Route', `Planning mis à jour pour le ${formatDateFr(newPlanData.date)} (${targetNameStr})`);
 
             const targetDateObj = new Date(newPlanData.date);
             setSelectedWeek(getWeekNumber(targetDateObj));
