@@ -1105,12 +1105,44 @@ export default function App() {
 
   const handleDownloadSinglePdf = (fileObj) => {
     if (!fileObj.data) return;
-    const link = document.createElement('a');
-    link.href = fileObj.data;
-    link.download = fileObj.name || 'document.pdf';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    
+    try {
+      // 1. Découpage du bloc data URI pour récupérer le type et les données brutes
+      const arr = fileObj.data.split(',');
+      const mime = arr[0].match(/:(.*?);/)[1] || 'application/pdf';
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      
+      // 2. Création d'un Blob propre compatible avec iOS
+      const blob = new Blob([u8arr], { type: mime });
+      const blobUrl = URL.createObjectURL(blob);
+
+      // 3. Sur iPhone (Safari PWA), ouvrir dans un nouvel onglet force l'affichage du lecteur PDF natif d'iOS
+      const pdfWindow = window.open(blobUrl, '_blank');
+      
+      if (!pdfWindow) {
+        // Fallback si le popup est bloqué : téléchargement direct via lien temporaire
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileObj.name || 'document.pdf';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (e) {
+      console.error("Erreur ouverture PDF sur mobile :", e);
+      // Fallback de secours ultime
+      const link = document.createElement('a');
+      link.href = fileObj.data;
+      link.download = fileObj.name || 'document.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   const handleOpenEditPlan = (plan) => {
