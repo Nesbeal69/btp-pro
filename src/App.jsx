@@ -74,7 +74,6 @@ export default function App() {
   const [regPassword, setRegPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
   
-  // Remplacement de la case à cocher par un mode d'inscription ('join' ou 'create')
   const [registrationType, setRegistrationType] = useState('join');
   const [regProjectCode, setRegProjectCode] = useState('');
   const [authError, setAuthError] = useState('');
@@ -99,9 +98,8 @@ export default function App() {
     canAddReclamation: false
   });
 
-  const [phoneRequests, setPhoneRequests] = useState([]); // Demandes d'accès numéro
+  const [phoneRequests, setPhoneRequests] = useState([]); 
   const [showPhoneRequestModal, setShowPhoneRequestModal] = useState(false);
-  const [phoneRequestTarget, setPhoneRequestTarget] = useState(null);
 
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [userToApprove, setUserToApprove] = useState(null);
@@ -180,8 +178,9 @@ export default function App() {
 
   const [newRequestData, setNewRequestData] = useState({ items: '', quantity: 1, urgency: 'Normal', description: '', attachmentName: '', attachmentData: '' });
 
+  // Ajout du champ urgency dans newReclamation
   const [showAddReclamationModal, setShowAddReclamationModal] = useState(false);
-  const [newReclamation, setNewReclamation] = useState({ building: '', apartment: '', floor: '', clientName: '', observation: '' });
+  const [newReclamation, setNewReclamation] = useState({ building: '', apartment: '', floor: '', clientName: '', observation: '', urgency: 'Normal' });
   const [reclamationStatusFilter, setReclamationStatusFilter] = useState('all');
   const [reclamationSearch, setReclamationSearch] = useState('');
   
@@ -458,6 +457,8 @@ export default function App() {
     }
   };
 
+  // Tri strict : du plus récent au plus ancien (la dernière réclamation reste en haut)
+  // Et gestion du tri des signalements internes (les faits descendent, les non-faits en haut)
   const filteredGroupedReclamations = useMemo(() => {
     const grouped = {};
     projectReclamations.forEach(rec => {
@@ -476,7 +477,16 @@ export default function App() {
     });
 
     return Object.values(grouped).map(group => {
+      // Tri par ordre d'arrivée : le plus récent en haut
       group.items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      
+      // Séparation interne : non traités ("À faire" ou autres) d'abord, puis les traités ("Fait") en bas
+      group.items.sort((a, b) => {
+        if (a.status === 'Fait' && b.status !== 'Fait') return 1;
+        if (a.status !== 'Fait' && b.status === 'Fait') return -1;
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      });
+
       group.latestTwo = group.items.slice(0, 2);
       group.pendingCount = group.items.filter(i => i.status !== 'Fait').length;
       return group;
@@ -504,16 +514,17 @@ export default function App() {
     e.preventDefault();
     if (!newReclamation.apartment || !newReclamation.observation || !myProjectCode || !currentUser) return;
     try {
+      const creatorFullName = `${currentUser.firstName || ''} ${currentUser.name}`.trim();
       await addDoc(collection(db, "reclamations"), {
         ...newReclamation,
         projectCode: myProjectCode,
-        createdBy: currentUser.name,
+        createdBy: creatorFullName,
         status: 'À faire',
-        createdAt: new Date().toISOString().split('T')[0],
+        createdAt: new Date().toISOString(),
         passages: []
       });
       setShowAddReclamationModal(false);
-      setNewReclamation({ building: '', apartment: '', floor: '', clientName: '', observation: '' });
+      setNewReclamation({ building: '', apartment: '', floor: '', clientName: '', observation: '', urgency: 'Normal' });
     } catch (e) { console.error(e); }
   };
 
@@ -523,11 +534,12 @@ export default function App() {
     const statusEl = document.getElementById('interventionStatus');
     const newStatus = statusEl ? statusEl.value : 'Fait';
 
+    const authorFullName = `${currentUser.firstName || ''} ${currentUser.name}`.trim();
     const newPassage = {
       date: new Date().toISOString(),
       status: newStatus,
       details: resolutionText,
-      author: currentUser.name
+      author: authorFullName // Nom et prénom enregistrés pour chaque réponse dans les notes
     };
 
     try {
@@ -597,9 +609,10 @@ export default function App() {
     e.preventDefault();
     if (!newToolData.name || !newToolData.id || !myProjectCode || !currentUser) return;
     try {
+      const creatorFullName = `${currentUser.firstName || ''} ${currentUser.name}`.trim();
       const initialNote = {
         id: Date.now(),
-        author: currentUser.name,
+        author: creatorFullName,
         date: new Date().toISOString().split('T')[0],
         text: `Création de la machine et affectation initiale à : ${newToolData.assignedTo || 'Dépôt Central'}`
       };
@@ -638,14 +651,15 @@ export default function App() {
       const oldAssign = editingTool.assignedTo || 'Dépôt Central';
       const newAssign = editToolForm.assignedTo;
       
+      const authorFullName = `${currentUser.firstName || ''} ${currentUser.name}`.trim();
       let transferNoteText = `Mise à jour statut / affectation`;
       if (oldAssign !== newAssign) {
-        transferNoteText = `🔄 Transfert d'affectation : Passé de [${oldAssign}] à [${newAssign}] (par ${currentUser.name})`;
+        transferNoteText = `🔄 Transfert d'affectation : Passé de [${oldAssign}] à [${newAssign}] (par ${authorFullName})`;
       }
 
       const newHistoryNote = {
         id: Date.now(),
-        author: currentUser.name,
+        author: authorFullName,
         date: new Date().toISOString().split('T')[0],
         text: transferNoteText
       };
@@ -662,7 +676,8 @@ export default function App() {
 
   const handleAddNote = async (tool) => {
     if (!newNoteText.trim() || !tool.firestoreId || !currentUser) return;
-    const noteObj = { id: Date.now(), author: currentUser.name, date: new Date().toISOString().split('T')[0], text: newNoteText };
+    const authorFullName = `${currentUser.firstName || ''} ${currentUser.name}`.trim();
+    const noteObj = { id: Date.now(), author: authorFullName, date: new Date().toISOString().split('T')[0], text: newNoteText };
     try {
       const toolRef = doc(db, "equipment", tool.firestoreId);
       const updatedNotes = [noteObj, ...(tool.notes || [])];
@@ -676,10 +691,11 @@ export default function App() {
     e.preventDefault();
     if (!newRequestData.items || !myProjectCode || !currentUser) return;
     try {
+      const requesterFullName = `${currentUser.firstName || ''} ${currentUser.name}`.trim();
       await addDoc(collection(db, "requests"), {
         ...newRequestData,
         projectCode: myProjectCode,
-        requester: currentUser.name,
+        requester: requesterFullName,
         requesterId: currentUser.userIdNum || currentUser.id,
         status: 'En attente',
         createdAt: new Date().toISOString().split('T')[0],
@@ -867,10 +883,11 @@ export default function App() {
     if (myId === workerId) return;
 
     try {
+      const requesterFullName = `${currentUser.firstName || ''} ${currentUser.name}`.trim();
       await addDoc(collection(db, "phoneRequests"), {
         projectCode: myProjectCode,
         requesterId: myId,
-        requesterName: currentUser.name,
+        requesterName: requesterFullName,
         targetUserId: workerId,
         targetUserName: worker.name,
         status: 'pending',
@@ -895,12 +912,11 @@ export default function App() {
   const hasAccessToPhone = (worker) => {
     if (!currentUser) return false;
     if (isAdmin || worker.email === currentUser.email) return true;
-    if (worker.sharePhone !== false) return true; // Si partagé publiquement
+    if (worker.sharePhone !== false) return true;
 
     const myId = currentUser.userIdNum || currentUser.id;
     const workerId = worker.userIdNum || worker.id;
 
-    // Vérifier si une demande a été acceptée
     const acceptedReq = phoneRequests.find(req => 
       (req.targetUserId === workerId || req.targetUserId?.toString() === workerId?.toString()) &&
       (req.requesterId === myId || req.requesterId?.toString() === myId?.toString()) &&
@@ -1078,10 +1094,10 @@ export default function App() {
         uid: authUser.uid,
         userIdNum: Date.now(),
         name: regName,
-        firstName: regFirstName, // Enregistrement du prénom
+        firstName: regFirstName,
         email: regEmail.toLowerCase().trim(),
         phone: regPhone,
-        sharePhone: regSharePhone, // Choix de partage ou masquage du numéro
+        sharePhone: regSharePhone,
         role: isAdminCreation ? 'admin' : 'Employé',
         team: isAdminCreation ? 'Direction Chantier' : 'Ouvriers',
         status: isAdminCreation ? 'approved' : 'pending',
@@ -1266,7 +1282,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Choix interactif entre Rejoindre un chantier ou Créer un compte administrateur */}
                     <div className="pt-2 border-t border-white/10 space-y-3">
                       <label className="block text-xs font-medium text-slate-300">Que souhaitez-vous faire ?</label>
                       
@@ -1375,7 +1390,6 @@ export default function App() {
         </nav>
 
         <div className="flex items-center gap-3">
-          {/* Notification de demande de numéro reçue */}
           {myIncomingPhoneRequests.length > 0 && (
             <button 
               onClick={() => setShowPhoneRequestModal(true)}
@@ -1504,7 +1518,8 @@ export default function App() {
                         {projectReclamations.filter(r => r.status === 'À faire').length} en cours
                       </span>
                     </div>
-                    <h3 className="text-base font-bold text-slate-900 group-hover:text-red-600">Réclamations & Réserves</h3>
+                    {/* Renommé ici en Réclamations uniquement */}
+                    <h3 className="text-base font-bold text-slate-900 group-hover:text-red-600">Réclamations</h3>
                     <p className="text-xs text-slate-500 mt-1">Suivi par logement, appartement et étage.</p>
                   </div>
                   <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-red-600">
@@ -1980,6 +1995,7 @@ export default function App() {
           </div>
         )}
 
+        {/* ONGLET RÉCLAMATIONS (Entièrement nettoyé, renommé et optimisé) */}
         {activeTab === 'reclamations' && hasAccess('reclamations') && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-red-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-red-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1988,7 +2004,7 @@ export default function App() {
                   <AlertTriangle className="w-7 h-7 text-red-400" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black tracking-wide">Réclamations & Réserves Chantier</h2>
+                  <h2 className="text-xl font-black tracking-wide">Réclamations Chantier</h2>
                   <p className="text-xs text-slate-300 mt-0.5">Suivi des interventions par logement, appartement et étage avec historique.</p>
                 </div>
               </div>
@@ -2011,7 +2027,7 @@ export default function App() {
                   className="px-3 py-2 bg-black/40 border border-white/20 text-xs text-white rounded-xl focus:outline-none"
                 >
                   <option value="all" className="bg-slate-900">🔍 Tous les statuts</option>
-                  <option value="À faire" className="bg-slate-900">⚠️ Réserves en cours</option>
+                  <option value="À faire" className="bg-slate-900">⚠️ Réclamations en cours</option>
                   <option value="Fait" className="bg-slate-900">✅ Toutes résolues</option>
                 </select>
 
@@ -2063,53 +2079,68 @@ export default function App() {
                         <div className="mt-3 space-y-3">
                           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Derniers signalements</span>
                           
-                          {group.latestTwo && group.latestTwo.map((sig, sIdx) => (
-                            <div key={sig.firestoreId || sIdx} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2.5 relative">
-                              <div className="flex justify-between items-start gap-2">
-                                <p className="text-xs text-slate-800 font-semibold leading-relaxed flex-1">
-                                  "{sig.observation}"
-                                </p>
-                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
-                                  sig.status === 'Fait' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                                }`}>
-                                  {sig.status || 'À faire'}
-                                </span>
-                              </div>
+                          {group.latestTwo && group.latestTwo.map((sig, sIdx) => {
+                            const urgencyColor = 
+                              sig.urgency === 'Critique' ? 'bg-red-100 text-red-800 border-red-200' :
+                              sig.urgency === 'Urgent' ? 'bg-amber-100 text-amber-800 border-amber-200' :
+                              'bg-slate-100 text-slate-600 border-slate-200';
 
-                              <div className="flex flex-wrap justify-between items-center text-[11px] text-slate-500 pt-2 border-t border-slate-200/60 gap-2">
-                                <span>Par : <strong>{sig.createdBy}</strong> ({new Date(sig.createdAt).toLocaleDateString('fr-FR')})</span>
-                                
-                                <div className="flex items-center gap-1.5">
-                                  <button
-                                    onClick={() => { setResolvingReclamation(sig); setResolutionText(''); }}
-                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-xs"
-                                    title="Mettre à jour le statut ou noter le passage"
-                                  >
-                                    <CheckCircle2 className="w-3.5 h-3.5" /> Mettre à jour
-                                  </button>
+                            return (
+                              <div key={sig.firestoreId || sIdx} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2.5 relative">
+                                <div className="flex justify-between items-start gap-2">
+                                  <div className="space-y-1 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold border ${urgencyColor}`}>
+                                        Urgence : {sig.urgency || 'Normal'}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-slate-800 font-semibold leading-relaxed">
+                                      "{sig.observation}"
+                                    </p>
+                                  </div>
 
-                                  {(isAdmin || currentUser?.canAddReclamation) && (
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                                    sig.status === 'Fait' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                  }`}>
+                                    {sig.status || 'À faire'}
+                                  </span>
+                                </div>
+
+                                <div className="flex flex-wrap justify-between items-center text-[11px] text-slate-500 pt-2 border-t border-slate-200/60 gap-2">
+                                  <span>Par : <strong>{sig.createdBy}</strong> ({new Date(sig.createdAt).toLocaleDateString('fr-FR')})</span>
+                                  
+                                  <div className="flex items-center gap-1.5">
                                     <button
-                                      onClick={() => { setEditingSignalement(sig); setEditSignalementText(sig.observation); }}
-                                      className="p-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl transition-colors"
-                                      title="Modifier le contenu du signalement"
+                                      onClick={() => { setResolvingReclamation(sig); setResolutionText(''); }}
+                                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-xs"
+                                      title="Mettre à jour le statut ou noter le passage"
                                     >
-                                      <Edit3 className="w-3.5 h-3.5" />
+                                      <CheckCircle2 className="w-3.5 h-3.5" /> Mettre à jour
                                     </button>
-                                  )}
 
-                                  <button
-                                    onClick={() => setSelectedReclamationHistory([sig])}
-                                    className="p-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-xl transition-colors flex items-center gap-1 font-bold"
-                                    title="Voir l'historique des passages de ce signalement"
-                                  >
-                                    <History className="w-3.5 h-3.5" />
-                                    <span>({(sig.passages || []).length})</span>
-                                  </button>
+                                    {(isAdmin || currentUser?.canAddReclamation) && (
+                                      <button
+                                        onClick={() => { setEditingSignalement(sig); setEditSignalementText(sig.observation); }}
+                                        className="p-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl transition-colors"
+                                        title="Modifier le contenu du signalement"
+                                      >
+                                        <Edit3 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+
+                                    <button
+                                      onClick={() => setSelectedReclamationHistory([sig])}
+                                      className="p-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-xl transition-colors flex items-center gap-1 font-bold"
+                                      title="Voir l'historique des passages de ce signalement"
+                                    >
+                                      <History className="w-3.5 h-3.5" />
+                                      <span>({(sig.passages || []).length})</span>
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
 
@@ -2131,7 +2162,7 @@ export default function App() {
                     <AlertTriangle className="w-6 h-6" />
                   </div>
                   <h4 className="text-sm font-bold text-slate-800">Aucune réclamation trouvée</h4>
-                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Toutes les réclamations et réserves de ce chantier sont réglées ou aucune n'a été ajoutée.</p>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">Toutes les réclamations de ce chantier sont réglées ou aucune n'a été ajoutée.</p>
                 </div>
               )}
             </div>
@@ -2674,7 +2705,6 @@ export default function App() {
 
       <PrivacyFooter />
 
-      {/* Modal de gestion des demandes d'accès aux numéros de téléphone */}
       {showPhoneRequestModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden dark:bg-white">
@@ -2812,8 +2842,9 @@ export default function App() {
                 </select>
               </div>
 
+              {/* Terme professionnel mis à jour (suppression de l'historique des gars) */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Note / Commentaire des gars *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Note de suivi des équipes *</label>
                 <textarea
                   id="resolutionText"
                   required
@@ -2826,7 +2857,7 @@ export default function App() {
 
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
                 <button type="button" onClick={() => setResolvingReclamation(null)} className="px-5 py-2.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">Annuler</button>
-                <button type="submit" className="px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-lg shadow-emerald-600/20 transition-all">Enregistrer le passage</button>
+                <button type="submit" className="px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-lg shadow-emerald-600/20 transition-all">Enregistrer l'intervention</button>
               </div>
             </div>
           </form>
@@ -2846,7 +2877,7 @@ export default function App() {
 
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Contenu du signalement / Réserve *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Contenu de la réclamation *</label>
                 <textarea
                   required
                   value={editSignalementText}
@@ -2864,11 +2895,12 @@ export default function App() {
         </div>
       )}
 
+      {/* Modal d'ajout de réclamation avec choix d'urgence */}
       {showAddReclamationModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreateReclamation} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl dark:bg-white">
             <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900">Nouvelle Réclamation / Réserve</h3>
+              <h3 className="text-base font-bold text-slate-900">Nouvelle Réclamation</h3>
               <button type="button" onClick={() => setShowAddReclamationModal(false)}>✕</button>
             </div>
 
@@ -2917,6 +2949,19 @@ export default function App() {
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Niveau d'urgence *</label>
+              <select
+                value={newReclamation.urgency}
+                onChange={e => setNewReclamation({ ...newReclamation, urgency: e.target.value })}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none"
+              >
+                <option value="Normal">🟢 Normal</option>
+                <option value="Urgent">⚠️ Urgent</option>
+                <option value="Critique">🚨 Critique</option>
+              </select>
             </div>
 
             <div>
@@ -3430,7 +3475,7 @@ export default function App() {
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 max-h-[80vh] overflow-y-auto shadow-2xl dark:bg-white">
             <div className="flex justify-between items-center pb-3 border-b border-slate-100">
               <h3 className="font-bold text-slate-900 text-base">
-                Historique des passages et statuts
+                Historique des interventions et statuts
               </h3>
               <button 
                 onClick={() => setSelectedReclamationHistory(null)}
@@ -3457,7 +3502,7 @@ export default function App() {
 
                   <div className="space-y-2 pt-1">
                     <p className="font-bold text-[11px] text-slate-500 uppercase tracking-wider">
-                      Journal des passages des gars :
+                      Journal des interventions :
                     </p>
                     
                     {(sig.passages || []).map((pass, pIdx) => (
