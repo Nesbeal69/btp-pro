@@ -84,6 +84,8 @@ export default function App() {
   // État pour la cloche de notifications
   const [notifications, setNotifications] = useState([]);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
+
+  const [activeToast, setActiveToast] = useState(null);
   
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -309,6 +311,45 @@ export default function App() {
     }
     return dateString;
   };
+
+useEffect(() => {
+  if (!currentUser || !myProjectCode) return;
+  const myId = currentUser.userIdNum || currentUser.id;
+
+  // On écoute les notifications du projet
+  const unsub = onSnapshot(collection(db, "notifications"), (snapshot) => {
+    const allNotifs = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
+    
+    // Trouver la plus récente
+    const latest = allNotifs
+      .filter(n => {
+        if (n.projectCode !== myProjectCode) return false;
+        if (n.read) return false; // Uniquement les non lues
+        if (isAdmin) return true;
+        const target = n.targetUserId;
+        if (target === 'all') return true;
+        if (target === myId || target?.toString() === myId?.toString()) return true;
+        if (Array.isArray(target) && (target.includes('all') || target.includes(myId))) return true;
+        return false;
+      })
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0];
+
+    // Si on a une notif très récente (créée il y a moins de 5 secondes) et qu'on ne l'affiche pas déjà
+    if (latest && latest.createdAt) {
+      const notifTime = new Date(latest.createdAt).getTime();
+      const now = Date.now();
+      if (now - notifTime < 5000) { // 5 secondes
+        setActiveToast(latest);
+        // Disparaît au bout de 4 secondes
+        setTimeout(() => {
+          setActiveToast(null);
+        }, 4000);
+      }
+    }
+  });
+
+  return () => unsub();
+}, [currentUser, myProjectCode, isAdmin]);
 
   useEffect(() => {
     setLoadingUser(true);
@@ -4377,6 +4418,24 @@ export default function App() {
                 className="w-full text-xs file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700" 
               />
             </div>
+
+            {activeToast && (
+  <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white border border-blue-500/40 p-4 rounded-2xl shadow-2xl max-w-sm animate-bounce flex items-start gap-3">
+    <div className="p-2 bg-blue-600 rounded-xl text-white shrink-0">
+      🔔
+    </div>
+    <div className="space-y-1 flex-1">
+      <h4 className="text-xs font-bold text-blue-400">{activeToast.title}</h4>
+      <p className="text-xs text-slate-200">{activeToast.message}</p>
+    </div>
+    <button 
+      onClick={() => setActiveToast(null)} 
+      className="text-slate-400 hover:text-white text-xs font-bold"
+    >
+      ✕
+    </button>
+  </div>
+)}
 
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setShowAddToolModal(false)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl font-semibold">Annuler</button>
