@@ -81,9 +81,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loadingUser, setLoadingUser] = useState(true);
   
-  // État pour le mode repos (coché par défaut sur l'accueil)
-  const [restModeEnabled, setRestModeEnabled] = useState(true);
-
   // État pour la cloche de notifications
   const [notifications, setNotifications] = useState([]);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
@@ -116,6 +113,7 @@ export default function App() {
     customRole: '',
     password: '', 
     photoURL: '',
+    restModeEnabled: true,
     canViewPlanning: true,
     canViewRequests: true,
     canViewReclamations: true,
@@ -238,24 +236,32 @@ export default function App() {
 
   const isAdmin = currentUser?.role === 'admin';
   const myProjectCode = currentUser ? (currentUser.projectCode || currentUser.adminProjectCode) : null;
+  const restModeEnabled = currentUser?.restModeEnabled ?? true;
 
-  // Fonction centrale pour déclencher et stocker une notification dans la cloche
-  const triggerNotification = async (tabName, title, message) => {
+  // Fonction pour basculer et sauvegarder le mode repos dans Firestore
+  const handleToggleRestMode = async (newValue) => {
+    if (!currentUser || !currentUser.firestoreId) return;
+    try {
+      const userRef = doc(db, "users", currentUser.firestoreId);
+      await updateDoc(userRef, { restModeEnabled: newValue });
+      setCurrentUser(prev => ({ ...prev, restModeEnabled: newValue }));
+    } catch (e) {
+      console.error("Erreur mise à jour mode repos :", e);
+    }
+  };
+
+  // Fonction centrale pour déclencher et stocker une notification avec ciblage strict
+  const triggerNotification = async (tabName, title, message, targetUserId = 'all') => {
     if (!currentUser || !myProjectCode) return;
 
-    // Si le mode repos global est actif ET qu'on est hors horaires, on ne fait pas de popup instantanée, 
-    // mais on enregistre quand même dans Firestore pour la cloche (historique persistant)
-    const isRestBlocked = restModeEnabled && !isWithinWorkingHours();
-    
-    // Vérification des onglets autorisés pour l'utilisateur
     if (!isAdmin && currentUser.notifTabs?.[tabName] === false) {
-      return; // L'utilisateur a désactivé les notifs pour cet onglet
+      return; 
     }
 
     try {
       await addDoc(collection(db, "notifications"), {
         projectCode: myProjectCode,
-        targetUserId: isAdmin ? 'all' : (currentUser.userIdNum || currentUser.id),
+        targetUserId: targetUserId, // 'all', un ID précis, ou tableau/chaîne selon le besoin
         tabName,
         title,
         message,
@@ -400,13 +406,23 @@ export default function App() {
     };
   }, []);
 
+  // Filtrage ultra-strict des notifications dans la cloche pour chaque utilisateur
   const projectNotifications = useMemo(() => {
     if (!myProjectCode || !currentUser) return [];
     const myId = currentUser.userIdNum || currentUser.id;
-    return notifications.filter(n => 
-      n.projectCode === myProjectCode && (n.targetUserId === 'all' || n.targetUserId === myId || n.targetUserId?.toString() === myId?.toString())
-    ).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-  }, [notifications, myProjectCode, currentUser]);
+    
+    return notifications.filter(n => {
+      if (n.projectCode !== myProjectCode) return false;
+      if (isAdmin) return true;
+
+      const target = n.targetUserId;
+      if (target === 'all') return true;
+      if (target === myId || target?.toString() === myId?.toString()) return true;
+      if (Array.isArray(target) && (target.includes('all') || target.includes(myId) || target.map(String).includes(myId?.toString()))) return true;
+
+      return false;
+    }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  }, [notifications, myProjectCode, currentUser, isAdmin]);
 
   const unreadNotifCount = useMemo(() => {
     return projectNotifications.filter(n => !n.read).length;
@@ -527,7 +543,7 @@ export default function App() {
       }, { merge: true });
 
       if (status === 'DemandeModification') {
-        await triggerNotification('pointage', '⚠️ Demande de modification d\'heure', `${currentUser.firstName} ${currentUser.name} demande une correction pour le ${day.dateStr}.`);
+        await triggerNotification('pointage', '⚠️ Demande de modification d\'heure', `${currentUser.firstName} ${currentUser.name} demande une correction pour le ${day.dateStr}.`, 'all');
       }
     } catch (e) {
       console.error(e);
@@ -623,7 +639,7 @@ export default function App() {
         passages: []
       });
 
-      await triggerNotification('reclamations', '⚠️ Nouvelle Réclamation', `Logement ${newReclamation.apartment} : ${newReclamation.observation}`);
+      await triggerNotification('reclamations', '⚠️ Nouvelle Réclamation', `Logement ${newReclamation.apartment} : ${newReclamation.observation}`, 'all');
 
       setShowAddReclamationModal(false);
       setNewReclamation({ building: '', apartment: '', floor: '', clientName: '', observation: '', urgency: 'Normal' });
@@ -725,7 +741,7 @@ export default function App() {
         notes: [initialNote]
       });
 
-      await triggerNotification('tools', '🔧 Nouveau Matériel / Machine', `${newToolData.name} (${newToolData.brand}) ajouté au parc.`);
+      await triggerNotification('tools', '🔧 Nouveau Matériel / Machine', `${newToolData.name} (${newToolData.brand}) ajouté au parc.`, 'all');
 
       setShowAddToolModal(false);
       setNewToolData({ id: '', name: '', brand: 'REMS', status: 'Disponible', assignedTo: 'Dépôt Central', imageURL: '' });
@@ -760,7 +776,7 @@ export default function App() {
       let transferNoteText = `Mise à jour statut / affectation`;
       if (oldAssign !== newAssign) {
         transferNoteText = `🔄 Transfert d'affectation : Passé de [${oldAssign}] à [${newAssign}] (par ${authorFullName})`;
-        await triggerNotification('tools', '🔄 Transfert d\'outillage', `${editingTool.name} transféré de ${oldAssign} à ${newAssign}.`);
+        await triggerNotification('tools', '🔄 Transfert d\'outillage', `${editingTool.name} transféré de ${oldAssign} à ${newAssign}.`, 'all');
       }
 
       const newHistoryNote = {
@@ -808,7 +824,7 @@ export default function App() {
         receivedDate: null
       });
 
-      await triggerNotification('requests', '📦 Nouvelle Demande Matériel', `${requesterFullName} a demandé : ${newRequestData.items} (x${newRequestData.quantity})`);
+      await triggerNotification('requests', '📦 Nouvelle Demande Matériel', `${requesterFullName} a demandé : ${newRequestData.items} (x${newRequestData.quantity})`, 'all');
 
       setShowAddRequestModal(false);
       setNewRequestData({ items: '', quantity: 1, urgency: 'Normal', description: '', attachmentName: '', attachmentData: '' });
@@ -876,6 +892,7 @@ export default function App() {
       customRole: isStandard ? '' : currentRole,
       password: userToEdit.password || '', 
       photoURL: userToEdit.photoURL || '',
+      restModeEnabled: userToEdit.restModeEnabled ?? true,
       canViewPlanning: userToEdit.canViewPlanning ?? true,
       canViewRequests: userToEdit.canViewRequests ?? true,
       canViewReclamations: userToEdit.canViewReclamations ?? true,
@@ -909,6 +926,7 @@ export default function App() {
         sharePhone: userModalData.sharePhone,
         password: userModalData.password,
         photoURL: userModalData.photoURL || '',
+        restModeEnabled: userModalData.restModeEnabled,
         notifTabs: userModalData.notifTabs
       };
 
@@ -924,6 +942,9 @@ export default function App() {
       }
 
       await updateDoc(doc(db, "users", userModalData.firestoreId), updatePayload);
+      if (userModalData.firestoreId === currentUser.firestoreId) {
+        setCurrentUser(prev => ({ ...prev, ...updatePayload }));
+      }
       setShowUserModal(false);
     } catch (e) { console.error(e); }
   };
@@ -1230,6 +1251,7 @@ export default function App() {
         status: isAdminCreation ? 'approved' : 'pending',
         projectCode: assignedProjectCode,
         joinedAt: new Date().toISOString().split('T')[0],
+        restModeEnabled: true,
         canViewPlanning: true,
         canViewRequests: true,
         canViewReclamations: true,
@@ -1678,7 +1700,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Widget Mode Repos sur l'accueil (Coché par défaut) */}
+            {/* Widget Mode Repos sauvegardé dans Firebase */}
             <div className="bg-white border border-slate-200/80 p-5 rounded-3xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 dark:bg-white dark:border-slate-200">
               <div className="flex items-center gap-3">
                 <div className={`p-3 rounded-2xl ${restModeEnabled ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'}`}>
@@ -1698,7 +1720,7 @@ export default function App() {
                 <input 
                   type="checkbox" 
                   checked={restModeEnabled} 
-                  onChange={e => setRestModeEnabled(e.target.checked)} 
+                  onChange={e => handleToggleRestMode(e.target.checked)} 
                   className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
                 <span className="text-xs font-bold text-slate-800">Activer le mode repos (Hors horaires)</span>
@@ -3320,6 +3342,19 @@ export default function App() {
                 />
               </div>
 
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">Mode Repos (Horaires de travail)</span>
+                  <span className="text-[10px] text-slate-500">Suspendre les alertes hors horaires chantier.</span>
+                </div>
+                <input 
+                  type="checkbox" 
+                  checked={userModalData.restModeEnabled} 
+                  onChange={e => setUserModalData({...userModalData, restModeEnabled: e.target.checked})} 
+                  className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer" 
+                />
+              </div>
+
               {isAdmin && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Rôle</label>
@@ -3889,6 +3924,7 @@ export default function App() {
 
             const selectedIds = newPlanData.targetUserIds || ['all'];
             let targetNameStr = "Toute l'équipe";
+            let targetNotificationId = 'all';
             
             if (!selectedIds.includes('all')) {
               const names = selectedIds.map(id => {
@@ -3896,6 +3932,10 @@ export default function App() {
                 return found ? `${found.firstName || ''} ${found.name}` : '';
               }).filter(Boolean);
               targetNameStr = names.join(', ');
+              // Si une seule personne est visée, on cible son ID exact pour sa cloche
+              if (selectedIds.length === 1) {
+                targetNotificationId = Number(selectedIds[0]);
+              }
             }
 
             await addDoc(collection(db, "plans"), {
@@ -3909,7 +3949,14 @@ export default function App() {
               targetName: targetNameStr
             });
 
-            await triggerNotification('planning', '📅 Nouvelle Feuille de Route', `Planning mis à jour pour le ${formatDateFr(newPlanData.date)} (${targetNameStr})`);
+            // Déclenchement de la notification avec le ciblage exact (toute l'équipe ou ID précis)
+            if (selectedIds.includes('all')) {
+              await triggerNotification('planning', '📅 Nouvelle Feuille de Route', `Planning mis à jour pour le ${formatDateFr(newPlanData.date)} (Toute l'équipe)`, 'all');
+            } else {
+              for (const uid of selectedIds) {
+                await triggerNotification('planning', '📅 Nouvelle Feuille de Route', `Une tâche vous a été assignée pour le ${formatDateFr(newPlanData.date)}.`, Number(uid));
+              }
+            }
 
             const targetDateObj = new Date(newPlanData.date);
             setSelectedWeek(getWeekNumber(targetDateObj));
