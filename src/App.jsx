@@ -635,13 +635,17 @@ useEffect(() => {
     });
 
     return Object.values(grouped).map(group => {
-      group.items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
       
       group.items.sort((a, b) => {
-        if (a.status === 'Fait' && b.status !== 'Fait') return 1;
-        if (a.status !== 'Fait' && b.status === 'Fait') return -1;
-        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
-      });
+      // 1. Mettre les réclamations non résolues ("À faire" ou autres) avant les résolues ("Fait")
+      const aDone = a.status === 'Fait';
+      const bDone = b.status === 'Fait';
+      if (aDone && !bDone) return 1;
+      if (!aDone && bDone) return -1;
+
+      // 2. Si elles ont le même statut, trier par date de création (la plus récente en premier)
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
 
       group.latestTwo = group.items.slice(0, 2);
       group.pendingCount = group.items.filter(i => i.status !== 'Fait').length;
