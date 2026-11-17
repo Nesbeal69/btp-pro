@@ -2395,7 +2395,15 @@ useEffect(() => {
                       <div>
                         <div className="flex justify-between items-start pb-3 border-b border-slate-100 pr-8">
                           <div>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Localisation {group.building && `(${group.building})`}</span>
+                            {group.building ? (
+  <span className="inline-block px-2.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-black uppercase tracking-wider">
+    🏢 Bâtiment {group.building}
+  </span>
+) : (
+  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+    Bâtiment non précisé
+  </span>
+)}
                             <h3 className="text-lg font-black text-slate-900 flex items-center gap-1.5">
                               <Home className="w-4 h-4 text-blue-600" /> Logement {group.apartment}
                             </h3>
