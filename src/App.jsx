@@ -2962,18 +2962,27 @@ useEffect(() => {
                         <span className="font-bold text-emerald-600">{tool.status || 'Disponible'}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-500 font-medium">Affecté à :</span>
-                        <span className="font-bold text-slate-800">{tool.assignedTo || 'Dépôt Central'}</span>
+                        <span className="text-slate-500 font-medium">Affectation :</span>
+                        <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-200">
+                          {tool.assignedTo || 'Dépôt Central'}
+                        </span>
                       </div>
                     </div>
 
                     {tool.imageURL && (
-                      <div className="mt-3">
+                      <div className="mt-3 flex items-center gap-3 bg-slate-50 p-2.5 rounded-2xl border border-slate-200/60">
+                        <img 
+                          src={tool.imageURL} 
+                          alt={tool.name} 
+                          className="w-12 h-12 rounded-xl object-cover border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => setSelectedToolImage(tool.imageURL)}
+                          title="Cliquer pour agrandir"
+                        />
                         <button
                           onClick={() => setSelectedToolImage(tool.imageURL)}
-                          className="w-full py-2 bg-slate-100 hover:bg-indigo-50 text-indigo-700 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2 border border-slate-200/80"
+                          className="text-xs text-indigo-600 font-bold hover:underline flex items-center gap-1"
                         >
-                          <ImageIcon className="w-4 h-4 text-indigo-600" /> Voir la photo de la machine
+                          <ImageIcon className="w-3.5 h-3.5" /> Agrandir la photo
                         </button>
                       </div>
                     )}
