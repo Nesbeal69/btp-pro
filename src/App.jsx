@@ -42,7 +42,9 @@ import {
   ChevronRight,
   Image as ImageIcon,
   Shield,
-  Trash2
+  Trash2,
+  Bell,
+  BellOff
 } from 'lucide-react';
 
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -55,11 +57,38 @@ function getWeekNumber(date) {
   return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 
+// Fonction utilitaire pour vérifier si on est dans les horaires de travail
+function isWithinWorkingHours() {
+  const now = new Date();
+  const day = now.getDay(); // 0 = Dimanche, 1 = Lundi, ..., 5 = Vendredi, 6 = Samedi
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const currentTimeInMinutes = hours * 60 + minutes;
+
+  // Weekend (Samedi ou Dimanche)
+  if (day === 0 || day === 6) return false;
+
+  // Vendredi : 8h00 à 13h00 (8 * 60 = 480 min, 13 * 60 = 780 min)
+  if (day === 5) {
+    return currentTimeInMinutes >= 480 && currentTimeInMinutes <= 780;
+  }
+
+  // Lundi au Jeudi : 8h00 à 17h00 (8 * 60 = 480 min, 17 * 60 = 1020 min)
+  if (day >= 1 && day <= 4) {
+    return currentTimeInMinutes >= 480 && currentTimeInMinutes <= 1020;
+  }
+
+  return false;
+}
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authMode, setAuthMode] = useState('login'); 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loadingUser, setLoadingUser] = useState(true);
+  
+  // État pour le mode repos (coché par défaut sur l'accueil)
+  const [restModeEnabled, setRestModeEnabled] = useState(true);
   
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -67,10 +96,10 @@ export default function App() {
   const [resetSent, setResetSent] = useState(false);
   
   const [regName, setRegName] = useState('');
-  const [regFirstName, setRegFirstName] = useState(''); // Prénom
+  const [regFirstName, setRegFirstName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
-  const [regSharePhone, setRegSharePhone] = useState(true); // Partager ou masquer son numéro
+  const [regSharePhone, setRegSharePhone] = useState(true);
   const [regPassword, setRegPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
   
@@ -95,7 +124,15 @@ export default function App() {
     canViewWorkers: true,
     canViewTools: true,
     canViewPointage: true,
-    canAddReclamation: false
+    canAddReclamation: false,
+    notifTabs: {
+      planning: true,
+      requests: true,
+      reclamations: true,
+      workers: true,
+      tools: true,
+      pointage: true
+    }
   });
 
   const [phoneRequests, setPhoneRequests] = useState([]); 
@@ -112,7 +149,15 @@ export default function App() {
     canViewWorkers: true,
     canViewTools: true,
     canViewPointage: true,
-    canAddReclamation: false
+    canAddReclamation: false,
+    notifTabs: {
+      planning: true,
+      requests: true,
+      reclamations: true,
+      workers: true,
+      tools: true,
+      pointage: true
+    }
   });
 
   const [users, setUsers] = useState([]);
@@ -178,7 +223,6 @@ export default function App() {
 
   const [newRequestData, setNewRequestData] = useState({ items: '', quantity: 1, urgency: 'Normal', description: '', attachmentName: '', attachmentData: '' });
 
-  // Ajout du champ urgency dans newReclamation
   const [showAddReclamationModal, setShowAddReclamationModal] = useState(false);
   const [newReclamation, setNewReclamation] = useState({ building: '', apartment: '', floor: '', clientName: '', observation: '', urgency: 'Normal' });
   const [reclamationStatusFilter, setReclamationStatusFilter] = useState('all');
@@ -196,6 +240,16 @@ export default function App() {
 
   const isAdmin = currentUser?.role === 'admin';
   const myProjectCode = currentUser ? (currentUser.projectCode || currentUser.adminProjectCode) : null;
+
+  // Vérification de l'envoi des notifications pour un onglet donné
+  const shouldSendNotification = (tabName) => {
+    if (!currentUser) return false;
+    if (restModeEnabled && !isWithinWorkingHours()) {
+      return false;
+    }
+    if (isAdmin) return true;
+    return currentUser.notifTabs?.[tabName] ?? true;
+  };
 
   const hasAccess = (tabName) => {
     if (isAdmin) return true;
@@ -457,8 +511,6 @@ export default function App() {
     }
   };
 
-  // Tri strict : du plus récent au plus ancien (la dernière réclamation reste en haut)
-  // Et gestion du tri des signalements internes (les faits descendent, les non-faits en haut)
   const filteredGroupedReclamations = useMemo(() => {
     const grouped = {};
     projectReclamations.forEach(rec => {
@@ -477,10 +529,8 @@ export default function App() {
     });
 
     return Object.values(grouped).map(group => {
-      // Tri par ordre d'arrivée : le plus récent en haut
       group.items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
       
-      // Séparation interne : non traités ("À faire" ou autres) d'abord, puis les traités ("Fait") en bas
       group.items.sort((a, b) => {
         if (a.status === 'Fait' && b.status !== 'Fait') return 1;
         if (a.status !== 'Fait' && b.status === 'Fait') return -1;
@@ -523,6 +573,11 @@ export default function App() {
         createdAt: new Date().toISOString(),
         passages: []
       });
+
+      if (shouldSendNotification('reclamations')) {
+        console.log("🔔 Notification réclamations envoyée");
+      }
+
       setShowAddReclamationModal(false);
       setNewReclamation({ building: '', apartment: '', floor: '', clientName: '', observation: '', urgency: 'Normal' });
     } catch (e) { console.error(e); }
@@ -539,7 +594,7 @@ export default function App() {
       date: new Date().toISOString(),
       status: newStatus,
       details: resolutionText,
-      author: authorFullName // Nom et prénom enregistrés pour chaque réponse dans les notes
+      author: authorFullName
     };
 
     try {
@@ -622,6 +677,11 @@ export default function App() {
         projectCode: myProjectCode,
         notes: [initialNote]
       });
+
+      if (shouldSendNotification('tools')) {
+        console.log("🔔 Notification outillage envoyée");
+      }
+
       setShowAddToolModal(false);
       setNewToolData({ id: '', name: '', brand: 'REMS', status: 'Disponible', assignedTo: 'Dépôt Central', imageURL: '' });
     } catch (error) {
@@ -701,6 +761,11 @@ export default function App() {
         createdAt: new Date().toISOString().split('T')[0],
         receivedDate: null
       });
+
+      if (shouldSendNotification('requests')) {
+        console.log("🔔 Notification matériel envoyée");
+      }
+
       setShowAddRequestModal(false);
       setNewRequestData({ items: '', quantity: 1, urgency: 'Normal', description: '', attachmentName: '', attachmentData: '' });
     } catch (e) { console.error(e); }
@@ -773,7 +838,15 @@ export default function App() {
       canViewWorkers: userToEdit.canViewWorkers ?? true,
       canViewTools: userToEdit.canViewTools ?? true,
       canViewPointage: userToEdit.canViewPointage ?? true,
-      canAddReclamation: userToEdit.canAddReclamation ?? false
+      canAddReclamation: userToEdit.canAddReclamation ?? false,
+      notifTabs: userToEdit.notifTabs || {
+        planning: true,
+        requests: true,
+        reclamations: true,
+        workers: true,
+        tools: true,
+        pointage: true
+      }
     });
     setShowUserModal(true);
   };
@@ -792,6 +865,7 @@ export default function App() {
         sharePhone: userModalData.sharePhone,
         password: userModalData.password,
         photoURL: userModalData.photoURL || '',
+        notifTabs: userModalData.notifTabs
       };
 
       if (currentUser.role === 'admin') {
@@ -841,7 +915,15 @@ export default function App() {
       canViewWorkers: true,
       canViewTools: true,
       canViewPointage: true,
-      canAddReclamation: false
+      canAddReclamation: false,
+      notifTabs: {
+        planning: true,
+        requests: true,
+        reclamations: true,
+        workers: true,
+        tools: true,
+        pointage: true
+      }
     });
     setShowApproveModal(true);
   };
@@ -862,7 +944,8 @@ export default function App() {
         canViewWorkers: approvePermissions.canViewWorkers,
         canViewTools: approvePermissions.canViewTools,
         canViewPointage: approvePermissions.canViewPointage,
-        canAddReclamation: approvePermissions.canAddReclamation
+        canAddReclamation: approvePermissions.canAddReclamation,
+        notifTabs: approvePermissions.notifTabs
       });
       setShowApproveModal(false);
       setUserToApprove(null);
@@ -1110,7 +1193,15 @@ export default function App() {
         canViewTools: true,
         canViewPointage: true,
         canAddReclamation: isAdminCreation,
-        canAddRequest: true
+        canAddRequest: true,
+        notifTabs: {
+          planning: true,
+          requests: true,
+          reclamations: true,
+          workers: true,
+          tools: true,
+          pointage: true
+        }
       };
 
       await setDoc(doc(db, "users", authUser.uid), newUser);
@@ -1467,6 +1558,33 @@ export default function App() {
               </div>
             </div>
 
+            {/* Widget Mode Repos sur l'accueil (Coché par défaut) */}
+            <div className="bg-white border border-slate-200/80 p-5 rounded-3xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 dark:bg-white dark:border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className={`p-3 rounded-2xl ${restModeEnabled ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'}`}>
+                  {restModeEnabled ? <BellOff className="w-6 h-6" /> : <Bell className="w-6 h-6" />}
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Mode Repos / Horaires de travail</h3>
+                  <p className="text-xs text-slate-500">
+                    {restModeEnabled 
+                      ? "Actif : Les notifications sont suspendues hors horaires (Lun-Jeu : 8h-17h, Ven : 8h-13h)."
+                      : "Inactif : Vous recevez les notifications 24h/24."}
+                  </p>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-3 cursor-pointer bg-slate-50 hover:bg-slate-100 px-4 py-2.5 rounded-2xl border border-slate-200 transition-colors">
+                <input 
+                  type="checkbox" 
+                  checked={restModeEnabled} 
+                  onChange={e => setRestModeEnabled(e.target.checked)} 
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                />
+                <span className="text-xs font-bold text-slate-800">Activer le mode repos (Hors horaires)</span>
+              </label>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {hasAccess('planning') && (
                 <div onClick={() => { 
@@ -1518,7 +1636,6 @@ export default function App() {
                         {projectReclamations.filter(r => r.status === 'À faire').length} en cours
                       </span>
                     </div>
-                    {/* Renommé ici en Réclamations uniquement */}
                     <h3 className="text-base font-bold text-slate-900 group-hover:text-red-600">Réclamations</h3>
                     <p className="text-xs text-slate-500 mt-1">Suivi par logement, appartement et étage.</p>
                   </div>
@@ -1995,7 +2112,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ONGLET RÉCLAMATIONS (Entièrement nettoyé, renommé et optimisé) */}
         {activeTab === 'reclamations' && hasAccess('reclamations') && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-slate-900 via-red-950 to-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-lg border border-red-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -2842,7 +2958,6 @@ export default function App() {
                 </select>
               </div>
 
-              {/* Terme professionnel mis à jour (suppression de l'historique des gars) */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">Note de suivi des équipes *</label>
                 <textarea
@@ -2895,7 +3010,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Modal d'ajout de réclamation avec choix d'urgence */}
       {showAddReclamationModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreateReclamation} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl dark:bg-white">
@@ -2978,180 +3092,6 @@ export default function App() {
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setShowAddReclamationModal(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Annuler</button>
               <button type="submit" className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-xl shadow-md shadow-red-600/20">Enregistrer</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {showApproveModal && userToApprove && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleConfirmApprove} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto dark:bg-white">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900">Approuver {userToApprove.firstName} {userToApprove.name}</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Définissez son rôle et cochez les onglets autorisés.</p>
-            </div>
-            
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Rôle principal</label>
-              <select 
-                value={selectedRoleToAssign} 
-                onChange={e => setSelectedRoleToAssign(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none font-semibold mb-2"
-              >
-                <option value="Employé">👷‍♂️ Employé</option>
-                <option value="Intérimaire">⚡ Intérimaire</option>
-                <option value="Chef d’équipe">👑 Chef d’équipe</option>
-                <option value="Apprenti">📘 Apprenti</option>
-                <option value="Autre">✍️ Autre (Saisir un rôle personnalisé)</option>
-              </select>
-
-              {selectedRoleToAssign === 'Autre' && (
-                <input 
-                  type="text" 
-                  required
-                  value={customRoleInput} 
-                  onChange={e => setCustomRoleInput(e.target.value)}
-                  placeholder="Tapez le rôle personnalisé..."
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none font-semibold animate-fadeIn"
-                />
-              )}
-            </div>
-
-            <div className="pt-3 border-t border-slate-100 space-y-2">
-              <span className="text-xs font-bold text-slate-800 block">Autorisations d'accès aux onglets :</span>
-              
-              <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/70 text-xs">
-                <label className="flex items-center gap-2 cursor-pointer font-medium">
-                  <input type="checkbox" checked={approvePermissions.canViewPlanning} onChange={e => setApprovePermissions({...approvePermissions, canViewPlanning: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
-                  <span>📅 Planning</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer font-medium">
-                  <input type="checkbox" checked={approvePermissions.canViewRequests} onChange={e => setApprovePermissions({...approvePermissions, canViewRequests: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
-                  <span>📦 Matériel</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer font-medium">
-                  <input type="checkbox" checked={approvePermissions.canViewReclamations} onChange={e => setApprovePermissions({...approvePermissions, canViewReclamations: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
-                  <span>⚠️ Réclamations (Voir)</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer font-medium">
-                  <input type="checkbox" checked={approvePermissions.canViewWorkers} onChange={e => setApprovePermissions({...approvePermissions, canViewWorkers: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
-                  <span>👥 Effectifs</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer font-medium">
-                  <input type="checkbox" checked={approvePermissions.canViewTools} onChange={e => setApprovePermissions({...approvePermissions, canViewTools: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
-                  <span>🔧 Outillage</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer font-medium">
-                  <input type="checkbox" checked={approvePermissions.canViewPointage} onChange={e => setApprovePermissions({...approvePermissions, canViewPointage: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
-                  <span>⏱️ Pointage</span>
-                </label>
-              </div>
-
-              <div className="bg-red-50/60 p-3 rounded-2xl border border-red-200/60 mt-2">
-                <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-red-900">
-                  <input type="checkbox" checked={approvePermissions.canAddReclamation} onChange={e => setApprovePermissions({...approvePermissions, canAddReclamation: e.target.checked})} className="rounded text-red-600 w-4 h-4" />
-                  <span>➕ Autoriser à créer des réclamations</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-              <button type="button" onClick={() => setShowApproveModal(false)} className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 font-bold rounded-xl transition-colors">Annuler</button>
-              <button type="submit" className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-xs text-white font-bold rounded-xl shadow-md transition-all">Valider l'accès</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {selectedTool && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white p-6 rounded-3xl w-full max-w-lg space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto dark:bg-white">
-            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">{selectedTool.name}</h3>
-                <p className="text-xs text-slate-500">Marque : {selectedTool.brand || 'REMS'} | ID : {selectedTool.id}</p>
-              </div>
-              <button onClick={() => setSelectedTool(null)} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-xs font-bold">✕</button>
-            </div>
-
-            <div className="flex gap-2">
-              <input type="text" value={newNoteText} onChange={e => setNewNoteText(e.target.value)} placeholder="Ajouter une note ou remarque..." className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none" />
-              <button onClick={() => handleAddNote(selectedTool)} className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-sm">Ajouter</button>
-            </div>
-
-            <div className="space-y-2">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Historique & Transferts</span>
-              {selectedTool.notes?.map(note => (
-                <div key={note.id} className="p-3 bg-slate-50 rounded-xl text-xs border border-slate-200/60 space-y-1">
-                  <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
-                    <span>Par : {note.author || 'Admin'}</span>
-                    <span>{note.date}</span>
-                  </div>
-                  <p className="text-slate-800 font-medium">{note.text}</p>
-                </div>
-              ))}
-            </div>
-
-            <button onClick={() => setSelectedTool(null)} className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-colors">Fermer</button>
-          </div>
-        </div>
-      )}
-
-      {selectedToolImage && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white p-4 rounded-3xl max-w-lg w-full space-y-4 shadow-2xl relative dark:bg-white">
-            <button onClick={() => setSelectedToolImage(null)} className="absolute right-4 top-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-xs z-10">✕</button>
-            <h3 className="text-sm font-bold text-slate-900 px-2">Aperçu photo machine</h3>
-            <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 flex items-center justify-center max-h-[70vh]">
-              <img src={selectedToolImage} alt="Machine" className="w-full h-auto object-contain max-h-[70vh]" />
-            </div>
-            <button onClick={() => setSelectedToolImage(null)} className="w-full py-2.5 bg-slate-900 text-white font-bold text-xs rounded-xl">Fermer</button>
-          </div>
-        </div>
-      )}
-
-      {editingTool && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleSaveToolEdit} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl dark:bg-white">
-            <h3 className="text-lg font-bold text-slate-900">Modifier / Réaffecter l'outil</h3>
-            
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Affecter à :</label>
-              <select value={editToolForm.assignedTo} onChange={e => setEditToolForm({...editToolForm, assignedTo: e.target.value})} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold">
-                <option value="Dépôt Central">📦 Dépôt Central (Libre)</option>
-                {approvedUsers.map(u => <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.firstName} {u.name}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Statut :</label>
-              <select value={editToolForm.status} onChange={e => setEditToolForm({...editToolForm, status: e.target.value})} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold">
-                <option value="Disponible">🟢 Disponible</option>
-                <option value="En service">⚡ En service</option>
-                <option value="En révision">🛠️ En révision</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Photo (optionnel) :</label>
-              <input 
-                type="file" 
-                accept="image/*" 
-                onChange={(e) => {
-                  const file = e.target.files[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => setEditToolForm({...editToolForm, imageURL: reader.result});
-                    reader.readAsDataURL(file);
-                  }
-                }} 
-                className="w-full text-xs file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700" 
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setEditingTool(null)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl font-semibold">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-indigo-600 text-white text-xs rounded-xl font-bold">Enregistrer le transfert</button>
             </div>
           </form>
         </div>
@@ -3288,11 +3228,95 @@ export default function App() {
                 </div>
               )}
 
+              {/* SECTION GESTION DES NOTIFICATIONS PAR ONGLET PAR L'ADMIN */}
+              {isAdmin && (
+                <div className="pt-3 border-t border-slate-100 space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                    <Bell className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Activer les notifications par onglet :</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/70 text-xs">
+                    <label className="flex items-center gap-2 cursor-pointer font-medium">
+                      <input 
+                        type="checkbox" 
+                        checked={userModalData.notifTabs?.planning ?? true} 
+                        onChange={e => setUserModalData({
+                          ...userModalData, 
+                          notifTabs: {...userModalData.notifTabs, planning: e.target.checked}
+                        })} 
+                        className="rounded text-blue-600 w-4 h-4" 
+                      />
+                      <span>📅 Planning</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer font-medium">
+                      <input 
+                        type="checkbox" 
+                        checked={userModalData.notifTabs?.requests ?? true} 
+                        onChange={e => setUserModalData({
+                          ...userModalData, 
+                          notifTabs: {...userModalData.notifTabs, requests: e.target.checked}
+                        })} 
+                        className="rounded text-blue-600 w-4 h-4" 
+                      />
+                      <span>📦 Matériel</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer font-medium">
+                      <input 
+                        type="checkbox" 
+                        checked={userModalData.notifTabs?.reclamations ?? true} 
+                        onChange={e => setUserModalData({
+                          ...userModalData, 
+                          notifTabs: {...userModalData.notifTabs, reclamations: e.target.checked}
+                        })} 
+                        className="rounded text-blue-600 w-4 h-4" 
+                      />
+                      <span>⚠️ Réclamations</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer font-medium">
+                      <input 
+                        type="checkbox" 
+                        checked={userModalData.notifTabs?.workers ?? true} 
+                        onChange={e => setUserModalData({
+                          ...userModalData, 
+                          notifTabs: {...userModalData.notifTabs, workers: e.target.checked}
+                        })} 
+                        className="rounded text-blue-600 w-4 h-4" 
+                      />
+                      <span>👥 Effectifs</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer font-medium">
+                      <input 
+                        type="checkbox" 
+                        checked={userModalData.notifTabs?.tools ?? true} 
+                        onChange={e => setUserModalData({
+                          ...userModalData, 
+                          notifTabs: {...userModalData.notifTabs, tools: e.target.checked}
+                        })} 
+                        className="rounded text-blue-600 w-4 h-4" 
+                      />
+                      <span>🔧 Outillage</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer font-medium">
+                      <input 
+                        type="checkbox" 
+                        checked={userModalData.notifTabs?.pointage ?? true} 
+                        onChange={e => setUserModalData({
+                          ...userModalData, 
+                          notifTabs: {...userModalData.notifTabs, pointage: e.target.checked}
+                        })} 
+                        className="rounded text-blue-600 w-4 h-4" 
+                      />
+                      <span>⏱️ Pointage</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
               {isAdmin && (
                 <div className="pt-3 border-t border-slate-100 space-y-2">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
                     <Shield className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Autorisations d'accès aux onglets (Admin uniquement) :</span>
+                    <span>Autorisations d'accès aux onglets :</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/70 text-xs">
                     <label className="flex items-center gap-2 cursor-pointer font-medium">
@@ -3358,6 +3382,209 @@ export default function App() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {showApproveModal && userToApprove && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleConfirmApprove} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto dark:bg-white">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Approuver {userToApprove.firstName} {userToApprove.name}</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Définissez son rôle, ses accès et ses notifications par onglet.</p>
+            </div>
+            
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Rôle principal</label>
+              <select 
+                value={selectedRoleToAssign} 
+                onChange={e => setSelectedRoleToAssign(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none font-semibold mb-2"
+              >
+                <option value="Employé">👷‍♂️ Employé</option>
+                <option value="Intérimaire">⚡ Intérimaire</option>
+                <option value="Chef d’équipe">👑 Chef d’équipe</option>
+                <option value="Apprenti">📘 Apprenti</option>
+                <option value="Autre">✍️ Autre (Saisir un rôle personnalisé)</option>
+              </select>
+
+              {selectedRoleToAssign === 'Autre' && (
+                <input 
+                  type="text" 
+                  required
+                  value={customRoleInput} 
+                  onChange={e => setCustomRoleInput(e.target.value)}
+                  placeholder="Tapez le rôle personnalisé..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none font-semibold animate-fadeIn"
+                />
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 space-y-2">
+              <span className="text-xs font-bold text-slate-800 block">Activer les notifications par onglet :</span>
+              <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/70 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.notifTabs.planning} onChange={e => setApprovePermissions({...approvePermissions, notifTabs: {...approvePermissions.notifTabs, planning: e.target.checked}})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>📅 Planning</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.notifTabs.requests} onChange={e => setApprovePermissions({...approvePermissions, notifTabs: {...approvePermissions.notifTabs, requests: e.target.checked}})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>📦 Matériel</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.notifTabs.reclamations} onChange={e => setApprovePermissions({...approvePermissions, notifTabs: {...approvePermissions.notifTabs, reclamations: e.target.checked}})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>⚠️ Réclamations</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.notifTabs.workers} onChange={e => setApprovePermissions({...approvePermissions, notifTabs: {...approvePermissions.notifTabs, workers: e.target.checked}})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>👥 Effectifs</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.notifTabs.tools} onChange={e => setApprovePermissions({...approvePermissions, notifTabs: {...approvePermissions.notifTabs, tools: e.target.checked}})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>🔧 Outillage</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.notifTabs.pointage} onChange={e => setApprovePermissions({...approvePermissions, notifTabs: {...approvePermissions.notifTabs, pointage: e.target.checked}})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>⏱️ Pointage</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 space-y-2">
+              <span className="text-xs font-bold text-slate-800 block">Autorisations d'accès aux onglets :</span>
+              <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/70 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.canViewPlanning} onChange={e => setApprovePermissions({...approvePermissions, canViewPlanning: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>📅 Planning</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.canViewRequests} onChange={e => setApprovePermissions({...approvePermissions, canViewRequests: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>📦 Matériel</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.canViewReclamations} onChange={e => setApprovePermissions({...approvePermissions, canViewReclamations: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>⚠️ Réclamations (Voir)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.canViewWorkers} onChange={e => setApprovePermissions({...approvePermissions, canViewWorkers: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>👥 Effectifs</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.canViewTools} onChange={e => setApprovePermissions({...approvePermissions, canViewTools: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>🔧 Outillage</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input type="checkbox" checked={approvePermissions.canViewPointage} onChange={e => setApprovePermissions({...approvePermissions, canViewPointage: e.target.checked})} className="rounded text-blue-600 w-4 h-4" />
+                  <span>⏱️ Pointage</span>
+                </label>
+              </div>
+
+              <div className="bg-red-50/60 p-3 rounded-2xl border border-red-200/60 mt-2">
+                <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-red-900">
+                  <input type="checkbox" checked={approvePermissions.canAddReclamation} onChange={e => setApprovePermissions({...approvePermissions, canAddReclamation: e.target.checked})} className="rounded text-red-600 w-4 h-4" />
+                  <span>➕ Autoriser à créer des réclamations</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <button type="button" onClick={() => setShowApproveModal(false)} className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 font-bold rounded-xl transition-colors">Annuler</button>
+              <button type="submit" className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-xs text-white font-bold rounded-xl shadow-md transition-all">Valider l'accès</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {selectedTool && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white p-6 rounded-3xl w-full max-w-lg space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto dark:bg-white">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">{selectedTool.name}</h3>
+                <p className="text-xs text-slate-500">Marque : {selectedTool.brand || 'REMS'} | ID : {selectedTool.id}</p>
+              </div>
+              <button onClick={() => setSelectedTool(null)} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-xs font-bold">✕</button>
+            </div>
+
+            <div className="flex gap-2">
+              <input type="text" value={newNoteText} onChange={e => setNewNoteText(e.target.value)} placeholder="Ajouter une note ou remarque..." className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none" />
+              <button onClick={() => handleAddNote(selectedTool)} className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-sm">Ajouter</button>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Historique & Transferts</span>
+              {selectedTool.notes?.map(note => (
+                <div key={note.id} className="p-3 bg-slate-50 rounded-xl text-xs border border-slate-200/60 space-y-1">
+                  <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
+                    <span>Par : {note.author || 'Admin'}</span>
+                    <span>{note.date}</span>
+                  </div>
+                  <p className="text-slate-800 font-medium">{note.text}</p>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={() => setSelectedTool(null)} className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-colors">Fermer</button>
+          </div>
+        </div>
+      )}
+
+      {selectedToolImage && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white p-4 rounded-3xl max-w-lg w-full space-y-4 shadow-2xl relative dark:bg-white">
+            <button onClick={() => setSelectedToolImage(null)} className="absolute right-4 top-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-xs z-10">✕</button>
+            <h3 className="text-sm font-bold text-slate-900 px-2">Aperçu photo machine</h3>
+            <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 flex items-center justify-center max-h-[70vh]">
+              <img src={selectedToolImage} alt="Machine" className="w-full h-auto object-contain max-h-[70vh]" />
+            </div>
+            <button onClick={() => setSelectedToolImage(null)} className="w-full py-2.5 bg-slate-900 text-white font-bold text-xs rounded-xl">Fermer</button>
+          </div>
+        </div>
+      )}
+
+      {editingTool && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleSaveToolEdit} className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4 shadow-2xl dark:bg-white">
+            <h3 className="text-lg font-bold text-slate-900">Modifier / Réaffecter l'outil</h3>
+            
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Affecter à :</label>
+              <select value={editToolForm.assignedTo} onChange={e => setEditToolForm({...editToolForm, assignedTo: e.target.value})} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold">
+                <option value="Dépôt Central">📦 Dépôt Central (Libre)</option>
+                {approvedUsers.map(u => <option key={u.firestoreId} value={u.name}>👷‍♂️ {u.firstName} {u.name}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Statut :</label>
+              <select value={editToolForm.status} onChange={e => setEditToolForm({...editToolForm, status: e.target.value})} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold">
+                <option value="Disponible">🟢 Disponible</option>
+                <option value="En service">⚡ En service</option>
+                <option value="En révision">🛠️ En révision</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Photo (optionnel) :</label>
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => setEditToolForm({...editToolForm, imageURL: reader.result});
+                    reader.readAsDataURL(file);
+                  }
+                }} 
+                className="w-full text-xs file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700" 
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setEditingTool(null)} className="px-4 py-2 bg-slate-100 text-xs rounded-xl font-semibold">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-indigo-600 text-white text-xs rounded-xl font-bold">Enregistrer le transfert</button>
+            </div>
+          </form>
         </div>
       )}
 
@@ -3569,6 +3796,10 @@ export default function App() {
                 targetUserIds: selectedIds.map(Number),
                 targetName: names.join(', ')
               });
+            }
+
+            if (shouldSendNotification('planning')) {
+              console.log("🔔 Notification planning envoyée");
             }
 
             const targetDateObj = new Date(newPlanData.date);
